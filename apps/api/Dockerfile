@@ -1,7 +1,7 @@
 # Multi-stage: the runtime image carries no TypeScript, no source, no dev deps.
 
 # ---------- deps ----------
-FROM node:20-alpine AS deps
+FROM docker.io/library/node:20-alpine AS deps
 WORKDIR /app
 
 # Manifests only, so this layer is cached until a dependency actually changes.
@@ -11,7 +11,7 @@ COPY apps/api/package.json ./apps/api/
 RUN npm ci --workspace @commander/api --workspace @commander/shared --include-workspace-root
 
 # ---------- build ----------
-FROM node:20-alpine AS build
+FROM docker.io/library/node:20-alpine AS build
 WORKDIR /app
 
 # The whole deps stage, not individual node_modules paths: npm workspaces
@@ -32,7 +32,7 @@ RUN npx prisma generate --schema apps/api/prisma/schema.prisma \
 RUN npm prune --omit=dev
 
 # ---------- runtime ----------
-FROM node:20-alpine AS runtime
+FROM docker.io/library/node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 

@@ -20,7 +20,7 @@
 
 services:
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: docker.io/cloudflare/cloudflared:latest
     restart: unless-stopped
     depends_on:
       - web

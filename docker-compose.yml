@@ -5,7 +5,11 @@ name: commander
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # Fully qualified, here and in both Dockerfiles. Docker assumes Docker Hub
+    # for a bare `postgres:16-alpine`; Podman does not — it searches the
+    # registries the host configures, and on Fedora that means an interactive
+    # "please select an image" prompt that stalls an unattended deploy outright.
+    image: docker.io/library/postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}

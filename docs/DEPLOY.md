@@ -44,6 +44,7 @@ sh scripts/compose.sh ps            # أي أمر compose، بنفس الاخت�
 | **SELinux** (فيدورا/RHEL) | التركيب `./Caddyfile:/etc/caddy/Caddyfile:ro` في تراكب Caddy يحتاج `:ro,Z`. الـcompose الأساسي لا يركّب شيئاً من المضيف، فلا يتأثر |
 | **منفذ أقلّ من ١٠٢٤** | rootless لا يربطه. `WEB_PORT` الافتراضي ٨٠٨٠ فلا مشكلة — إلّا إن استعملت تراكب Caddy (٨٠ و٤٤٣) فيلزمه root أو `net.ipv4.ip_unprivileged_port_start` |
 | **معمارية الصورة** | صورةٌ بُنيت على arm64 لا تعمل على x86_64. **ابنِ على الخادم** (`npm run up` يبني)، أو ابنِ متعدّد المعمارية |
+| **أسماء الصور مؤهَّلة بالكامل** | `docker.io/library/postgres:16-alpine` لا `postgres:16-alpine`. دوكر يفترض Docker Hub صامتاً؛ بودمان يستشير `unqualified-search-registries` في المضيف — وفيدورا تضع ثلاثة، فيتوقّف ويسأل «أي صورة؟». على خادم بلا طرفية هذا تعليقٌ لا سؤال. يحرسه `tests/coverage/images.test.ts` |
 
 ### البقاء بعد الإقلاع
 

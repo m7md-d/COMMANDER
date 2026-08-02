@@ -62,6 +62,7 @@ npm run verify           # typecheck + lint + build + test  ← قبل ادّع�
 | `domain-tests.test.ts` | دالة مُصدَّرة من `domain/` لا يسمّيها اختبار |
 | `proposals.test.ts` | حالة مقترح غير معرَّفة، أو فهرسٌ يخالف الملف |
 | `tooling.test.ts` | سكربت npm يكتب محرّك حاويات حرفياً بدل `scripts/compose.sh` |
+| `images.test.ts` | صورة حاوية بلا اسم سجلّ — بودمان يسأل عنها، والنشر لا أحد عنده ليجيب |
 | `tracked.test.ts` | ملفّ مصدر يتجاهله git — أي لن يوجد في نسخة جديدة |
 
 `tracked.test.ts` مكتوب من عطل وقع فعلاً: `.gitignore` فيها `coverage/` مقصودةً لمخرجات
