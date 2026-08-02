@@ -1,0 +1,67 @@
+# Pinned so the project name never follows the directory name. Compose derives
+# it from the folder by default, which means renaming or moving the checkout
+# silently creates a *new* volume and an empty database.
+name: commander
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # The API waits on this rather than on the container merely existing;
+    # Postgres accepts connections several seconds after the process starts.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      API_PORT: 4000
+      PUBLIC_URL: ${PUBLIC_URL}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
+      DEFAULT_LOCALE: ${DEFAULT_LOCALE:-ar}
+      # Empty by default: enrichment is optional and the dossier degrades to
+      # "data unavailable" rather than failing when the App is not installed.
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+    # Migrations run on start, not in the image build: the database does not
+    # exist at build time, and a rebuilt image must be able to migrate forward.
+    command: >
+      sh -c "npx prisma migrate deploy --schema apps/api/prisma/schema.prisma &&
+             node apps/api/dist/main.js"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      # Only the web container is published; the API is reachable through its
+      # /api proxy, so Postgres and the API never touch the host network.
+      - "${WEB_PORT:-8080}:80"
+
+volumes:
+  postgres-data:

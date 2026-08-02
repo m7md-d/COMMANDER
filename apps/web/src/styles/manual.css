@@ -1,0 +1,152 @@
+/*
+ * THE FIELD MANUAL — an index rail and a punched sheet.
+ *
+ * The sheet reuses `.file-sheet`: a manual page and a front's file are the same
+ * physical object in this panel, and giving the manual its own paper would say
+ * they are different kinds of document when they are not.
+ *
+ * The rail is what the layout is for. A manual is not read from the top — it is
+ * scanned for the entry that matches the problem in front of you — so the five
+ * entries stay visible while the sheet scrolls, each carrying the question it
+ * answers rather than only its title.
+ */
+
+.manual {
+  display: grid;
+  grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.manual-index {
+  position: sticky;
+  inset-block-start: var(--space-4);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Entries divided by hairlines, not boxed: a column of ruled lines is read
+   downward, and five cards are read one at a time. */
+.manual-entry {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2);
+  color: inherit;
+  border-block-end: var(--border-width) solid var(--color-border);
+  transition: translate var(--transition-fast), border-color var(--transition-fast);
+}
+
+.manual-entry:hover,
+.manual-entry:focus-visible {
+  translate: calc(var(--space-1) * -1) 0;
+}
+
+.manual-entry[aria-current="page"] {
+  border-block-end-color: var(--color-accent);
+}
+
+.manual-serial {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.manual-entry[aria-current="page"] .manual-serial {
+  color: var(--color-accent-text);
+}
+
+.manual-entry-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-inline-size: 0;
+}
+
+.manual-entry-title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+}
+
+.manual-entry[aria-current="page"] .manual-entry-title {
+  font-weight: var(--weight-semibold);
+  color: var(--color-accent-text);
+}
+
+.manual-entry-blurb {
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--color-text-muted);
+}
+
+/* ---------- the sheet ---------- */
+
+.manual-sheet {
+  /* The manual has no tabs above it, so unlike a front's file it is a closed
+     sheet on all four edges. */
+  border-block-start: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.article {
+  padding-block-start: var(--space-6);
+}
+
+.article + .article {
+  margin-block-start: var(--space-2);
+  border-block-start: var(--border-width) solid var(--color-border);
+}
+
+.article-title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.01em;
+}
+
+.article-body {
+  margin-block-start: var(--space-2);
+  max-inline-size: 68ch;
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-muted);
+}
+
+/* ---------- fact tables ---------- */
+
+.facts {
+  inline-size: 100%;
+  margin-block-start: var(--space-4);
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.facts th,
+.facts td {
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  border: var(--border-width) solid var(--color-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.facts thead th {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.facts tbody th {
+  font-weight: var(--weight-medium);
+}
+
+@media (max-width: 60rem) {
+  .manual {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .manual-index {
+    position: static;
+  }
+}

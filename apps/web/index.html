@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- lang and dir are set at runtime by I18nProvider; these are the boot defaults. -->
+<html lang="ar" dir="rtl" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Commit Commander</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%96%3C/text%3E%3C/svg%3E"
+    />
+    <script>
+      /*
+       * Applies the stored theme before first paint. Without this the page
+       * renders dark, then flashes to light on hydration for light-mode users.
+       */
+      (function () {
+        try {
+          var stored = localStorage.getItem("commander.theme") || "dark";
+          var resolved =
+            stored === "system"
+              ? window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark"
+              : stored;
+          document.documentElement.dataset.theme = resolved;
+        } catch (e) {
+          document.documentElement.dataset.theme = "dark";
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

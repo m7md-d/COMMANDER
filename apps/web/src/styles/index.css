@@ -1,0 +1,39 @@
+/*
+ * The single stylesheet entry. Import order is significant: tokens must be
+ * defined before anything references them, and later layers build on earlier
+ * ones. main.tsx imports this file and nothing else — no component imports CSS.
+ *
+ * Each layer is a separate file to keep every one under the 200-line limit in
+ * CONSTITUTION.md §4.
+ */
+
+@import "./tokens.css"; /* raw palette, spacing, type, motion — the only literals */
+@import "./themes.css"; /* the semantic layer: dark and light */
+@import "./base.css"; /* reset and element defaults */
+@import "./layout.css"; /* shell, stacks, grids */
+@import "./components.css"; /* surfaces, page header, buttons */
+@import "./forms.css"; /* field, controls, toggle, stepper */
+@import "./select.css"; /* the custom select trigger and menu */
+@import "./patterns.css"; /* badge, chip, stat, table */
+@import "./shell.css"; /* command bar, feedback, code blocks, auth */
+@import "./overlays.css"; /* dialog, tooltip, skeleton, skip link */
+@import "./menu.css"; /* the anchored navigation menu */
+@import "./skeletons.css"; /* shaped placeholders, built from the real layouts */
+@import "./screens.css"; /* the CRT tube, glass and phosphor text */
+@import "./readouts.css"; /* the readout, tape and clock on the screens */
+@import "./console.css"; /* the headquarters and its console */
+@import "./dispatch.css"; /* the deliveries log as field message slips */
+@import "./models.css"; /* the model picker as a spokesperson roster */
+@import "./board.css"; /* the fronts as slots on a situation board */
+@import "./file.css"; /* a front as a folder: letterhead, index tabs, punched sheet */
+@import "./sheet.css"; /* what goes on a sheet: ruled sections and rule clauses */
+@import "./survey.css"; /* what reconnaissance found, as a standing readout */
+@import "./tree.css"; /* the project's files as a ruled plan, totals and all */
+@import "./ladder.css"; /* the calibration ladder: an ordered scale as a switch bank */
+@import "./calibration.css"; /* the standings key and the computed firing table */
+@import "./manual.css"; /* the field manual: index rail, articles, fact tables */
+@import "./roster.css"; /* the leaderboard and member rosters as service records */
+@import "./dossier.css"; /* the dossier roster listbox and risk meter */
+@import "./reviews.css"; /* per-commit code-review cards in the dossier */
+@import "./insignia.css"; /* the wordmark and the stencilled label */
+@import "./decor.css"; /* atmosphere: survey grid, vignette, wire, hatch */

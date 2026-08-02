@@ -1,0 +1,177 @@
+/* Application shell: navigation, feedback, code and auth surfaces.
+   Split out of patterns.css to satisfy CONSTITUTION.md §4. */
+
+/* ---------- the command bar ---------- */
+
+/*
+ * All that remains of the old navigation rail. It names where you are, gets you
+ * back to the board, and opens the menu — nothing else lives here, because
+ * anything that does becomes permanent furniture on every screen.
+ */
+.command-bar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-8);
+  background-color: var(--color-surface);
+  border-block-end: var(--border-width) solid var(--color-border);
+}
+
+.command-bar-brand {
+  color: inherit;
+  text-decoration: none;
+}
+
+.command-bar-brand:hover {
+  text-decoration: none;
+}
+
+.command-bar-brand:focus-visible {
+  outline: 0.125rem solid var(--color-accent);
+  outline-offset: 0.25rem;
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- back button ---------- */
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  flex: none;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.back-btn:hover {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+.back-icon {
+  inline-size: 1.1rem;
+  block-size: 1.1rem;
+  /* Points toward the start of the reading order in both directions, via the
+     project's --flip (1 in LTR, -1 in RTL) — no per-direction rule. */
+  transform: scaleX(var(--flip, 1));
+}
+
+@media (width <= 60rem) {
+  .command-bar {
+    padding-inline: var(--space-4);
+  }
+}
+
+/* ---------- feedback ---------- */
+
+.empty-state {
+  padding: var(--space-10) var(--space-4);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.empty-state-message {
+  margin: 0;
+}
+
+/* The way out of the dead end, set apart from the message. */
+.empty-state-action {
+  margin-block-start: var(--space-4);
+  display: flex;
+  justify-content: center;
+}
+
+.toast-region {
+  position: fixed;
+  inset-block-end: var(--space-5);
+  inset-inline-end: var(--space-5);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-inline-size: 22rem;
+}
+
+.toast {
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-surface-raised);
+  border: var(--border-width) solid var(--color-border);
+  border-inline-start: 0.1875rem solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm);
+}
+
+.toast-success {
+  border-inline-start-color: var(--color-success);
+}
+.toast-error {
+  border-inline-start-color: var(--color-danger);
+}
+
+.spinner {
+  inline-size: 1rem;
+  block-size: 1rem;
+  border: 0.125rem solid var(--color-border-strong);
+  border-block-start-color: var(--color-accent);
+  border-radius: var(--radius-full);
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- code / report blocks ---------- */
+
+.code-block {
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre;
+  overflow-x: auto;
+  direction: ltr;
+  text-align: start;
+}
+
+.report-block {
+  padding: var(--space-4);
+  background-color: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-inline-start: 0.1875rem solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+  line-height: var(--leading-relaxed);
+}
+
+/* ---------- login ---------- */
+
+.auth-screen {
+  min-block-size: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+}
+
+.auth-card {
+  inline-size: min(23rem, 100%);
+  padding: var(--space-8);
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}

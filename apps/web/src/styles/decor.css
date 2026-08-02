@@ -1,0 +1,100 @@
+/*
+ * THE ATMOSPHERE LAYER.
+ *
+ * Everything here is chrome: texture and edges. None of it carries information,
+ * all of it is `aria-hidden` at the markup level, and none of it may ever be the
+ * only signal for a state.
+ *
+ * The rule that keeps this from turning cartoonish is contrast discipline, and
+ * the first attempt broke it in two places worth recording:
+ *
+ *   - The grid was drawn in --color-border, the same value real borders use, so
+ *     the background competed with the content sitting on it. It now has its own
+ *     --color-grid token pinned below the threshold of notice.
+ *   - The sandbag course was a row of flat ellipses, which at that size read as
+ *     a magazine of rounds rather than a revetment. It is gone. A motif that
+ *     needs explaining is a motif that failed, and the honest fix for a failed
+ *     texture is deletion, not adjustment.
+ *
+ * Weight comes from structure — hard edges, deliberate spacing, stencilled
+ * labels — not from decoration shouting.
+ */
+
+/* ---------- the ground: survey grid ---------- */
+
+/*
+ * A surveyed sheet under the panel, so content sits *on* something rather than
+ * floating on a flat fill. Two scales: the coarse one carries the structure,
+ * the fine one is texture. Both are below --color-border by design.
+ */
+.app-shell {
+  background-image:
+    linear-gradient(to right, var(--color-grid-strong) 0.0625rem, transparent 0.0625rem),
+    linear-gradient(to bottom, var(--color-grid-strong) 0.0625rem, transparent 0.0625rem),
+    linear-gradient(to right, var(--color-grid) 0.0625rem, transparent 0.0625rem),
+    linear-gradient(to bottom, var(--color-grid) 0.0625rem, transparent 0.0625rem);
+  background-size: 8rem 8rem, 8rem 8rem, 2rem 2rem, 2rem 2rem;
+  background-position: center;
+}
+
+/* ---------- vignette ---------- */
+
+/*
+ * The light source is overhead and the corners fall away. This is what makes a
+ * dark interface read as a *room* rather than as a dark rectangle, and it is
+ * the single cheapest way to buy the atmosphere the panel is after.
+ */
+.app-main {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-main::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 120% 90% at 50% 0%,
+    transparent 40%,
+    var(--color-scrim) 160%
+  );
+  opacity: 0.5;
+}
+
+/* ---------- hazard hatch ---------- */
+
+/* Diagonal caution stripes. Reserved for the edge of anything destructive or
+   unsaved — the one motif allowed to use a status colour. */
+.hatch-edge {
+  border-block-start: 0.1875rem solid transparent;
+  border-image: repeating-linear-gradient(45deg, var(--color-accent) 0 0.375rem, transparent 0.375rem 0.75rem) 3;
+}
+
+.hatch-danger {
+  border-image: repeating-linear-gradient(45deg, var(--color-danger) 0 0.375rem, transparent 0.375rem 0.75rem) 3;
+}
+
+/* ---------- wire ---------- */
+
+/*
+ * Barbed wire, second attempt. The first was a repeating gradient, which can
+ * only produce parallel strokes — so it rendered as a dashed line, because that
+ * is all a gradient can be.
+ *
+ * A barb is an X crossing the strand, and an X needs two strokes at opposing
+ * angles meeting at a point. That is a shape, not a fill, so it is drawn as an
+ * inline SVG. `stroke` is a literal here for the same reason a data URI cannot
+ * read a custom property: the mask below is what applies the themed colour, so
+ * the colour inside the SVG is only a stencil and never reaches the screen.
+ */
+.wire {
+  block-size: var(--space-5);
+  background-color: var(--color-border-strong);
+  opacity: 0.7;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='20' viewBox='0 0 56 20'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.4'%3E%3Cpath d='M0 10h56'/%3E%3Cpath d='M22 4l12 12M34 4L22 16'/%3E%3C/g%3E%3C/svg%3E");
+  mask-repeat: repeat-x;
+  mask-size: 3.5rem 100%;
+  mask-position: center;
+}

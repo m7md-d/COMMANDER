@@ -1,0 +1,118 @@
+/*
+ * THE SEMANTIC LAYER — the only place a theme is decided.
+ *
+ * Split from tokens.css so the two halves stay honestly separate: that file
+ * holds raw values and scales, this one holds *meaning*, remapped per theme.
+ * A component never reads either directly by name — it reads --color-*, and
+ * gets both themes for free (apps/web/CONSTITUTION.md §2).
+ */
+
+/* ================= SEMANTIC LAYER — dark (default) ================= */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: var(--palette-olive-900);
+  --color-surface: var(--palette-olive-850);
+  --color-surface-raised: var(--palette-olive-800);
+  --color-surface-sunken: var(--palette-olive-900);
+  --color-border: var(--palette-olive-750);
+  --color-border-strong: var(--palette-olive-700);
+
+  --color-text: #e9ece0;
+  --color-text-muted: var(--palette-olive-300);
+  --color-text-inverted: var(--palette-olive-900);
+
+  --color-accent: var(--palette-khaki-500);
+  --color-accent-hover: var(--palette-khaki-400);
+  --color-accent-text: var(--palette-khaki-400);
+  --color-accent-soft: rgb(191 149 90 / 16%);
+  --color-on-accent: var(--palette-olive-900);
+
+  --color-success: var(--palette-green-400);
+  --color-success-soft: rgb(134 201 92 / 14%);
+  --color-danger: var(--palette-red-400);
+  --color-danger-soft: rgb(212 115 95 / 14%);
+  --color-info: var(--palette-blue-400);
+  --color-info-soft: rgb(132 166 187 / 14%);
+
+  --color-focus-ring: rgb(191 149 90 / 45%);
+  /* The survey grid gets its own token because it is the one line in the panel
+     that must sit *below* the threshold of notice. Reusing --color-border made
+     it as loud as a real border, which is exactly what a background must not be. */
+  --color-grid: rgb(155 163 136 / 4.5%);
+  --color-grid-strong: rgb(155 163 136 / 7%);
+  /* Scrims sit under floating layers; tuned per theme so the page behind them
+     dims rather than disappears. */
+  --color-scrim: rgb(6 8 5 / 62%);
+  /* A wash with no primitive of its own: the highlight along a lit top edge.
+     Defined here because this is the identity layer; read as a token elsewhere. */
+  --color-edge-highlight: rgb(255 255 255 / 5%);
+
+  --shadow-sm: 0 0.0625rem 0.125rem rgb(0 0 0 / 40%);
+  --shadow-md: 0 0.25rem 1rem rgb(0 0 0 / 45%);
+  --shadow-lg: 0 0.75rem 2.5rem rgb(0 0 0 / 55%);
+}
+
+/* ================= SEMANTIC LAYER — light ================= */
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --color-bg: var(--palette-olive-50);
+  --color-surface: var(--palette-olive-0);
+  --color-surface-raised: var(--palette-olive-0);
+  --color-surface-sunken: var(--palette-olive-25);
+  --color-border: var(--palette-olive-150);
+  --color-border-strong: var(--palette-olive-200);
+
+  --color-text: #151810;
+  --color-text-muted: var(--palette-olive-500);
+  --color-text-inverted: var(--palette-olive-0);
+
+  /* Khaki at full brightness fails contrast on white, so light mode uses the
+     darker steps for anything carrying text. */
+  --color-accent: var(--palette-khaki-600);
+  --color-accent-hover: var(--palette-khaki-700);
+  --color-accent-text: var(--palette-khaki-700);
+  --color-accent-soft: rgb(153 115 64 / 12%);
+  --color-on-accent: var(--palette-olive-0);
+
+  --color-success: var(--palette-green-700);
+  --color-success-soft: rgb(99 168 63 / 14%);
+  --color-danger: var(--palette-red-700);
+  --color-danger-soft: rgb(179 70 48 / 10%);
+  --color-info: var(--palette-blue-700);
+  --color-info-soft: rgb(81 127 153 / 14%);
+
+  --color-focus-ring: rgb(153 115 64 / 35%);
+  --color-grid: rgb(70 78 61 / 5%);
+  --color-grid-strong: rgb(70 78 61 / 8%);
+  --color-scrim: rgb(21 24 16 / 40%);
+  --color-edge-highlight: rgb(255 255 255 / 45%);
+
+  --shadow-sm: 0 0.0625rem 0.125rem rgb(21 24 16 / 6%);
+  --shadow-md: 0 0.25rem 1rem rgb(21 24 16 / 8%);
+  --shadow-lg: 0 0.75rem 2.5rem rgb(21 24 16 / 14%);
+}
+
+/* ================= THE SITUATION SCREENS — theme-independent =================
+ *
+ * A CRT is a CRT whatever the room lighting: a dark tube with a phosphor glow,
+ * not a surface that inverts. So these are defined once, at :root, and neither
+ * theme remaps them — the screens read the same on a bright desk and a dark one.
+ */
+:root {
+  --color-screen-bg: var(--palette-screen);
+  --color-screen-text: var(--palette-phosphor);
+  --color-screen-bright: var(--palette-phosphor-bright);
+  --color-screen-dim: rgb(95 200 120 / 45%);
+  --color-screen-line: rgb(95 200 120 / 9%);
+  --color-screen-glow: rgb(95 200 120 / 22%);
+  --color-screen-edge: rgb(95 200 120 / 32%);
+  /* The tube's own darkness: the bezel it is sunk into, and the vignette at its
+     corners. Theme-independent for the same reason the phosphor is. */
+  --color-screen-well: rgb(0 0 0 / 55%);
+  --color-screen-vignette: rgb(0 0 0 / 45%);
+}

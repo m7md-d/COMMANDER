@@ -1,0 +1,163 @@
+/*
+ * THE SITUATION BOARD — the fronts, as slots on a status board.
+ *
+ * Deliberately not a card grid. A grid of equal tiles says "these are things";
+ * a board of stacked slots divided by hairlines says "these are positions under
+ * watch", and lets the eye run down one column of designations instead of
+ * hunting a name inside each tile.
+ *
+ * Every slot is the same three-zone rank: lamp and serial, then subject and its
+ * particulars, then the figures. Because the zones never move, scanning the
+ * board is one vertical sweep — which is the entire reason it is not a grid.
+ */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.board-slot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background-color: var(--color-surface);
+  color: inherit;
+  text-align: start;
+  transition:
+    background-color var(--transition-fast),
+    translate var(--transition-fast);
+}
+
+.board-slot + .board-slot {
+  border-block-start: var(--border-width) solid var(--color-border);
+}
+
+/* Displacement toward the reading edge, not a fill — the same hover grammar as
+   the command menu and the file tabs. */
+.board-slot:hover,
+.board-slot:focus-visible {
+  background-color: var(--color-surface-raised);
+  translate: calc(var(--space-1) * -1) 0;
+}
+
+/* ---------- zone 1: lamp and serial ---------- */
+
+.board-mark {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Same lamp as the console keys: state is read as a light, never as a colour
+   alone — the word beside the subject carries it too. */
+.board-lamp {
+  flex: none;
+  inline-size: 0.625rem;
+  block-size: 0.625rem;
+  border-radius: var(--radius-full);
+  background-color: var(--color-border-strong);
+  transition:
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.board-lamp-live {
+  background-color: var(--color-success);
+  box-shadow: 0 0 0.5rem var(--color-success);
+}
+
+.board-serial {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- zone 2: subject ---------- */
+
+.board-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.board-subject {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+/* The particulars line: stage, watchers, roster — separated by a hairline dot
+   so it reads as one caption rather than three loose chips. */
+.board-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+}
+
+.board-tags > span + span::before {
+  content: "·";
+  margin-inline-end: var(--space-2);
+}
+
+/* ---------- zone 3: figures ---------- */
+
+.board-figures {
+  display: flex;
+  gap: var(--space-5);
+  margin: 0;
+}
+
+.board-figures > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.board-figures dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.board-figures dd {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Below the fold of a phone the figures drop under the subject rather than
+ * squeezing the name to nothing. The lamp column stays — it is the one thing
+ * that must survive every width.
+ */
+@media (max-width: 44rem) {
+  .board-slot {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .board-figures {
+    grid-column: 2;
+    justify-content: start;
+    padding-block-start: var(--space-2);
+    border-block-start: var(--border-width) solid var(--color-border);
+  }
+
+  .board-figures > div {
+    align-items: start;
+  }
+}

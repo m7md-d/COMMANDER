@@ -1,0 +1,20 @@
+{
+  /*
+   * Type-checks the test files that tsconfig.json must exclude.
+   *
+   * The build config cannot include them — `tsc -p tsconfig.json` emits to
+   * dist/ and a shipped image has no business carrying test code. But excluding
+   * them from the build also excluded them from `npm run typecheck`, which meant
+   * seven test files were never type-checked at all: prompt-builder.test.ts once
+   * shipped a fixture missing a required field and only crashed at runtime, on a
+   * mistake the compiler had every fact needed to catch.
+   *
+   * So: same settings, tests included, nothing emitted. Added 2026-07-27.
+   */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

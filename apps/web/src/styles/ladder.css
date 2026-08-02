@@ -1,0 +1,124 @@
+/*
+ * THE CALIBRATION LADDER — an ordered scale you sit on one notch of.
+ *
+ * Drawn as a bank of switch positions rather than a row of buttons: the rungs
+ * are joined into one strip with hairlines between them, and the chosen rung is
+ * marked by a lit notch on its top edge, not by a filled background. A fill
+ * would read as "pressed"; a notch reads as "this is where the switch is".
+ *
+ * The radio itself is removed from the flow but not from the accessibility tree
+ * (never `display: none`), so the group keeps arrow-key traversal and the label
+ * association it gets natively.
+ */
+
+.ladder {
+  border: none;
+  padding: 0;
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.ladder-rungs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  margin-block-start: var(--space-2);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.ladder-rung {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  background-color: var(--color-surface-sunken);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.ladder-rung + .ladder-rung {
+  border-inline-start: var(--border-width) solid var(--color-border);
+}
+
+.ladder-rung:hover {
+  background-color: var(--color-surface-raised);
+}
+
+/* Kept in the tree, out of the layout. Focus is shown on the rung instead. */
+.ladder-input {
+  position: absolute;
+  inline-size: 0.0625rem;
+  block-size: 0.0625rem;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ladder-input:focus-visible ~ .ladder-label {
+  outline: 0.125rem solid var(--color-focus-ring);
+  outline-offset: 0.125rem;
+}
+
+/* The lit notch: the switch position marker. Off rungs keep the notch as a dark
+   groove, so the strip reads as a bank of positions even before you look at the
+   words. */
+.ladder-notch {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 35%;
+  block-size: 0.1875rem;
+  background-color: var(--color-border-strong);
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ladder-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+}
+
+.ladder-note {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: var(--leading-tight);
+}
+
+.ladder-input:checked ~ .ladder-notch {
+  background-color: var(--color-accent);
+  box-shadow: 0 0 0.5rem var(--color-accent);
+}
+
+.ladder-input:checked ~ .ladder-label {
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+}
+
+.ladder-rung:has(.ladder-input:checked) {
+  background-color: var(--color-surface);
+}
+
+/* Four rungs of Arabic will not fit side by side on a phone; the strip becomes
+   a column and the hairline moves to the block edge with it. */
+@media (max-width: 44rem) {
+  .ladder-rungs {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+  }
+
+  .ladder-rung + .ladder-rung {
+    border-inline-start: none;
+    border-block-start: var(--border-width) solid var(--color-border);
+  }
+
+  /* The marker moves from the top edge to the reading edge — still logical, so
+     it lands on the right in Arabic without a direction rule. */
+  .ladder-notch {
+    inset-block: 0;
+    inset-inline-start: 0;
+    inset-inline-end: auto;
+    inline-size: 0.1875rem;
+    block-size: auto;
+  }
+}

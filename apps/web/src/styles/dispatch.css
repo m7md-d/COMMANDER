@@ -1,0 +1,157 @@
+/*
+ * Dispatch slips — the deliveries log as field messages, not a table.
+ *
+ * The object is a stamped message form. Readability drives the layout: the
+ * front (repository) is the largest line, the axis (branch) sits under it, each
+ * behind a stencilled tag, so the eye finds *where* before *what*. The stamp is
+ * the load-bearing motif — inked, never solid, rotated a touch, letter-spaced.
+ */
+
+/* ---------- filter bar ---------- */
+
+.filter-bar {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  margin-block-end: var(--space-5);
+  padding: var(--space-4);
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- grid ---------- */
+
+.dispatch-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+}
+
+.dispatch-grid-compact {
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+}
+
+/* ---------- the slip ---------- */
+
+.dispatch {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  border-inline-start: 0.1875rem solid var(--dispatch-tone, var(--color-border-strong));
+}
+
+.dispatch-compact {
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+
+/* Outcome → spine and stamp colour, in one place so the slip and its stamp can
+   never disagree about what "failed" looks like. */
+.dispatch-sent {
+  --dispatch-tone: var(--color-success);
+}
+.dispatch-failed {
+  --dispatch-tone: var(--color-danger);
+}
+.dispatch-pending {
+  --dispatch-tone: var(--color-accent);
+}
+.dispatch-processing {
+  --dispatch-tone: var(--color-info);
+}
+.dispatch-skipped {
+  --dispatch-tone: var(--color-text-muted);
+}
+
+.dispatch-hazard {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  block-size: 0.1875rem;
+}
+
+.dispatch-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.dispatch-stamp {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border: 0.125rem solid var(--dispatch-tone);
+  border-radius: var(--radius-sm);
+  color: var(--dispatch-tone);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  /* Inked, not filled: a stamp is pressed, so it sits slightly askew and never
+     at full strength. */
+  opacity: 0.85;
+  rotate: -2.5deg;
+}
+
+.dispatch-time {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- front / axis, the readable core ---------- */
+
+.dispatch-tag {
+  display: block;
+  margin-block-end: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.dispatch-front {
+  display: block;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.dispatch-compact .dispatch-front {
+  font-size: var(--text-base);
+}
+
+.dispatch-axis {
+  display: block;
+  color: var(--color-accent-text);
+  word-break: break-word;
+}
+
+.dispatch-reason {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.dispatch-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width) solid var(--color-border);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.dispatch-actor {
+  color: var(--color-text);
+}

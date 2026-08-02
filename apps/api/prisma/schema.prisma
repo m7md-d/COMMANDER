@@ -1,0 +1,510 @@
+// Single source of truth for data shape (CONSTITUTION.md §1).
+// Change here first, then `npm run prisma:dev -w @commander/api -- --name <what>`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Repository {
+  id                   String   @id @default(cuid())
+  fullName             String   @unique @map("full_name")
+  enabled              Boolean  @default(true)
+  /// Empty array means every branch. A trailing * is the only wildcard.
+  branches             String[] @default([])
+  discordWebhookUrl    String   @default("") @map("discord_webhook_url")
+  /// Empty means fall back to the global default model.
+  model                String   @default("")
+  silentWhenClean      Boolean  @default(false) @map("silent_when_clean")
+  /// One line describing what the project is, injected into the report prompt so
+  /// the model judges this project rather than a generic repository.
+  projectBrief         String   @default("") @map("project_brief")
+  /// Lifecycle stage (see ProjectStage). Decides what the model treats as
+  /// expected work — scaffolding is the job during bootstrap, a red flag when frozen.
+  projectStage         String   @default("active") @map("project_stage")
+  /// GitHub App installation that grants API access to this repository.
+  /// Empty means dossier enrichment falls back to webhook-only data.
+  githubInstallationId String   @default("") @map("github_installation_id")
+  /// When reconnaissance last completed. Null means never scanned — which the
+  /// panel must be able to say, because "no areas found" and "never looked" are
+  /// different facts and only one of them is the operator's problem.
+  lastScannedAt        DateTime? @map("last_scanned_at")
+
+  /// A shared check template this front inherits, or null for the shipped
+  /// defaults. Nulled rather than cascaded on delete: losing a template must
+  /// loosen a front back to defaults, never delete the front.
+  checkTemplateId String?        @map("check_template_id")
+  checkTemplate   CheckTemplate? @relation(fields: [checkTemplateId], references: [id], onDelete: SetNull)
+
+  /// This front's own overrides, layered over the template field by field.
+  /// JSON for the same reason as rules — the shape varies by metric.
+  checks Json @default("{}")
+
+  /// The git tree sha the stored file rows were built from. Storing the input
+  /// beside the result is what lets a later finding be re-derived and proved
+  /// rather than merely asserted.
+  treeSha       String    @default("") @map("tree_sha")
+  treeSyncedAt  DateTime? @map("tree_synced_at")
+  /// GitHub capped the tree listing. The snapshot is a floor, not a total, and
+  /// no amount of retrying changes that — so it is recorded, not hidden.
+  treeTruncated Boolean   @default(false) @map("tree_truncated")
+
+  /// Rule config is a per-repository document with a shape that varies by rule,
+  /// so it is stored as JSON and validated by zod rather than modelled as
+  /// eight nullable columns.
+  rules Json
+
+  /// Ordered per-branch watchers (see Watcher): first matching pattern wins and
+  /// sets the branch's gravity, prompt and model. JSON for the same reason as
+  /// rules — the shape is a list that grows, not a fixed set of columns.
+  watchers Json @default("[]")
+
+  /// When the periodic reports go out, keyed by report kind (see ScheduleConfig).
+  /// An empty object means the shipped default — Monday at 09:00 local — which is
+  /// what every front had implicitly before this column existed.
+  schedules Json @default("{}")
+
+  promptId String? @map("prompt_id")
+  prompt   Prompt? @relation(fields: [promptId], references: [id], onDelete: SetNull)
+
+  members    Member[]
+  stats      MemberStat[]
+  deliveries Delivery[]
+  treeFiles  TreeFile[]
+
+  ledgerEvents     LedgerEvent[]
+  commitRecords    CommitRecord[]
+  fileAttributions FileAttribution[]
+  repoDocuments    RepoDocument[]
+  dossiers         MemberDossier[]
+  dossierNotes     DossierNote[]
+  reportSchedules  ReportSchedule[]
+  todoMarkers      TodoMarker[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("repositories")
+}
+
+model Member {
+  id           String     @id @default(cuid())
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  login       String
+  displayName String @default("") @map("display_name")
+  /// GitHub avatar, filled by the repository scan. Empty until then — the panel
+  /// falls back to initials rather than showing a broken image.
+  avatarUrl   String @default("") @map("avatar_url")
+  rank        String @default("")
+  /// Free-text context handed to the model. Sanitized before it reaches a prompt.
+  note        String @default("")
+
+  @@unique([repositoryId, login])
+  @@map("members")
+}
+
+/// Counters live apart from Member because stats accrue for any pushing login,
+/// including people never registered in the panel.
+model MemberStat {
+  id           String     @id @default(cuid())
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  login           String
+  totalCommits    Int    @default(0) @map("total_commits")
+  totalPushes     Int    @default(0) @map("total_pushes")
+  /// { ruleId: count }
+  violationCounts Json   @default("{}") @map("violation_counts")
+
+  firstSeenAt DateTime? @map("first_seen_at")
+  lastSeenAt  DateTime? @map("last_seen_at")
+
+  @@unique([repositoryId, login])
+  @@index([repositoryId, totalCommits])
+  @@map("member_stats")
+}
+
+model Prompt {
+  id        String  @id @default(cuid())
+  name      String
+  system    String
+  user      String
+  /// Exactly one row carries this. Deleting it is blocked by the service.
+  isDefault Boolean @default(false) @map("is_default")
+
+  repositories Repository[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("prompts")
+}
+
+/// Global settings as one row. `id` is pinned so there can only ever be one.
+model Setting {
+  id        String   @id @default("singleton")
+  data      Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+enum DeliveryStatus {
+  pending
+  processing
+  sent
+  failed
+  skipped
+
+  @@map("delivery_status")
+}
+
+/// The outbox. The webhook writes a row and returns 202; the worker claims and
+/// processes it. Nothing is lost to a transient LLM or Discord failure.
+model Delivery {
+  id String @id @default(cuid())
+
+  repositoryId       String?     @map("repository_id")
+  repository         Repository? @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
+  /// Denormalized so the log still reads correctly after a repository is deleted.
+  repositoryFullName String      @map("repository_full_name")
+
+  branch         String @default("")
+  actorLogin     String @default("") @map("actor_login")
+  commitCount    Int    @default(0) @map("commit_count")
+  violationCount Int    @default(0) @map("violation_count")
+
+  status       DeliveryStatus @default(pending)
+  reason       String         @default("ok")
+  /// Values interpolated into the localized reason, e.g. { status: 429 }.
+  reasonDetail Json           @default("{}") @map("reason_detail")
+
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime? @map("next_attempt_at")
+  /// Set when a worker claims the row; used to reclaim rows from a crashed worker.
+  lockedAt      DateTime? @map("locked_at")
+
+  /// The normalized push, kept so a retry needs no help from GitHub.
+  payload Json
+
+  reportText   String? @map("report_text")
+  model        String?
+  errorMessage String? @map("error_message")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+  /// Null while active; set when moved to the archive shelf so the main list
+  /// can hide it without deleting it. Retention (outbox.prune) still applies.
+  archivedAt  DateTime? @map("archived_at")
+
+  @@index([status, nextAttemptAt])
+  @@index([repositoryId, createdAt])
+  @@index([createdAt])
+  /// The active/archived scope filter reads this alongside the sort key.
+  @@index([archivedAt, createdAt])
+  @@map("deliveries")
+}
+
+/// ─────────────────────────────────────────────────────────────────────────
+/// Dossier system
+/// ─────────────────────────────────────────────────────────────────────────
+
+/// One row per thing a member did, not a counter.
+/// Decay is a function of *when* something happened, so an aggregate count
+/// (as MemberStat keeps) can never be decayed or discounted. This table is the
+/// evidence ledger every score is recomputed from.
+///
+/// Named for the ledger rather than for violations because a record that can
+/// only hold accusations produces a system that can only accuse: improvement is
+/// measured here too (a file brought back under its limit), and it belongs in
+/// the same append-only record, on the same timeline, with the same evidence.
+/// `kind` is what keeps the two apart — see LedgerKind.
+model LedgerEvent {
+  id           String     @id @default(cuid())
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  /// "violation" | "commendation". Defaulted rather than required so the rows
+  /// written before this column existed keep the meaning they were written with.
+  kind String @default("violation")
+
+  /// The rule or metric the entry cites — the same id in both kinds, because
+  /// crossing `file_lines` and coming back under it are one measurement read
+  /// twice, not two subjects.
+  login      String
+  ruleId     String   @map("rule_id")
+  occurredAt DateTime @map("occurred_at")
+  detail     Json     @default("{}")
+  deliveryId String?  @map("delivery_id")
+
+  @@index([repositoryId, kind, login, occurredAt])
+  @@index([repositoryId, kind, occurredAt])
+  @@map("ledger_events")
+}
+
+/// Per-commit facts. `enriched` marks whether GitHub's API has been asked for
+/// line counts — the push webhook carries file paths only, never diffs.
+model CommitRecord {
+  id           String     @id @default(cuid())
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  sha         String
+  login       String
+  title       String
+  committedAt DateTime @map("committed_at")
+
+  filesChanged Int     @default(0) @map("files_changed")
+  additions    Int     @default(0)
+  deletions    Int     @default(0)
+  enriched     Boolean @default(false)
+
+  /// LLM code review of the diff — { verdict, remark, findings }, validated by
+  /// zod on read (commitReviewSchema). Null until the review pass runs, which
+  /// needs the App (for the diff) and OpenRouter (for the judgement).
+  review      Json?
+  reviewModel String?   @map("review_model")
+  reviewedAt  DateTime? @map("reviewed_at")
+
+  @@unique([repositoryId, sha])
+  @@index([repositoryId, login, committedAt])
+  @@map("commit_records")
+}
+
+/// Line-level ownership per member per path, accumulated from enriched commits.
+/// This is what answers "who touched this file, and how much".
+model FileAttribution {
+  id           String     @id @default(cuid())
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  login         String
+  path          String
+  linesAdded    Int      @default(0) @map("lines_added")
+  linesRemoved  Int      @default(0) @map("lines_removed")
+  commitCount   Int      @default(0) @map("commit_count")
+  lastTouchedAt DateTime @map("last_touched_at")
+
+  @@unique([repositoryId, login, path])
+  @@index([repositoryId, login, linesAdded])
+  @@map("file_attributions")
+}
+
+/// Cached repository document (the watched repo's own CONSTITUTION.md, etc.)
+/// so the dossier can quote the project's rules instead of inventing them.
+/// `sha` is GitHub's blob sha — a mismatch is the cache invalidation signal.
+model RepoDocument {
+  id           String     @id @default(cuid())
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  path      String
+  sha       String
+  content   String
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  @@unique([repositoryId, path])
+  @@map("repo_documents")
+}
+
+/// Computed standing plus the LLM narrative. The narrative is regenerated only
+/// when `factsFingerprint` changes, which keeps the prose tied to the numbers
+/// and keeps the model off the hot path of every push.
+model MemberDossier {
+  id           String     @id @default(cuid())
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  login String
+
+  riskScore       Float  @default(0) @map("risk_score")
+  toleranceTier   String @default("exemplary") @map("tolerance_tier")
+  cleanStreakDays Float  @default(0) @map("clean_streak_days")
+  anomalyCount    Int    @default(0) @map("anomaly_count")
+  /// Decayed contribution per rule, for the panel's breakdown.
+  scoreByRule     Json   @default("{}") @map("score_by_rule")
+
+  narrative            String?   @map("narrative")
+  narrativeFingerprint String?   @map("narrative_fingerprint")
+  narrativeUpdatedAt   DateTime? @map("narrative_updated_at")
+
+  computedAt DateTime @default(now()) @map("computed_at")
+
+  @@unique([repositoryId, login])
+  @@index([repositoryId, riskScore])
+  @@map("member_dossiers")
+}
+
+/// Observations attached to a member. `expiresAt` exists so a note can be a
+/// temporary flag rather than a permanent mark — the same anti-rot principle
+/// the score follows.
+model DossierNote {
+  id           String     @id @default(cuid())
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  login     String
+  body      String
+  /// manual = written by the operator, auto = raised by the system.
+  kind      String    @default("manual")
+  createdAt DateTime  @default(now()) @map("created_at")
+  expiresAt DateTime? @map("expires_at")
+
+  @@index([repositoryId, login, createdAt])
+  @@map("dossier_notes")
+}
+
+/// Measurement of one blob, addressed by content rather than by location.
+///
+/// The key is GitHub's blob sha, which is a hash of the content — so the same
+/// file under a new name is the same row, a revert lands back on a row we
+/// already have, and two repositories sharing a vendored file share its
+/// measurement. That makes the cost of measuring linear in *change*, not in
+/// project size, which is the only shape that stays affordable.
+///
+/// Deliberately not tied to a repository: content has no owner.
+model BlobMetric {
+  sha   String @id
+  bytes Int
+
+  /// Null means not measured — never zero as a stand-in. All three are read in
+  /// one pass over the same bytes, so `measuredAt` covers the set; a single one
+  /// staying null means that measurement could not be taken honestly, not that
+  /// the blob was never read.
+  lines         Int?
+  functionLines Int? @map("function_lines")
+  nestingDepth  Int? @map("nesting_depth")
+  braceDepth    Int? @map("brace_depth")
+  longestLine   Int? @map("longest_line")
+  measuredAt  DateTime? @map("measured_at")
+
+  /// The TODO/FIXME notes in this content (see Marker). Null means never scanned
+  /// for them, which is a different fact from an empty list — scanned and none
+  /// found. Content-addressed like every other measurement here, so a note is
+  /// read once however many projects carry the same file.
+  markers   Json?     @map("markers")
+  markersAt DateTime? @map("markers_at")
+
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+
+  files TreeFile[]
+
+  @@map("blob_metrics")
+}
+
+/// A note a developer left in this repository's code, and how long it has been
+/// there.
+///
+/// Separate from `blob_metrics.markers` because the two answer different
+/// questions. That column says what is in a piece of content; this table says
+/// what is in *this project* and since when — and "since when" cannot live on a
+/// content hash, because editing the line above a note changes the hash without
+/// changing the note.
+///
+/// `first_seen_at` is the same kind of anchor as `tree_files.first_seen_at`, and
+/// carries the same warning: it means "since we started watching", not "since it
+/// was written". The report says so rather than implying an age it cannot know.
+model TodoMarker {
+  id           String     @id @default(cuid())
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  /// Path plus normalized text (see markerFingerprint). Not the line number: a
+  /// note that moves down twenty lines is the same note.
+  fingerprint String
+  path        String
+  kind        String
+  line        Int
+  text        String
+
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+
+  @@unique([repositoryId, fingerprint])
+  @@index([repositoryId, firstSeenAt])
+  @@map("todo_markers")
+}
+
+/// One file in a repository's stored tree snapshot: where the content is, and
+/// which blob is currently there. The measurement itself lives in BlobMetric.
+///
+/// `firstSeenAt` is the anchor a baseline is drawn from — what was already here
+/// before the platform started watching is inherited, not anyone's fault.
+model TreeFile {
+  id           String     @id @default(cuid())
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  path    String
+  blobSha String @map("blob_sha")
+  /// Restrict, not Cascade: content is immutable, so a measurement stays true
+  /// forever and is worth keeping even after every path pointing at it moved.
+  /// The constraint's real job is the other direction — a tree row can never
+  /// name a blob we never recorded.
+  blob    BlobMetric @relation(fields: [blobSha], references: [sha], onDelete: Restrict)
+
+  /// The line count the first time this path was ever measured — what the file
+  /// already was when checking began. Anything over the limit at that moment is
+  /// inherited and charged to nobody. Null until the path is first measured, and
+  /// never rewritten afterwards: a baseline that moves is not a baseline.
+  baselineLines Int? @map("baseline_lines")
+
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([repositoryId, path])
+  @@index([repositoryId, blobSha])
+  @@map("tree_files")
+}
+
+/// A reusable set of check limits. Somebody with five TypeScript projects should
+/// tune ten thresholds once, not five times — that is the entire reason this is
+/// a table and not another JSON column on the repository.
+model CheckTemplate {
+  id     String @id @default(cuid())
+  name   String @unique
+  /// Partial per metric: a template states what it cares about and inherits the
+  /// rest from the shipped defaults.
+  checks Json
+
+  repositories Repository[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("check_templates")
+}
+
+/// When a time-triggered report last ran, per front and per kind.
+///
+/// In the database rather than a timer in memory, and that is the whole point: a
+/// process restarted on Monday morning would otherwise either skip the week's
+/// digest or send it twice, depending only on how long the process had been up.
+/// Scheduling is derived from stored state, never from process age — the same
+/// lesson `recoverOrphans()` forced on the queue.
+model ReportSchedule {
+  id           String     @id @default(cuid())
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  /// An OccasionKind. Text so a new report needs no migration.
+  kind String
+
+  /// Null means the schedule exists but has never fired. It is stamped on first
+  /// sight without reporting, because a week nobody watched cannot be summarised.
+  lastRunAt DateTime? @map("last_run_at")
+
+  /// Counts of files over each limit at the last run, so the next digest can say
+  /// which way the code moved. Stored rather than recomputed because "how it was
+  /// a week ago" is not derivable from a snapshot of how it is now.
+  lastState Json @default("{}") @map("last_state")
+
+  @@unique([repositoryId, kind])
+  @@map("report_schedules")
+}

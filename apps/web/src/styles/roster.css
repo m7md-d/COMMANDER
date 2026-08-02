@@ -1,0 +1,171 @@
+/*
+ * Service records: the leaderboard and member rosters as personnel cards, not a
+ * table. Cards reflow on narrow screens instead of scrolling sideways
+ * (docs/UI-AUDIT.md §9). All sizing is relative; state shows on the inked edge
+ * and the stamp, never colour alone.
+ */
+
+/* Imported by the repository scan; decorative, so it carries an empty alt and
+   is not announced. */
+.member-avatar {
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  margin-block-end: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+/* ---------- editable service record ---------- */
+
+/*
+ * A personnel record, not a form in a box: the identity plate is pinned to the
+ * reading edge and the particulars sit beside it, so a roster of ten is scanned
+ * down a column of faces rather than by reading ten first fields.
+ */
+.record {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background-color: var(--color-surface-raised);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.record-plate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 3rem;
+  block-size: 3rem;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-sunken);
+  object-fit: cover;
+  overflow: hidden;
+}
+
+/* No portrait on file: the initial, stamped. Reads as a blank plate awaiting a
+   photograph rather than as a missing image. */
+.record-plate-empty {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  text-transform: uppercase;
+}
+
+.record-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+@media (max-width: 40rem) {
+  .record {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* One watcher: pattern, standing, remove. The pattern takes the slack because
+   it is the only free-text field in the row. */
+.watcher-row {
+  display: grid;
+  grid-template-columns: 1fr minmax(9rem, auto) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.roster {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--space-3);
+}
+
+.roster-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background-color: var(--color-surface-raised);
+  border: var(--border-width) solid var(--color-border);
+  border-inline-start: 0.1875rem solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.roster-clean {
+  border-inline-start-color: var(--color-success);
+}
+
+.roster-flagged {
+  border-inline-start-color: var(--color-danger);
+}
+
+.roster-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.roster-id {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-inline-size: 0;
+}
+
+.roster-rank {
+  align-self: start;
+  font-size: var(--text-xs);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-accent-text);
+}
+
+.roster-name {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.roster-login {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.roster-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width) solid var(--color-border);
+}
+
+.roster-figures > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.roster-figures dt {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.roster-figures dd {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.roster-when {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+}

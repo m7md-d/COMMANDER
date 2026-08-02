@@ -1,0 +1,104 @@
+/* Phosphor readouts that live inside a CrtScreen: the sector table, the
+   telegraph tape, and the ops clock. Split from screens.css (the tube and its
+   glass) to keep each under the 200-line limit — the tube is the display, these
+   are what is on it. */
+
+/* ---------- sector readout ---------- */
+
+.readout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.readout-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.readout-label {
+  color: var(--color-screen-dim);
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.readout-dots {
+  flex: 1;
+  align-self: center;
+  min-inline-size: var(--space-4);
+  border-block-end: var(--border-width) dashed var(--color-screen-line);
+}
+
+.readout-value {
+  font-size: var(--text-xl);
+  color: var(--color-screen-bright);
+  font-variant-numeric: tabular-nums;
+  /* The phosphor bloom. This single shadow is what sells "emitting" over
+     "coloured text", so it is the readout's most load-bearing line. */
+  text-shadow: 0 0 0.5rem var(--color-screen-glow);
+}
+
+/* ---------- telegraph tape ---------- */
+
+.tape {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.tape-line {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.tape-sigil {
+  flex: none;
+  inline-size: 1ch;
+  text-align: center;
+  color: var(--color-screen-dim);
+}
+
+.tape-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-screen-text);
+}
+
+/* Outcome rides the sigil's brightness; the glyph itself (+ / ! / ·) carries the
+   meaning, which is how a genuinely monochrome display distinguishes states. */
+.tape-sent .tape-sigil {
+  color: var(--color-screen-bright);
+  text-shadow: 0 0 0.4rem var(--color-screen-glow);
+}
+
+.tape-failed .tape-sigil {
+  color: var(--color-screen-bright);
+  animation: screen-blink 1.1s steps(2, jump-none) infinite;
+}
+
+/* ---------- ops clock ---------- */
+
+.clock {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+}
+
+.clock-time {
+  font-size: var(--text-base);
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.clock-zone {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}

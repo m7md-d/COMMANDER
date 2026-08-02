@@ -1,0 +1,143 @@
+/* Floating layers and loading placeholders. Everything here is positioned
+   above the page, which is why the z tokens finally have a consumer
+   (docs/UI-AUDIT.md §10). Semantic tokens only, as everywhere else. */
+
+/* ---------- scrim ---------- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background-color: var(--color-scrim);
+  backdrop-filter: blur(0.125rem);
+}
+
+/* ---------- dialog ---------- */
+
+.dialog {
+  position: fixed;
+  z-index: var(--z-modal);
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  /* --flip (1 LTR / -1 RTL): in RTL inset-inline-start resolves to `right`, so a
+     plain -50% shove would push the dialog a full width off the leading edge.
+     The flip sends it back to centre in both scripts. */
+  transform: translate(calc(-50% * var(--flip, 1)), -50%);
+  inline-size: min(32rem, calc(100vw - var(--space-8)));
+  max-block-size: calc(100dvh - var(--space-8));
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+/*
+ * The centring transform is written into the element, and framer-motion also
+ * writes `transform` when it animates y/scale. Letting both own the property
+ * would make the dialog jump, so translation is delegated to the inset pair and
+ * the element only ever shifts by half its own size.
+ */
+@supports (translate: -50% -50%) {
+  .dialog {
+    transform: none;
+    translate: calc(-50% * var(--flip, 1)) -50%;
+  }
+}
+
+.dialog-title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+}
+
+/* The subject of a destructive action: quoted, never paraphrased. */
+.dialog-subject {
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-inline-start: 0.1875rem solid var(--color-danger);
+  border-radius: var(--radius-sm);
+  word-break: break-word;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* ---------- skeleton ---------- */
+
+.skeleton-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.skeleton-line {
+  display: block;
+  block-size: var(--space-4);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-raised);
+  /* A sweep rather than a pulse: a pulse at this contrast reads as a flashing
+     error state, which is the opposite of "content is on its way". */
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-accent-soft) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.4s var(--ease-in-out) infinite;
+}
+
+/* Every line the same width would read as a table, not as prose. Scoped to the
+   generic stack: a shaped skeleton sets each line's width from the thing it
+   stands in for, and must not have a ragged edge imposed on it by position. */
+.skeleton-lines .skeleton-line:nth-child(3n) {
+  inline-size: 72%;
+}
+.skeleton-lines .skeleton-line:nth-child(3n + 2) {
+  inline-size: 88%;
+}
+
+@keyframes skeleton-sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ---------- skip link ---------- */
+
+/* Visible only once focused: the first Tab on any page reaches the content
+   without walking the whole sidebar (docs/UI-AUDIT.md §17). */
+.skip-link {
+  position: fixed;
+  z-index: var(--z-toast);
+  inset-block-start: var(--space-3);
+  inset-inline-start: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+  border-radius: var(--radius-sm);
+  font-weight: var(--weight-medium);
+  transform: translateY(-200%);
+  transition: transform var(--transition-fast);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}

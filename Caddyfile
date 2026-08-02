@@ -1,0 +1,15 @@
+# Automatic HTTPS. Caddy obtains and renews a Let's Encrypt certificate for the
+# domain in $PUBLIC_DOMAIN on its own — ports 80 and 443 must be reachable from
+# the internet for the ACME challenge (see docs/DEPLOY-ORACLE.md).
+#
+# To receive certificate-expiry notices, add a global block above this line:
+#   {
+#     email you@example.com
+#   }
+
+{$PUBLIC_DOMAIN} {
+	encode zstd gzip
+	# nginx (the web service) serves the SPA and proxies /api to the API, so one
+	# upstream carries both the panel and the webhook endpoint.
+	reverse_proxy web:80
+}

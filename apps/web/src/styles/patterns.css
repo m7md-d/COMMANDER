@@ -1,0 +1,135 @@
+/* Composite patterns: badges, tables, navigation, feedback. Same rules apply —
+   semantic tokens only, no literals. */
+
+/* ---------- badge ---------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.badge-neutral {
+  background-color: var(--color-surface-raised);
+  color: var(--color-text-muted);
+}
+.badge-accent {
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent-text);
+}
+.badge-success {
+  background-color: var(--color-success-soft);
+  color: var(--color-success);
+}
+.badge-danger {
+  background-color: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+.badge-info {
+  background-color: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+/* ---------- chip (removable tag) ---------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  background-color: var(--color-surface-raised);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+}
+
+.chip-input {
+  inline-size: 8rem;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.chip-remove {
+  color: var(--color-text-muted);
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.chip-remove:hover {
+  color: var(--color-danger);
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* ---------- stat tile ---------- */
+
+.stat {
+  padding: var(--space-4) var(--space-5);
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.stat-value {
+  display: block;
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ---------- table ---------- */
+
+.table {
+  font-size: var(--text-sm);
+}
+
+.table th,
+.table td {
+  padding: var(--space-3);
+  text-align: start;
+  border-block-end: var(--border-width) solid var(--color-border);
+  vertical-align: middle;
+}
+
+.table th {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.table td {
+  /* Counters read wrong when digits shift width between rows. */
+  font-variant-numeric: tabular-nums;
+}
+
+.table tbody tr:last-child td {
+  border-block-end: none;
+}
+
+.table tbody tr:hover td {
+  background-color: var(--color-surface-raised);
+}
+

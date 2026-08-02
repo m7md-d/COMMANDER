@@ -1,0 +1,37 @@
+# Overlay for development: source is mounted, both apps hot-reload, and
+# Postgres is reachable from the host for psql/Prisma Studio.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+
+services:
+  postgres:
+    ports:
+      # 5433 on the host, not 5432: a developer machine very often already has
+      # a Postgres bound to the default port. Override with POSTGRES_HOST_PORT.
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+
+  api:
+    build:
+      target: build
+    environment:
+      NODE_ENV: development
+    command: >
+      sh -c "npx prisma migrate deploy --schema apps/api/prisma/schema.prisma &&
+             npm run dev --workspace @commander/api"
+    volumes:
+      - ./apps/api/src:/app/apps/api/src
+      - ./packages/shared/src:/app/packages/shared/src
+    ports:
+      - "4000:4000"
+
+  web:
+    build:
+      target: build
+    command: npm run dev --workspace @commander/web -- --host 0.0.0.0
+    environment:
+      VITE_API_TARGET: http://api:4000
+    volumes:
+      - ./apps/web/src:/app/apps/web/src
+      - ./packages/shared/src:/app/packages/shared/src
+    ports:
+      - "5173:5173"

@@ -2,9 +2,16 @@ node_modules/
 dist/
 build/
 .vite/
-coverage/
 apps/api/generated/
 postgres-data/
+
+# Coverage *output*, anchored. A bare `coverage/` matches any directory of that
+# name at any depth — including tests/coverage/, which is eight of this project's
+# guards. It swallowed them silently: they still ran locally, so nothing failed,
+# and a fresh clone would simply have had fewer guards than the README claims.
+/coverage/
+apps/*/coverage/
+packages/*/coverage/
 
 # Secrets — never commit.
 .env
@@ -12,8 +19,18 @@ postgres-data/
 !.env.example
 *.pem
 
-# Superseded Cloudflare Worker prototypes.
-old/
+# Database dumps. docs/DEPLOY.md schedules one of these in a cron job, and a dump
+# carries every commit message, member login and ledger row in the system — the
+# single worst file this repository could publish.
+# Prisma migrations are .sql as well, hence the narrow patterns and not *.sql.
+backups/
+backup-*.sql
+*.dump
+
+# Machine-local agent settings. The rules in .claude/rules/ are part of the
+# project and are committed; this is not.
+.claude/settings.local.json
+.claude/*.local.json
 
 # Local noise.
 .DS_Store

@@ -1,0 +1,68 @@
+/*
+ * THE SECTOR SURVEY — what reconnaissance found, as a standing readout.
+ *
+ * The scan used to report into a toast: it imported people, measured a layout,
+ * and then four seconds later there was no evidence any of it had happened. A
+ * survey is a document you keep, so this is drawn as one — a sunken sheet with
+ * a ruled head, proportional bars for the areas, and the findings tagged below.
+ *
+ * The bars reuse `.meter` from the dossier rather than inventing a second bar:
+ * one bar vocabulary across the panel is worth more than a bespoke one here.
+ */
+
+.survey {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background-color: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* The head: what was found and when, in one ruled line. Mono numerals so the
+   figures line up under each other as the survey is re-run. */
+.survey-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  padding-block-end: var(--space-3);
+  border-block-end: var(--border-width) solid var(--color-border);
+  font-size: var(--text-sm);
+}
+
+.survey-when {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.survey-total {
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.survey-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Area names are paths — always LTR, always mono, however the panel reads. */
+.survey-area {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+/*
+ * A caution rather than an error: a capped listing is still a useful survey, it
+ * is just a floor. Marked on the edge so it is not read as a failure banner.
+ */
+.survey-caution {
+  padding-inline-start: var(--space-3);
+  border-inline-start: 0.1875rem solid var(--color-accent);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

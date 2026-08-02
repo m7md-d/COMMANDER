@@ -1,0 +1,36 @@
+{
+  "name": "commander",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted GitHub push auditor that writes satirical military communiques to Discord, with a full control panel.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @commander/shared && npm run build -w @commander/api && npm run build -w @commander/web",
+    "typecheck": "npm run typecheck -w @commander/shared && npm run typecheck -w @commander/api && npm run typecheck -w @commander/web",
+    "lint": "eslint . --max-warnings 0",
+    "test": "npm run test -w @commander/shared && npm run test -w @commander/api && npm run test:guards",
+    "verify": "npm run typecheck && npm run lint && npm run build && npm run test",
+    "compose": "sh scripts/compose.sh",
+    "dev": "sh scripts/compose.sh -f docker-compose.yml -f docker-compose.dev.yml up --build",
+    "up": "sh scripts/compose.sh up -d --build",
+    "down": "sh scripts/compose.sh down",
+    "logs": "sh scripts/compose.sh logs -f api",
+    "test:guards": "tsx --test \"tests/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^9.17.0",
+    "globals": "^14.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

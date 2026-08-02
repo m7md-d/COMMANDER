@@ -1,0 +1,147 @@
+/*
+ * DESIGN TOKENS — the only file in the project allowed to contain a colour
+ * literal, a font stack, or a raw pixel value (apps/web/CONSTITUTION.md §2).
+ *
+ * Two layers, and the distinction is load-bearing:
+ *   primitives  --palette-*  raw values — this file, never read by a component
+ *   semantics   --color-*    meaning — themes.css, read everywhere
+ *
+ * Theming works because only the semantic layer is remapped. A component that
+ * says `var(--color-surface)` is correct in both themes for free; one that says
+ * `var(--palette-olive-900)` breaks in light mode, which is why reaching for a
+ * primitive outside this file is forbidden.
+ *
+ * IDENTITY — field command post.
+ *
+ * Olive carries the interface: every surface, border and neutral is a green
+ * that has had its saturation pulled down, so the whole panel reads as uniform
+ * cloth rather than as a grey app with green bits.
+ *
+ * Khaki is the single accent — the leather-and-brass tone. It marks the active
+ * navigation item and the primary action, and nothing else. Spending it more
+ * widely is what kills it.
+ *
+ * Status green is deliberately a *different* green: brighter and cooler than
+ * the olive environment. If success shared the accent's hue, "this worked" and
+ * "click this" would be the same colour, which is the failure mode of every
+ * green-on-green theme.
+ */
+
+:root {
+  /* ---------- primitives: olive (the environment) ---------- */
+  --palette-olive-0: #ffffff;
+  --palette-olive-25: #f7f8f2;
+  --palette-olive-50: #edefe4;
+  --palette-olive-100: #e1e4d5;
+  --palette-olive-150: #d6dac8;
+  --palette-olive-200: #bec4ad;
+  --palette-olive-300: #9ba388;
+  --palette-olive-400: #7b8469;
+  --palette-olive-500: #5d6651;
+  --palette-olive-600: #464e3d;
+  --palette-olive-700: #343b2d;
+  --palette-olive-750: #2c3226;
+  --palette-olive-800: #22271d;
+  --palette-olive-850: #181c15;
+  --palette-olive-900: #0f120d;
+
+  /* ---------- primitives: khaki (the single accent) ---------- */
+  --palette-khaki-300: #e6cda2;
+  --palette-khaki-400: #d6b47f;
+  --palette-khaki-500: #bf955a;
+  --palette-khaki-600: #997340;
+  --palette-khaki-700: #71542d;
+
+  /* ---------- primitives: status ---------- */
+  /* Cooler and brighter than the olive environment, on purpose. */
+  --palette-green-400: #86c95c;
+  --palette-green-500: #63a83f;
+  --palette-green-700: #3d6f27;
+  /* Rust rather than fire-engine red: it belongs to the same earth family. */
+  --palette-red-400: #d4735f;
+  --palette-red-500: #b34630;
+  --palette-red-700: #7f2d1e;
+  /* Weathered steel, so information never competes with the accent. */
+  --palette-blue-400: #84a6bb;
+  --palette-blue-500: #517f99;
+  --palette-blue-700: #35586c;
+
+  /* ---------- primitives: phosphor (the CRT screens only) ----------
+     Saturated on purpose. This is the one family allowed to glow, because a
+     screen is a light source, not a surface — the discipline that keeps olive
+     from turning cartoonish does not apply to a thing that literally emits. */
+  --palette-phosphor-bright: #9bf0ad;
+  --palette-phosphor: #5fc878;
+  --palette-phosphor-dim: #3c8450;
+  --palette-screen: #06110a;
+
+  /* ---------- spacing: 0.25rem base, no in-between values ---------- */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ---------- typography ---------- */
+  --font-sans: "IBM Plex Sans Arabic", "Segoe UI", system-ui, -apple-system, "Helvetica Neue",
+    sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.0625rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.75;
+
+  /* ---------- shape ---------- */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-full: 62.4375rem;
+
+  --border-width: 0.0625rem;
+
+  /*
+   * ---------- motion ----------
+   * Durations are tokens for the same reason colours are: a component that
+   * invents 350ms desynchronises from everything else on screen. The JS side
+   * reads these through shared/lib/motion.ts rather than restating them.
+   */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+
+  /* Decelerate: enters fast and settles. The default for anything appearing. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Symmetric: for state changes that are neither arrival nor departure. */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --transition-fast: var(--duration-fast) var(--ease-in-out);
+  --transition-base: var(--duration-base) var(--ease-in-out);
+
+  /* ---------- layering ---------- */
+  --z-sticky: 10;
+  --z-overlay: 100;
+  --z-modal: 110;
+  --z-toast: 120;
+
+  /* ---------- layout ---------- */
+  --sidebar-width: 15rem;
+  --content-max: 76rem;
+}

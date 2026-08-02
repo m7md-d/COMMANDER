@@ -1,0 +1,31 @@
+# Cloudflare Tunnel overlay — بديل عن docker-compose.public.yml (Caddy).
+#
+# cloudflared يفتح اتصالاً *صادراً* إلى حافة Cloudflare ويقدّم نطاقك من هناك، فلا
+# يُفتح أي منفذ وارد: لا 80/443، لا قاعدة iptables، لا DuckDNS، لا Caddy.
+# Cloudflare ينهي TLS عند حافته. استعمل هذا الملف إذا كان نطاقك على Cloudflare.
+#
+# إعداد لمرّة واحدة في لوحة Cloudflare Zero Trust:
+#   Networks ← Tunnels ← Create a tunnel ← Cloudflared ← سمِّه، وانسخ الـTOKEN.
+#   ثم Public Hostname: نطاقك الفرعي (مثل commander.example.com)
+#     Service: HTTP ← URL: web:80
+#   (cloudflared يتشارك شبكة هذا الـcompose، فيحلّ الاسم `web` داخلياً.)
+#
+# ثم في .env:
+#   TUNNEL_TOKEN=...              # الـtoken من اللوحة
+#   PUBLIC_URL=https://commander.example.com
+#   WEB_PORT=127.0.0.1:8080      # يُبقي web خارج الواجهة العامة (اختياري لكن مُوصى)
+#
+# التشغيل:
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - web
+    # النفق صادر فقط؛ لا `ports:` هنا بقصد. cloudflared يقرأ TUNNEL_TOKEN من البيئة،
+    # فلا يظهر الـtoken في وسائط العملية ولا في `docker inspect` للأمر.
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}

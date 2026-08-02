@@ -1,0 +1,198 @@
+/*
+ * THE FILE CHART — the project's tree drawn as a ruled plan.
+ *
+ * Not a file-explorer sidebar. The rest of the panel is documents you hold: the
+ * front is a folder with a letterhead, the manual is sheets. Editor chrome would
+ * be the one object here that belongs to a different application.
+ *
+ * The load-bearing idea is that a *collapsed* row already says something. Every
+ * directory carries the totals of everything beneath it, so the four columns —
+ * name, share, figure, owner — never move between a directory and a file, and
+ * the chart is scanned down a column rather than read line by line.
+ *
+ * Reuses rather than invents: the bars are `.meter-track`/`.meter-fill` from the
+ * dossier, and the head's figures and cautions are the survey's. A second bar
+ * vocabulary on one screen makes two proportions impossible to compare, which
+ * is the only thing a bar is for.
+ */
+
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  /* Grid children refuse to shrink below their content by default, and a chart
+     full of long paths is exactly that content. */
+  min-inline-size: 0;
+  padding: var(--space-4);
+  background-color: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* What was found and when, on one ruled line — the survey's head, same rule. */
+.chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding-block-end: var(--space-3);
+  border-block-end: var(--border-width) solid var(--color-border);
+  font-size: var(--text-sm);
+}
+
+.chart-body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- the row ---------- */
+
+/*
+ * Five columns, identical for a directory and a file: mark, name, share,
+ * figure, owner. Holding the columns still across kinds and depths is what lets
+ * the eye run down one of them.
+ */
+.chart-row {
+  display: grid;
+  grid-template-columns:
+    var(--space-3) minmax(0, 1fr) var(--space-16)
+    minmax(var(--space-12), auto) minmax(var(--space-10), auto);
+  gap: var(--space-3);
+  align-items: center;
+  inline-size: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.chart-row:hover {
+  background-color: var(--color-surface-raised);
+}
+
+.chart-row:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 0.1875rem var(--color-focus-ring);
+}
+
+/* The open file carries a border, not just a fill: colour alone is not a state. */
+.chart-file[aria-pressed="true"] {
+  background-color: var(--color-surface-raised);
+  border-color: var(--color-accent);
+}
+
+/*
+ * The disclosure mark is a notch that lights when the branch is open — the same
+ * vocabulary as the calibration ladder's switch bank.
+ *
+ * Deliberately not a rotating chevron: a chevron points somewhere, and "somewhere"
+ * is a physical direction that would need flipping in Arabic. A notch is either
+ * lit or it is not, in any direction.
+ */
+.chart-dir::before,
+.chart-file::before {
+  content: "";
+  display: block;
+  justify-self: center;
+  border-radius: var(--radius-sm);
+}
+
+.chart-dir::before {
+  inline-size: var(--space-3);
+  block-size: var(--space-3);
+  border: var(--border-width) solid var(--color-border-strong);
+  transition: background-color var(--transition-fast);
+}
+
+.chart-branch[open] > .chart-dir::before {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+/* A file is a point on the plan, not a switch: nothing to open, nothing to light. */
+.chart-file::before {
+  inline-size: var(--space-1);
+  block-size: var(--space-1);
+  background-color: var(--color-border-strong);
+  border-radius: var(--radius-full);
+}
+
+/* The native marker would be a second, contradictory disclosure indicator. */
+.chart-dir {
+  list-style: none;
+}
+
+.chart-dir::-webkit-details-marker {
+  display: none;
+}
+
+/* ---------- the spine ---------- */
+
+/*
+ * Indentation comes from the DOM actually nesting, not from a computed padding
+ * per depth: the visual nesting *is* the structural nesting, so the two cannot
+ * disagree, and no component has to know how deep it is.
+ */
+.chart-children {
+  margin-inline-start: var(--space-3);
+  padding-inline-start: var(--space-3);
+  border-inline-start: var(--border-width) dashed var(--color-border);
+}
+
+/* ---------- cells ---------- */
+
+/*
+ * A path is Latin text inside an Arabic page. `direction` alone is not enough on
+ * an inline box: without isolation the bidi algorithm reorders the segments
+ * around it and `src/features/hooks.ts` comes apart.
+ */
+.chart-name,
+.chart-path {
+  font-family: var(--font-mono);
+  unicode-bidi: isolate;
+}
+
+.chart-name {
+  font-size: var(--text-sm);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chart-path {
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.chart-share {
+  inline-size: 100%;
+}
+
+.chart-figure,
+.chart-owner {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chart-figure {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+/*
+ * Over the limit. Deliberately the same weight as the owner cell it replaces —
+ * it occupies that column, and a chart where every over-limit row shouts is a
+ * chart nobody reads twice. The colour carries it; the layout does not move.
+ */
+.chart-over {
+  color: var(--color-danger);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

@@ -1,0 +1,139 @@
+/*
+ * THE HEADQUARTERS and its console.
+ *
+ * The landing screen is the post itself: a masthead, two situation screens, and
+ * a bank of physical controls. The controls are the frequently-worked stations;
+ * the full roster lives in the menu.
+ *
+ * A console button is a key with a lamp, not a web button with a fill. The lamp
+ * reports state — idle, lit on approach, steady when this is where you are — and
+ * the surface only lifts. Reading lamps instead of colours is the whole reason
+ * this reads as a panel.
+ */
+
+.hq {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding-block-start: var(--space-2);
+}
+
+.hq-masthead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding-block-end: var(--space-4);
+  border-block-end: var(--border-width) solid var(--color-border);
+}
+
+.hq-masthead-clock {
+  margin-inline-start: auto;
+}
+
+.hq-screens {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 56rem) {
+  .hq-screens {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.hq-console {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.console-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+/* ---------- console button ---------- */
+
+.console-btn {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background-color: var(--color-surface-raised);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  text-decoration: none;
+  /* A hairline of light along the top edge: a moulded key, catching the
+     overhead source that the vignette implies. */
+  box-shadow:
+    var(--shadow-sm),
+    inset 0 var(--border-width) 0 var(--color-edge-highlight);
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.console-btn:hover,
+.console-btn:focus-visible {
+  transform: translateY(-0.125rem);
+  border-color: var(--color-accent);
+  text-decoration: none;
+}
+
+.console-btn:active {
+  transform: translateY(0);
+}
+
+.console-btn[aria-current="page"] {
+  border-color: var(--color-accent);
+}
+
+.console-lamp {
+  flex: none;
+  inline-size: 0.625rem;
+  block-size: 0.625rem;
+  margin-block-start: var(--space-1);
+  border-radius: var(--radius-full);
+  background-color: var(--color-border-strong);
+  transition:
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.console-btn:hover .console-lamp,
+.console-btn:focus-visible .console-lamp,
+.console-btn[aria-current="page"] .console-lamp {
+  background-color: var(--color-accent);
+  box-shadow: 0 0 0.5rem var(--color-accent);
+}
+
+.console-btn-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.console-btn-code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+}
+
+.console-btn-label {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.05em;
+}
+
+.console-btn-desc {
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-text-muted);
+}

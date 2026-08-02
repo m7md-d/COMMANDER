@@ -1,0 +1,109 @@
+/*
+ * The mark and the stencilled label — the two pieces of the identity that carry
+ * the platform's name rather than its atmosphere. Split from decor.css because
+ * these are brand, not texture: they change when the identity changes, and the
+ * textures do not.
+ */
+
+/* ---------- the wordmark ---------- */
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text);
+}
+
+.wordmark-insignia {
+  flex: none;
+  color: var(--color-accent);
+}
+
+.wordmark-insignia svg {
+  display: block;
+  inline-size: 1.75rem;
+  block-size: 2.05rem;
+}
+
+.wordmark-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+/*
+ * The stencil. One horizontal bridge cut through the letterforms, produced by
+ * clipping a gradient to the text — the transparent band lets the surface show
+ * through exactly as a cut plate would. `-webkit-` prefix retained: Safari
+ * still requires it for background-clip: text.
+ *
+ * The gradient paints in `--color-text`, not `currentcolor`: the clip trick sets
+ * `color: transparent`, so `currentcolor` would resolve to transparent and the
+ * whole name would vanish. Naming the token keeps it painted and theme-aware.
+ */
+.wordmark-name {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.22em;
+  line-height: 1;
+  /* The mark is a proper noun and stays LTR inside Arabic text. */
+  direction: ltr;
+  unicode-bidi: isolate;
+  background-image: linear-gradient(
+    to bottom,
+    var(--color-text) 0 52%,
+    transparent 52% 57%,
+    var(--color-text) 57% 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.wordmark-designation {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.wordmark-rule {
+  inline-size: var(--space-4);
+  block-size: 0.125rem;
+  flex: none;
+  background-color: var(--color-accent);
+}
+
+.wordmark-compact .wordmark-name {
+  font-size: var(--text-lg);
+}
+
+/* ---------- stencilled section label ---------- */
+
+/* Used for group headings and card labels. Tracking and case do the work; a
+   decorative typeface would fight the Arabic. */
+.stencil {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.stencil::after {
+  content: "";
+  flex: 1;
+  block-size: 0.0625rem;
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-border-strong) 0 0.25rem,
+    transparent 0.25rem 0.5rem
+  );
+}

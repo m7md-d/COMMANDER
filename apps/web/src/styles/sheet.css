@@ -1,0 +1,56 @@
+/*
+ * WHAT GOES ON A SHEET — sections and clauses.
+ *
+ * Split from file.css so each keeps one responsibility: that file builds the
+ * folder (letterhead, index tabs, punched sheet), this one is the vocabulary of
+ * what a sheet may contain.
+ */
+
+/* ---------- sections on a sheet ---------- */
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.panel-section + .panel-section {
+  margin-block-start: var(--space-6);
+}
+
+/* ---------- rules of engagement, as clauses ---------- */
+
+/*
+ * Not a stack of identical cards. A clause is a numbered article: its standing
+ * shows on the inked edge, its settings hang beneath it as a sub-clause, and a
+ * disabled article recedes without disappearing — you must still be able to see
+ * what you have switched off.
+ */
+.clause {
+  padding: var(--space-4);
+  background-color: var(--color-surface-raised);
+  border: var(--border-width) solid var(--color-border);
+  border-inline-start: 0.1875rem solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.clause-live {
+  border-inline-start-color: var(--color-success);
+}
+
+.clause:not(.clause-live) {
+  opacity: 0.72;
+}
+
+.clause-note {
+  margin-block-start: var(--space-2);
+}
+
+/* The sub-clause: indented and hung off a hairline, so settings read as
+   belonging to the article above rather than as a new one. */
+.clause-terms {
+  margin-block-start: var(--space-4);
+  padding-inline-start: var(--space-4);
+  border-inline-start: var(--border-width) dashed var(--color-border-strong);
+}

@@ -1,0 +1,172 @@
+/* Form controls: field wrapper, inputs, toggle. Split out of
+   components.css to satisfy CONSTITUTION.md §4 (200-line limit). */
+
+/* ---------- form controls ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.field-label {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.field-error {
+  color: var(--color-danger);
+  font-size: var(--text-xs);
+}
+
+.control {
+  inline-size: 100%;
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.control:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+}
+
+.control:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 0.1875rem var(--color-focus-ring);
+}
+
+.control:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.control-invalid {
+  border-color: var(--color-danger);
+}
+
+textarea.control {
+  min-block-size: 8rem;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+/* ---------- toggle ---------- */
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-input {
+  position: absolute;
+  opacity: 0;
+  inline-size: 0.0625rem;
+  block-size: 0.0625rem;
+}
+
+.toggle-track {
+  position: relative;
+  flex: none;
+  inline-size: 2.375rem;
+  block-size: 1.3125rem;
+  background-color: var(--color-surface-raised);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-full);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.toggle-thumb {
+  position: absolute;
+  inset-block-start: 0.125rem;
+  inset-inline-start: 0.125rem;
+  inline-size: 0.9375rem;
+  block-size: 0.9375rem;
+  background-color: var(--color-text-muted);
+  border-radius: var(--radius-full);
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.toggle-input:checked + .toggle-track {
+  background-color: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.toggle-input:checked + .toggle-track .toggle-thumb {
+  background-color: var(--color-accent);
+  /* Logical direction: the thumb travels toward the inline end in both scripts. */
+  transform: translateX(calc(1.0625rem * var(--flip, 1)));
+}
+
+.toggle-input:focus-visible + .toggle-track {
+  box-shadow: 0 0 0 0.1875rem var(--color-focus-ring);
+}
+
+[dir="rtl"] {
+  --flip: -1;
+}
+
+.toggle-label {
+  font-size: var(--text-sm);
+}
+
+/* ---------- number stepper ---------- */
+
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-sunken);
+  overflow: hidden;
+  inline-size: fit-content;
+}
+
+.stepper:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 0.1875rem var(--color-focus-ring);
+}
+
+.stepper-key {
+  inline-size: 2.25rem;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-lg);
+  color: var(--color-text-muted);
+  background-color: var(--color-surface-raised);
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.stepper-key:hover:not(:disabled) {
+  color: var(--color-accent-text);
+  background-color: var(--color-surface);
+}
+
+.stepper-key:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stepper-value {
+  inline-size: 4.5rem;
+  padding: var(--space-2);
+  border: none;
+  border-inline: var(--border-width) solid var(--color-border);
+  background: none;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  outline: none;
+}

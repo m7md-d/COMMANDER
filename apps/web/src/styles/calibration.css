@@ -1,0 +1,105 @@
+/*
+ * WHAT THE SETTING DOES — the standings key and the firing table.
+ *
+ * Split from ladder.css so each holds one responsibility: that file is the
+ * selector you operate, this one is the evidence of what operating it changes.
+ *
+ * The table is computed by `computeTone` — the same function the report
+ * pipeline runs — so these cells cannot describe behaviour the platform does
+ * not have. That is the reason it exists instead of a paragraph.
+ */
+
+/* ---------- the standings key ---------- */
+
+/* The three branch standings and what each does, stated once above the watcher
+   rows rather than repeated inside every one of them. */
+.gravity-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding: var(--space-3);
+  background-color: var(--color-surface-sunken);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.gravity-key > div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.gravity-key dt {
+  font-weight: var(--weight-medium);
+}
+
+.gravity-key dd {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+/* ---------- the calibration table ---------- */
+
+/*
+ * A firing table: standings down the side, probe offences across the top, the
+ * resulting register in the cell. Ruled, compact, monospaced figures — it is a
+ * reference card, not a data grid, so it carries no hover and no sorting.
+ */
+.calib {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.calib caption {
+  caption-side: top;
+  text-align: start;
+  padding-block-end: var(--space-2);
+}
+
+.calib th,
+.calib td {
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  border: var(--border-width) solid var(--color-border);
+}
+
+.calib thead th {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.08em;
+}
+
+.calib tbody th {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-normal);
+}
+
+/* The register, stamped. Escalation reads from the word and the inked edge, so
+   the table survives being read without colour. */
+.calib-level {
+  display: inline-block;
+  padding-inline-start: var(--space-2);
+  border-inline-start: 0.1875rem solid currentColor;
+  font-weight: var(--weight-medium);
+}
+
+.calib-commend {
+  color: var(--color-success);
+}
+
+.calib-wash {
+  color: var(--color-text-muted);
+}
+
+.calib-firm {
+  color: var(--color-accent-text);
+}
+
+.calib-severe {
+  color: var(--color-danger);
+}

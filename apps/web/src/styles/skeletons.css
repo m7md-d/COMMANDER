@@ -1,0 +1,61 @@
+/*
+ * SHAPED PLACEHOLDERS — closing docs/UI-AUDIT.md §6.
+ *
+ * The generic stack of lines told the truth about *timing* and lied about
+ * *geometry*: four lines gave way to a board of slots, or to a letterhead and a
+ * strip of tabs, and the page jumped exactly as far as the two shapes differed.
+ *
+ * The technique here is the whole fix — a shaped skeleton does not draw a
+ * picture of the layout, it **renders the layout's own container classes** with
+ * blank blocks inside. `.board` holding blank slots reserves the space that
+ * `.board` holding real slots will occupy, because it is the same CSS. The two
+ * cannot drift apart, which is the failure every hand-drawn skeleton eventually
+ * has.
+ *
+ * So this file holds only the blanks and their widths. Every measurement of
+ * structure comes from board.css, file.css and dispatch.css.
+ */
+
+/* Line widths, named for what they stand in for rather than for a size, so a
+   skeleton reads as a description of the content it is waiting on. */
+.sk-tag {
+  inline-size: 4rem;
+}
+
+.sk-figure {
+  inline-size: 2.5rem;
+}
+
+.sk-label {
+  inline-size: 7rem;
+}
+
+.sk-subject {
+  inline-size: min(18rem, 70%);
+}
+
+.sk-line {
+  inline-size: min(28rem, 90%);
+}
+
+.sk-full {
+  inline-size: 100%;
+}
+
+/* Shorter than a line of text: a caption, a serial, a stamp. */
+.sk-short {
+  block-size: var(--space-3);
+}
+
+/* Taller: a control, a stamp, a chip the eventual content will fill. */
+.sk-control {
+  block-size: var(--space-8);
+}
+
+/* A blank field: its label above its control, at the spacing forms.css uses, so
+   a form does not reflow when the values arrive. */
+.sk-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
