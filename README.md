@@ -35,7 +35,7 @@ Panel on `http://localhost:8080`. Migrations run when the API starts.
 
 | Command | |
 |---|---|
-| `npm run up` / `down` / `logs` | Production stack. Never `down -v` — it deletes the volume |
+| `npm run up` / `down` / `logs` | Production stack — rebuilds and replaces the containers. Never `down -v`, it deletes the volume |
 | `npm run dev` | Both apps hot-reload, Postgres on host port 5433 |
 | `npm run verify` | typecheck + lint + build + test |
 | `COMPOSE_ENGINE=docker npm run up` | Force an engine when both are installed |

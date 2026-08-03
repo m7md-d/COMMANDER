@@ -45,12 +45,13 @@ sh scripts/compose.sh ps            # أي أمر compose، بنفس الاخت�
 | **منفذ أقلّ من ١٠٢٤** | rootless لا يربطه. `WEB_PORT` الافتراضي ٨٠٨٠ فلا مشكلة — إلّا إن استعملت تراكب Caddy (٨٠ و٤٤٣) فيلزمه root أو `net.ipv4.ip_unprivileged_port_start` |
 | **معمارية الصورة** | صورةٌ بُنيت على arm64 لا تعمل على x86_64. **ابنِ على الخادم** (`npm run up` يبني)، أو ابنِ متعدّد المعمارية |
 | **أسماء الصور مؤهَّلة بالكامل** | `docker.io/library/postgres:16-alpine` لا `postgres:16-alpine`. دوكر يفترض Docker Hub صامتاً؛ بودمان يستشير `unqualified-search-registries` في المضيف — وفيدورا تضع ثلاثة، فيتوقّف ويسأل «أي صورة؟». على خادم بلا طرفية هذا تعليقٌ لا سؤال. يحرسه `tests/coverage/images.test.ts` |
+| **بناءٌ لا يُستبدَل** | `up -d --build` يبني صورةً جديدة ثم — إن وُجدت حاوية بالاسم — **يشغّل القديمة**. بودمان‑compose يفعل هذا بالضبط: السجلّ أخضر، والصورة جديدة فعلاً، والكود القديم ما زال يخدم. لذلك يمرّر `npm run up` الخيار `--force-recreate`، ويحرسه `tests/coverage/tooling.test.ts` |
 
 ### البقاء بعد الإقلاع
 
 ```bash
 # داخل مجلد المشروع على الخادم
-podman compose up -d --build
+npm run up
 podman generate systemd --new --files --name commander-api   # ولكل حاوية
 
 mkdir -p ~/.config/systemd/user && mv container-*.service ~/.config/systemd/user/
@@ -86,7 +87,7 @@ loginctl enable-linger "$USER"      # ← بدونها تموت الخدمات �
 عبر DNS الداخلي وتصلها دون نشرها على المضيف.
 
 ```bash
-sh scripts/compose.sh -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build
+sh scripts/compose.sh -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build --force-recreate
 ```
 
 انتظر `Registered tunnel connection` في `logs -f cloudflared`.
@@ -100,7 +101,7 @@ sh scripts/compose.sh -f docker-compose.yml -f docker-compose.tunnel.yml up -d -
 و`WEB_PORT=127.0.0.1:8080` حتى تبقى `web` خلف Caddy وحده.
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.public.yml up -d --build
+sh scripts/compose.sh -f docker-compose.yml -f docker-compose.public.yml up -d --build --force-recreate
 ```
 
 الشهادات في حجم `caddy-data`؛ حذفه يعني إعادة طلب الشهادة عند كل إقلاع وبلوغ حدّ
@@ -173,7 +174,7 @@ openssl rand -hex 16   # POSTGRES_PASSWORD  (ضعه أيضاً داخل DATABASE
 ## ٥. التشغيل اللاحق
 
 ```bash
-npm run up                     # يعيد البناء ويشغّل، على المحرّك المتاح
+npm run up                     # يبني ويستبدل الحاويات، على المحرّك المتاح
 
 mkdir -p backups
 sh scripts/compose.sh exec -T postgres pg_dump -U commander commander > backups/$(date +%F).sql

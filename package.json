@@ -15,8 +15,8 @@
     "test": "npm run test -w @commander/shared && npm run test -w @commander/api && npm run test:guards",
     "verify": "npm run typecheck && npm run lint && npm run build && npm run test",
     "compose": "sh scripts/compose.sh",
-    "dev": "sh scripts/compose.sh -f docker-compose.yml -f docker-compose.dev.yml up --build",
-    "up": "sh scripts/compose.sh up -d --build",
+    "dev": "sh scripts/compose.sh -f docker-compose.yml -f docker-compose.dev.yml up --build --force-recreate",
+    "up": "sh scripts/compose.sh up -d --build --force-recreate",
     "down": "sh scripts/compose.sh down",
     "logs": "sh scripts/compose.sh logs -f api",
     "test:guards": "tsx --test \"tests/**/*.test.ts\""
