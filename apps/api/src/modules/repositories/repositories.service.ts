@@ -48,6 +48,7 @@ export async function createRepository(input: RepositoryInput): Promise<Reposito
         projectBrief: input.projectBrief,
         projectStage: input.projectStage,
         watchers: toJson(input.watchers),
+        schedules: toJson(input.schedules),
         rules: input.rules ?? defaultRuleConfig(),
         checkTemplateId: input.checkTemplateId,
         checks: toJson(input.checks),
@@ -111,12 +112,16 @@ export async function updateRepository(id: string, patch: RepositoryUpdate): Pro
           ...(patch.promptId !== undefined && { promptId: patch.promptId }),
           ...(patch.silentWhenClean !== undefined && { silentWhenClean: patch.silentWhenClean }),
           ...(patch.githubInstallationId !== undefined && { githubInstallationId: patch.githubInstallationId }),
-          // Project awareness and branch gravity are written here too. Omitting
-          // them was a silent no-op: the PATCH returned 200 with the old value
-          // and the panel reported "saved" for an edit that never landed.
+          // Every field of the input contract is written here. Omitting one is a
+          // silent no-op: the PATCH returns 200 carrying the old value and the
+          // panel reports "saved" for an edit that never landed. It happened to
+          // projectBrief and projectStage, then again to schedules — which is why
+          // tests/coverage/contract-writes.test.ts now fails on the next omission
+          // instead of a user finding it.
           ...(patch.projectBrief !== undefined && { projectBrief: patch.projectBrief }),
           ...(patch.projectStage !== undefined && { projectStage: patch.projectStage }),
           ...(patch.watchers !== undefined && { watchers: toJson(patch.watchers) }),
+          ...(patch.schedules !== undefined && { schedules: toJson(patch.schedules) }),
           ...(patch.rules !== undefined && { rules: patch.rules }),
           ...(patch.checkTemplateId !== undefined && { checkTemplateId: patch.checkTemplateId }),
           ...(patch.checks !== undefined && { checks: toJson(patch.checks) }),
