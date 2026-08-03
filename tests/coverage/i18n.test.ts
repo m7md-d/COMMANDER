@@ -47,6 +47,10 @@ const TEMPLATED = [
   "manual.terminal.",
   "manual.capability.",
   "manual.register.",
+  // Built by `scanBlockerKey(blocker)` from the SCAN_BLOCKERS union, so the
+  // family is complete by construction and a member with no reader is a member
+  // the server can never return.
+  "scan.blocked.",
 ];
 
 /** Everything that reads keys — the dictionaries themselves excluded. */

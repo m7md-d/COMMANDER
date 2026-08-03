@@ -467,6 +467,20 @@ export const EN: Dictionary = {
   "repos.scanHint": "Reads the repository once: imports contributors with their avatars and learns the file layout. Useful when connecting an existing project.",
   "repos.scanDone": "Scan complete: {members} contributors, {files} files across {areas} areas",
   "repos.scanUnavailable": "Scanning needs the GitHub App and an installation id for this repository",
+
+  "scan.blocked.appNotConfigured":
+    "The GitHub App is not connected: GITHUB_APP_ID or GITHUB_APP_PRIVATE_KEY is empty in the environment. Set both and restart the API.",
+  "scan.blocked.noInstallationId":
+    "This front has no installation id. The field is per front — copy the number from the installation URL on GitHub into “GitHub App installation id” above.",
+  "scan.blocked.keyRejected":
+    "GitHub rejected the key. It must be base64 of the whole .pem including its BEGIN and END lines — encoding only the key body is refused exactly like this.",
+  "scan.blocked.installationNotFound":
+    "No installation with that id for this App. Check that the installation id has not been put in GITHUB_APP_ID: the installation id is the long number in the install URL, the App id is the short one on the app's settings page.",
+  "scan.blocked.repoNotInInstallation":
+    "The App is installed on the account but not on this repository. On GitHub: Settings → Applications → Configure, and add the repository to the selected list.",
+  "scan.blocked.githubUnreachable":
+    "GitHub could not be reached — network or timeout. The server received no answer at all.",
+  "scan.blocked.githubRefused": "GitHub refused the request for another reason. The API log carries the status.",
   "var.structure": "The project's file layout",
 
   "report.reviewLine": "- \"{title}\" — verdict: {verdict}. {remark}",

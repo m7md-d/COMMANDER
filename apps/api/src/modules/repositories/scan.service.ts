@@ -14,12 +14,14 @@
 import {
   structureDigestSchema,
   summarizeStructure,
+  type ScanBlocker,
+  type ScanResult,
   type StructureDigest,
 } from "@commander/shared";
 import { prisma } from "@/db/prisma.js";
 import { createLogger } from "@/core/logger/logger.js";
 import { NotFoundError } from "@/core/errors/app-error.js";
-import { isGitHubAppConfigured } from "@/integrations/github/app-auth.js";
+import { probeAccess } from "@/integrations/github/access.js";
 import { fetchContributors } from "@/integrations/github/commits.client.js";
 import { syncTree, type TreeSyncResult } from "@/modules/tree/tree.service.js";
 
@@ -29,27 +31,27 @@ const log = createLogger("scan");
  *  beside the cached documents because it invalidates the same way, by sha. */
 export const STRUCTURE_PATH = "__structure__";
 
-export interface ScanResult {
-  /** False when the App is unconfigured or the repo has no installation id. */
-  available: boolean;
-  membersImported: number;
-  filesSeen: number;
-  areas: number;
-  truncated: boolean;
-}
+const blocked = (blocker: ScanBlocker): ScanResult => ({
+  available: false,
+  blocker,
+  membersImported: 0,
+  filesSeen: 0,
+  areas: 0,
+  truncated: false,
+});
 
 export async function scanRepository(repositoryId: string): Promise<ScanResult> {
   const repository = await prisma.repository.findUnique({ where: { id: repositoryId } });
   if (!repository) throw new NotFoundError("repos.notFound");
 
-  const empty: ScanResult = {
-    available: false,
-    membersImported: 0,
-    filesSeen: 0,
-    areas: 0,
-    truncated: false,
-  };
-  if (!isGitHubAppConfigured() || !repository.githubInstallationId) return empty;
+  // Probed before any work: syncTree and importContributors degrade rather than
+  // throw, by design, so once they return the reason no longer exists to report.
+  // One cheap request buys an answer the operator can act on.
+  const blocker = await probeAccess(repository.githubInstallationId, repository.fullName);
+  if (blocker) {
+    log.info("scan blocked", { repositoryId, blocker });
+    return blocked(blocker);
+  }
 
   // The tree sync is the one that reads the file listing; the digest is then
   // derived from the rows it stored rather than from a second request, so the
@@ -71,6 +73,7 @@ export async function scanRepository(repositoryId: string): Promise<ScanResult> 
 
   return {
     available: true,
+    blocker: null,
     membersImported,
     filesSeen: structure?.totalFiles ?? 0,
     areas: structure?.areas.length ?? 0,

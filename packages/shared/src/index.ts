@@ -36,5 +36,6 @@ export * from "./contracts/delivery.js";
 export * from "./contracts/dossier.js";
 export * from "./contracts/check.js";
 export * from "./contracts/tree.js";
+export * from "./contracts/scan.js";
 
 export * from "./i18n/index.js";

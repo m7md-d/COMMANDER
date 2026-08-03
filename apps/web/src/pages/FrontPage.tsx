@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { scanBlockerKey } from "@commander/shared";
 import { useTranslate } from "@/shared/i18n/I18nProvider";
 import { useToast } from "@/shared/hooks/useToast";
 import { ApiError } from "@/shared/api/client";
@@ -100,8 +101,9 @@ export function FrontPage() {
             onDigest={() => setDialog("digest")}
             onScan={() =>
               scan.mutate(front.id, {
-                // The scan is a no-op without the App, and saying so beats a
-                // success toast reporting that nothing was found.
+                // A blocked scan names its own cause. "Unavailable" was true and
+                // useless: four different faults produced it, each with a
+                // different fix, and the server knew which one every time.
                 onSuccess: (result) =>
                   notify(
                     result.available
@@ -110,7 +112,7 @@ export function FrontPage() {
                           files: result.filesSeen,
                           areas: result.areas,
                         })
-                      : t("repos.scanUnavailable"),
+                      : t(result.blocker ? scanBlockerKey(result.blocker) : "repos.scanUnavailable"),
                     result.available ? "success" : "error",
                   ),
                 onError: fail,

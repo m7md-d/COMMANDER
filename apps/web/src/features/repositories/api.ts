@@ -2,6 +2,7 @@ import type {
   Repository,
   RepositoryInput,
   RepositoryUpdate,
+  ScanResult,
   StructureDigest,
   TreeSnapshot,
 } from "@commander/shared";
@@ -13,14 +14,7 @@ export interface RepositoryListResponse {
   webhookUrl: string;
 }
 
-/** What one reconnaissance pass found. `available` is false without the App. */
-export interface ScanResult {
-  available: boolean;
-  membersImported: number;
-  filesSeen: number;
-  areas: number;
-  truncated: boolean;
-}
+export type { ScanResult };
 
 export const repositoryKeys = {
   all: ["repositories"] as const,

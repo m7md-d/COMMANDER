@@ -452,6 +452,22 @@ export const AR = {
   "repos.scanHint": "يقرأ الريبو مرة واحدة: يستورد المساهمين بصورهم ويتعلّم هيكلة الملفات. مفيد عند ربط مشروع قائم.",
   "repos.scanDone": "اكتمل الفحص: {members} مساهماً و{files} ملفاً في {areas} منطقة",
   "repos.scanUnavailable": "الفحص يتطلب ربط GitHub App ومعرّف تثبيت لهذا الريبو",
+
+  // سبب واحد محدَّد لكل حالة، ولكلٍّ إصلاح مختلف. «غير متاح» وحدها كانت تترك
+  // المشغّل أمام أربعة احتمالات والمنصّة تعرف أيّها.
+  "scan.blocked.appNotConfigured":
+    "GitHub App غير مربوط: GITHUB_APP_ID أو GITHUB_APP_PRIVATE_KEY فاضي في البيئة. اضبطهما وأعد تشغيل الـAPI.",
+  "scan.blocked.noInstallationId":
+    "هذه الجبهة بلا معرّف تثبيت. الحقل لكل جبهة على حدة — انسخ الرقم من رابط التثبيت في GitHub وضعه في «معرّف تثبيت GitHub App» فوق.",
+  "scan.blocked.keyRejected":
+    "GitHub رفض المفتاح. المطلوب base64 لملف ‎.pem بكامله بما فيه سطرا BEGIN وEND — ترميز جسم المفتاح وحده يُرفض هكذا.",
+  "scan.blocked.installationNotFound":
+    "لا يوجد تثبيت بهذا الرقم لهذا التطبيق. تحقّق أنك لم تضع معرّف التثبيت مكان GITHUB_APP_ID: الأول رقم كبير في رابط التثبيت، والثاني صغير في صفحة التطبيق.",
+  "scan.blocked.repoNotInInstallation":
+    "التطبيق مثبَّت على الحساب لكن ليس على هذا الريبو. في GitHub: Settings ← Applications ← Configure، وأضف الريبو إلى المسموح لها.",
+  "scan.blocked.githubUnreachable":
+    "تعذّر الوصول إلى GitHub — شبكة أو مهلة. الخادم لم يستلم رداً أصلاً.",
+  "scan.blocked.githubRefused": "GitHub رفض الطلب لسبب آخر. التفصيل في سجلّ الـAPI.",
   "var.structure": "هيكلة ملفات المشروع",
 
   "report.reviewLine": "- \"{title}\" — الحكم: {verdict}. {remark}",

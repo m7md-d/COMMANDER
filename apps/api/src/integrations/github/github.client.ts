@@ -40,8 +40,12 @@ export async function request<T>(
   installationId: string,
   path: string,
 ): Promise<Result<T>> {
-  const token = await getInstallationToken(installationId);
-  if (!token) return { ok: false, error: "no_installation_token", notFound: false };
+  const auth = await getInstallationToken(installationId);
+  // The blocker travels as the error string rather than being flattened to
+  // "no_installation_token": callers that only log it lose nothing, and the one
+  // that reports to the operator gets the actual reason.
+  if (!auth.ok) return { ok: false, error: auth.blocker, notFound: false };
+  const token = auth.token;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);

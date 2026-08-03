@@ -11,6 +11,7 @@
  */
 
 import { createSign } from "node:crypto";
+import type { ScanBlocker } from "@commander/shared";
 import { env } from "@/config/env.js";
 import { createLogger } from "@/core/logger/logger.js";
 
@@ -76,17 +77,31 @@ interface InstallationTokenResponse {
   message?: string;
 }
 
+export type TokenResult = { ok: true; token: string } | { ok: false; blocker: ScanBlocker };
+
+/** GitHub distinguishes these, and so must we: they are four different fixes. */
+function refusalBlocker(status: number): ScanBlocker {
+  if (status === 401) return "keyRejected";
+  if (status === 404) return "installationNotFound";
+  return "githubRefused";
+}
+
 /**
- * @returns a bearer token for the installation, or null when the App is not
- * configured or GitHub refuses. Null is a normal outcome — every caller
- * degrades to webhook-only data rather than failing the delivery.
+ * @returns the installation's bearer token, or the reason there is none.
+ *
+ * Failure is a normal outcome — every caller degrades to webhook-only data
+ * rather than losing a report — but it is no longer an anonymous one. A bare
+ * null made "the App is off", "the key is malformed" and "that installation does
+ * not exist" indistinguishable to everything upstream, including the operator
+ * looking at the panel.
  */
-export async function getInstallationToken(installationId: string): Promise<string | null> {
-  if (!isGitHubAppConfigured() || !installationId) return null;
+export async function getInstallationToken(installationId: string): Promise<TokenResult> {
+  if (!isGitHubAppConfigured()) return { ok: false, blocker: "appNotConfigured" };
+  if (!installationId) return { ok: false, blocker: "noInstallationId" };
 
   const cached = tokenCache.get(installationId);
   if (cached && cached.expiresAt - TOKEN_REFRESH_MARGIN_MS > Date.now()) {
-    return cached.token;
+    return { ok: true, token: cached.token };
   }
 
   try {
@@ -103,7 +118,7 @@ export async function getInstallationToken(installationId: string): Promise<stri
 
     if (!response.ok || !body.token) {
       log.warn("installation token refused", { status: response.status, message: body.message });
-      return null;
+      return { ok: false, blocker: refusalBlocker(response.status) };
     }
 
     tokenCache.set(installationId, {
@@ -111,10 +126,10 @@ export async function getInstallationToken(installationId: string): Promise<stri
       expiresAt: body.expires_at ? Date.parse(body.expires_at) : Date.now() + 3_600_000,
     });
 
-    return body.token;
+    return { ok: true, token: body.token };
   } catch (error) {
     log.warn("installation token request failed", { error: String(error) });
-    return null;
+    return { ok: false, blocker: "githubUnreachable" };
   }
 }
 
