@@ -17,6 +17,7 @@ import { getDefaultPrompt, getPrompt } from "@/modules/prompts/prompts.service.j
 import { getSettings } from "@/modules/settings/settings.service.js";
 import { recordPush } from "@/modules/stats/stats.service.js";
 import { reviewPushCommits } from "@/modules/dossier/review.service.js";
+import { weighAgainstHistory } from "@/modules/dossier/dossier.ledger.js";
 import { composeReport, detectViolations } from "./report.pipeline.js";
 import { refreshTodos, refreshTree, runChecks } from "./delivery.checks.js";
 import { writeLedger } from "./delivery.ledger.js";
@@ -87,6 +88,7 @@ async function run(job: PrismaDelivery, received: NormalizedPush): Promise<void>
 
   // Real file and line counts before either the rules or the report read them.
   push = await enrichPush(repository, push);
+  const weight = await weighAgainstHistory(repository.id, push);
 
   // Rules read the push, checks read the tree — and from here down the charges
   // are one list, so the tone, the embed and the dossier need to know about
@@ -94,7 +96,10 @@ async function run(job: PrismaDelivery, received: NormalizedPush): Promise<void>
   const checked = await runChecks(repository, touched);
   // After the measurement, which is what fills in the notes it reads.
   await refreshTodos(repository.id, touched);
-  const violations = [...detectViolations(push, repository, settings), ...checked.violations];
+  const violations = [
+    ...detectViolations({ push, repository, settings, weight }),
+    ...checked.violations,
+  ];
 
   // A push that only fixed things is not a clean push in the sense this flag
   // means. The setting exists to stop routine work filling a channel, and

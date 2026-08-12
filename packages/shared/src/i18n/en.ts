@@ -232,6 +232,10 @@ export const EN: Dictionary = {
   "rule.branch_deleted.label": "Branch deleted",
   "rule.branch_deleted.hint": "Detects deletion of a watched branch.",
   "rule.branch_deleted.report": "deleted the branch {branch}",
+  "rule.merge_residue.label": "Merge residue",
+  "rule.merge_residue.hint":
+    "Detects files the merge commit itself introduced that belong to no commit it brings in. A clean merge and a conflict resolution both leave none.",
+  "rule.merge_residue.report": "landed a merge introducing {files} file(s) belonging to no commit in it",
 
   "day.0": "Sunday",
   "day.1": "Monday",

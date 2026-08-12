@@ -28,7 +28,7 @@ export async function runPreview(request: PreviewRequest): Promise<PreviewResult
   const stats = await listMemberStats(repository.id);
   const record = stats.find((entry) => entry.login.toLowerCase() === login.toLowerCase());
 
-  const violations = detectViolations(push, repository, settings);
+  const violations = detectViolations({ push, repository, settings });
 
   const composed = await composeReport({
     push,

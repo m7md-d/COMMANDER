@@ -61,7 +61,7 @@ npm run verify           # typecheck + lint + build + test  ← قبل ادّع�
 | `references.test.ts` | مسار وثيقة أو ملف يشير إليه الريبو ولا وجود له |
 | `domain-tests.test.ts` | دالة مُصدَّرة من `domain/` لا يسمّيها اختبار |
 | `proposals.test.ts` | حالة مقترح غير معرَّفة، أو فهرسٌ يخالف الملف |
-| `tooling.test.ts` | سكربت npm يكتب محرّك حاويات حرفياً بدل `scripts/compose.sh` |
+| `tooling.test.ts` | سكربت npm يكتب محرّك حاويات حرفياً بدل `scripts/compose.sh` · سكربت يبني صورة ولا يستبدل الحاوية |
 | `images.test.ts` | صورة حاوية بلا اسم سجلّ — بودمان يسأل عنها، والنشر لا أحد عنده ليجيب |
 | `tracked.test.ts` | ملفّ مصدر يتجاهله git — أي لن يوجد في نسخة جديدة |
 

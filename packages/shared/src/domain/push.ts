@@ -21,6 +21,20 @@ export interface NormalizedCommit {
    */
   additions?: number;
   deletions?: number;
+  /**
+   * Parent shas. Two or more means a merge. Undefined until enrichment asks
+   * GitHub, because the push payload does not carry them — and without them a
+   * merge can only be guessed at from its title, which squash and rebase merges
+   * do not have and any commit can imitate.
+   */
+  parents?: string[];
+  /**
+   * The paths this commit touched. Undefined until enrichment: the push payload
+   * carries them but the mapper keeps only counts, and the API view is the one
+   * that also covers a reconciled push. Needed to answer what a merge commit
+   * contains that the commits it brings in do not.
+   */
+  paths?: string[];
 }
 
 export interface NormalizedPush {

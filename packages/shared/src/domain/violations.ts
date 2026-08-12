@@ -17,6 +17,7 @@ export const RULE_IDS = [
   "weekend_ops",
   "large_diff",
   "branch_deleted",
+  "merge_residue",
 ] as const;
 
 export type RuleId = (typeof RULE_IDS)[number];
@@ -79,6 +80,7 @@ export interface RuleConfigMap {
   weekend_ops: WeekdayRuleConfig;
   large_diff: ThresholdRuleConfig;
   branch_deleted: RuleConfigBase;
+  merge_residue: RuleConfigBase;
 }
 
 export type RuleConfig = RuleConfigMap[RuleId];
@@ -108,5 +110,10 @@ export function defaultRuleConfig(): RuleConfigMap {
     weekend_ops: { enabled: false, days: [5, 6] },
     large_diff: { enabled: false, threshold: 40 },
     branch_deleted: { enabled: true },
+    // No threshold, deliberately: a threshold is a size a smuggler stays under,
+    // and one file belonging to no commit is the whole finding. It stays quiet
+    // because a clean merge and a conflict resolution both leave nothing behind
+    // — a conflicted file is in the branch too, so it is carried, not residue.
+    merge_residue: { enabled: true },
   };
 }

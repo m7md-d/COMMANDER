@@ -220,6 +220,10 @@ export const AR = {
   "rule.branch_deleted.label": "حذف فرع",
   "rule.branch_deleted.hint": "يرصد حذف فرع مراقَب.",
   "rule.branch_deleted.report": "حذف الفرع {branch}",
+  "rule.merge_residue.label": "بقيّة دمج",
+  "rule.merge_residue.hint":
+    "يرصد ملفات أدخلها كومت الدمج نفسه ولا تعود لأي كوميت يجلبه. الدمج النظيف وحلّ التعارض لا يتركان بقيّة.",
+  "rule.merge_residue.report": "دمجٌ أدخل {files} ملفاً لا يعود لأي كوميت فيه",
 
   "day.0": "الأحد",
   "day.1": "الإثنين",

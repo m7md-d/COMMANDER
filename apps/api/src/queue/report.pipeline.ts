@@ -5,8 +5,10 @@
 
 import {
   DEFAULT_GRAVITY,
+  weighPush,
   type Commendation,
   type NormalizedPush,
+  type PushWeight,
   type Repository,
   type Settings,
   type StructureDigest,
@@ -45,14 +47,30 @@ export interface ComposedReport {
   model: string;
 }
 
-export function detectViolations(push: NormalizedPush, repository: Repository, settings: Settings) {
+export function detectViolations(input: {
+  push: NormalizedPush;
+  repository: Repository;
+  settings: Settings;
+  /** What the push brought rather than what it carries. Absent for a preview,
+   *  which has no repository history to weigh a sample against. */
+  weight?: PushWeight;
+}) {
+  const { push, repository, settings } = input;
   return evaluateRules(
-    { push, timezoneOffset: settings.timezoneOffset },
+    {
+      push,
+      timezoneOffset: settings.timezoneOffset,
+      weight: input.weight ?? weighPush({ push, knownShas: EMPTY_HISTORY }),
+    },
     repository.rules,
     // The domain layer stays pure; logging the failure is the caller's job (§6).
     (ruleId, error) => log.error("rule threw", { ruleId, error: String(error) }),
   );
 }
+
+/** A push weighed against no history: every commit is new, which is what a
+ *  preview of a sample push means. */
+const EMPTY_HISTORY: ReadonlySet<string> = new Set();
 
 export function findMember(repository: Repository, login: string): MemberIdentity | null {
   const member = repository.members.find(

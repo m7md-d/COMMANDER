@@ -67,6 +67,11 @@ function applyDetail(commit: NormalizedCommit, detail: CommitDetail): Normalized
     ...(counted === 0 && countByStatus(detail.files)),
     additions: detail.additions,
     deletions: detail.deletions,
+    // Both were already in this response and were being dropped. They are what
+    // lets a merge be weighed on what it introduced rather than on the whole
+    // branch it carries — see weighPush.
+    parents: detail.parents,
+    paths: detail.files.map((file) => file.path),
   };
 }
 

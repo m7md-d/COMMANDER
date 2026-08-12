@@ -18,6 +18,26 @@ function describeStructure(structure: StructureDigest): string {
 const DIFF_CHAR_BUDGET = 12_000;
 const PER_FILE_CHAR_BUDGET = 3_000;
 
+/**
+ * Marks the cut, in the text the model reads.
+ *
+ * A silently sliced patch is not a shorter patch — it is a different one, and it
+ * reads as a file that stops mid-function. The reviewer then reports exactly
+ * what it was shown: "incomplete code", "functions left hanging". The accusation
+ * is manufactured by the truncation, not by the model, and it lands on somebody
+ * whose file was complete.
+ *
+ * Measured on a real report: a 311-line C file arrived as a 8,933-character
+ * patch, of which the reviewer saw 3,000 — 33%, ending mid-identifier inside a
+ * loop, with no closing brace and no `main`. Both invented findings followed
+ * from that and only that. An honest gap beats a confident wrong answer
+ * (docs/VISION.md); this is the line where the gap is made honest.
+ */
+function clip(patch: string, limit: number): string {
+  if (patch.length <= limit) return patch;
+  return `${patch.slice(0, limit)}\n… [اقتُطع الفرق: عُرض ${limit} حرفاً من ${patch.length}. ما بعد هذا الموضع لم يُعرض عليك.]`;
+}
+
 export function buildReviewPrompt(input: {
   title: string;
   authorLogin: string;
@@ -46,10 +66,15 @@ export function buildReviewPrompt(input: {
       blocks.push("… (بقية الملفات محذوفة لتجاوز الحد)");
       break;
     }
+    // The remaining budget clips too, so it goes through `clip` as well — a cut
+    // made by the running total is just as invisible as a cut made by the
+    // per-file bound, and was the second silent one here.
+    const head = `--- ${file.path} (${file.status}) ---\n`;
+    const allowance = Math.min(PER_FILE_CHAR_BUDGET, Math.max(budget - head.length, 0));
     const patch = file.patch
-      ? file.patch.slice(0, PER_FILE_CHAR_BUDGET)
+      ? clip(file.patch, allowance)
       : "(بلا فرق نصّي — ملف ثنائي أو أكبر من أن يُعرض)";
-    const block = `--- ${file.path} (${file.status}) ---\n${patch}`.slice(0, budget);
+    const block = head + patch;
     blocks.push(block);
     budget -= block.length;
   }

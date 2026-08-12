@@ -4,12 +4,19 @@
  * engine testable without a database or a server.
  */
 
-import type { NormalizedPush, RuleDetail } from "@commander/shared";
+import type { NormalizedPush, PushWeight, RuleDetail } from "@commander/shared";
 
 export interface RuleContext {
   push: NormalizedPush;
   /** Fixed UTC offset from settings. Used by the time-based rules. */
   timezoneOffset: number;
+  /**
+   * What the push actually brought, as opposed to what it carries — computed
+   * once by the caller because it needs the repository's known shas, which the
+   * domain may not read. The size rules judge this rather than `push.commits`,
+   * so a merge is not charged for the branch it closes (see weighPush).
+   */
+  weight: PushWeight;
 }
 
 /**

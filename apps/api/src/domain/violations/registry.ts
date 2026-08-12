@@ -17,6 +17,7 @@ import { nightOpsRule } from "./rules/night-ops.rule.js";
 import { weekendOpsRule } from "./rules/weekend-ops.rule.js";
 import { largeDiffRule } from "./rules/large-diff.rule.js";
 import { branchDeletedRule } from "./rules/branch-deleted.rule.js";
+import { mergeResidueRule } from "./rules/merge-residue.rule.js";
 
 type Registry = { [K in RuleId]: RuleEvaluator<RuleConfigMap[K]> };
 
@@ -29,4 +30,5 @@ export const RULE_REGISTRY: Registry = {
   weekend_ops: weekendOpsRule,
   large_diff: largeDiffRule,
   branch_deleted: branchDeletedRule,
+  merge_residue: mergeResidueRule,
 };

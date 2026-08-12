@@ -9,6 +9,7 @@
 import { OPENROUTER_ENDPOINT, OPENROUTER_TIMEOUT_MS } from "@/config/constants.js";
 import { env } from "@/config/env.js";
 import { createLogger } from "@/core/logger/logger.js";
+import { readUsage, type CompletionUsage, type RawUsage } from "./openrouter.usage.js";
 
 const log = createLogger("openrouter");
 
@@ -21,12 +22,13 @@ export interface CompletionRequest {
 }
 
 export type CompletionResult =
-  | { ok: true; text: string; model: string }
+  | { ok: true; text: string; model: string; usage: CompletionUsage | null }
   | { ok: false; error: string; model: string; retryable: boolean };
 
 interface OpenRouterResponse {
   choices?: { message?: { content?: string } }[];
   error?: { message?: string };
+  usage?: RawUsage;
 }
 
 /** 429 and 5xx recover on their own; 4xx will not, so retrying wastes quota. */
@@ -55,6 +57,27 @@ function postCompletion(request: CompletionRequest, signal: AbortSignal): Promis
       max_tokens: request.maxTokens,
     }),
   });
+}
+
+/**
+ * Records what the prompt actually cost, beside how long it was.
+ *
+ * Logged rather than stored: the pair is what establishes the real
+ * characters-per-token ratio for a given model, which is the only honest basis
+ * for telling an operator whether a budget fits a context window. Nothing reads
+ * it yet — see docs/proposals/0008-review-budget-in-settings.md.
+ */
+function reportUsage(request: CompletionRequest, body: OpenRouterResponse): CompletionUsage | null {
+  const usage = readUsage(body);
+  if (!usage) return null;
+
+  log.info("completion usage", {
+    model: request.model,
+    promptTokens: usage.promptTokens,
+    promptChars: request.systemPrompt.length + request.userPrompt.length,
+    completionTokens: usage.completionTokens,
+  });
+  return usage;
 }
 
 export async function requestCompletion(request: CompletionRequest): Promise<CompletionResult> {
@@ -87,7 +110,7 @@ export async function requestCompletion(request: CompletionRequest): Promise<Com
       return { ok: false, error: "empty_response", model: request.model, retryable: true };
     }
 
-    return { ok: true, text, model: request.model };
+    return { ok: true, text, model: request.model, usage: reportUsage(request, body) };
   } catch (error) {
     const aborted = error instanceof Error && error.name === "AbortError";
     log.warn("completion failed", { model: request.model, aborted });

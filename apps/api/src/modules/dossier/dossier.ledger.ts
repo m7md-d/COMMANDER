@@ -10,7 +10,14 @@
  * asymmetry built into it is not neutral, it is a case for the prosecution.
  */
 
-import type { Commendation, LedgerKind, ViolationHit } from "@commander/shared";
+import type {
+  Commendation,
+  LedgerKind,
+  NormalizedPush,
+  PushWeight,
+  ViolationHit,
+} from "@commander/shared";
+import { weighPush } from "@commander/shared";
 import { prisma } from "@/db/prisma.js";
 import { toJson } from "@/core/json.js";
 
@@ -50,6 +57,29 @@ async function record(kind: LedgerKind, input: LedgerWrite): Promise<void> {
       deliveryId: input.deliveryId,
     })),
   });
+}
+
+/**
+ * Weighs a push against the commits this repository already holds.
+ *
+ * Lives beside `recordCommits` because it asks the same table the same
+ * question from the other side, and the two must agree on what "already held"
+ * means. Must be called *before* recording: afterwards every sha in the push is
+ * known and the push weighs nothing.
+ */
+export async function weighAgainstHistory(
+  repositoryId: string,
+  push: NormalizedPush,
+): Promise<PushWeight> {
+  const shas = push.commits.map((commit) => commit.sha).filter(Boolean);
+  const held = shas.length
+    ? await prisma.commitRecord.findMany({
+        where: { repositoryId, sha: { in: shas } },
+        select: { sha: true },
+      })
+    : [];
+
+  return weighPush({ push, knownShas: new Set(held.map((row) => row.sha)) });
 }
 
 export async function recordCommits(input: {

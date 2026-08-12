@@ -13,6 +13,7 @@ export * from "./domain/violations.js";
 export * from "./domain/ledger.js";
 export * from "./domain/delivery.js";
 export * from "./domain/push.js";
+export * from "./domain/merge.js";
 export * from "./domain/occasion.js";
 export * from "./domain/digest.js";
 export * from "./domain/schedule.js";

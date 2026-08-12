@@ -10,7 +10,12 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { NormalizedCommit, NormalizedPush, RuleConfigBase } from "@commander/shared";
+import type {
+  NormalizedCommit,
+  NormalizedPush,
+  PushWeight,
+  RuleConfigBase,
+} from "@commander/shared";
 import { GITHUB_UI_COMMITTER } from "@commander/shared";
 import { directPushRule } from "@/domain/violations/rules/direct-push.rule.js";
 import { normalizePush } from "@/modules/webhook/push.mapper.js";
@@ -49,8 +54,12 @@ function push(commits: NormalizedCommit[]): NormalizedPush {
   };
 }
 
+/** This rule reads commits, not weight. Neutral so the two stay independent:
+ *  a direct push is one whether or not the repository has seen it before. */
+const UNWEIGHED: PushWeight = { newCommits: 0, filesTouched: 0, residue: [], measured: false };
+
 const evaluate = (commits: NormalizedCommit[]) =>
-  directPushRule({ push: push(commits), timezoneOffset: 3 }, ENABLED);
+  directPushRule({ push: push(commits), timezoneOffset: 3, weight: UNWEIGHED }, ENABLED);
 
 test("local commits pushed straight to the branch are flagged", () => {
   const hit = evaluate([commit(), commit({ sha: "b".repeat(40) })]);
@@ -107,5 +116,8 @@ test("normalizePush preserves the committer login the rule depends on", () => {
 
   assert.equal(normalized.commits[0]?.committerLogin, GITHUB_UI_COMMITTER);
   assert.equal(normalized.commits[0]?.title, "Add invoice export (#42)");
-  assert.equal(directPushRule({ push: normalized, timezoneOffset: 3 }, ENABLED), null);
+  assert.equal(
+    directPushRule({ push: normalized, timezoneOffset: 3, weight: UNWEIGHED }, ENABLED),
+    null,
+  );
 });

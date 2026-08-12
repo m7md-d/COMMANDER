@@ -24,6 +24,9 @@ export interface CommitDetail {
   additions: number;
   deletions: number;
   files: CommitFileChange[];
+  /** Two or more means a merge, which is the only way to tell one apart
+   *  reliably — a "Merge ..." title is a convention anybody can type or omit. */
+  parents: string[];
 }
 
 export interface RepoFile {
@@ -78,6 +81,7 @@ export async function request<T>(
 
 interface RawCommit {
   sha: string;
+  parents?: { sha?: string }[];
   stats?: { additions?: number; deletions?: number };
   files?: {
     filename: string;
@@ -105,6 +109,7 @@ export async function fetchCommitDetail(
     ok: true,
     data: {
       sha: raw.sha,
+      parents: (raw.parents ?? []).map((parent) => parent.sha ?? "").filter(Boolean),
       additions: raw.stats?.additions ?? 0,
       deletions: raw.stats?.deletions ?? 0,
       files: (raw.files ?? []).map((file) => ({

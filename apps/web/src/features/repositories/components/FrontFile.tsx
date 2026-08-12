@@ -58,7 +58,7 @@ export function FrontFile({
   const [tab, setTab] = useState<string>(FIRST_TAB);
 
   return (
-    <>
+    <div className="flex flex-col gap-6">
       <FrontLetterhead
         front={draft.value}
         serial={serial}
@@ -137,6 +137,6 @@ export function FrontFile({
           }}
         />
       ) : null}
-    </>
+    </div>
   );
 }

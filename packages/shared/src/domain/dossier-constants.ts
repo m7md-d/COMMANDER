@@ -17,6 +17,11 @@ export const BURST_DISCOUNT = 0.4;
  */
 export const RULE_SEVERITY: Record<ViolationId, number> = {
   force_push: 3.0,
+  // Beside force_push rather than beside large_diff: both are acts that put
+  // something into shared history which review did not see. This one is quieter,
+  // which is what makes it worth weighting — a large merge is exactly where a
+  // file nobody approved is least likely to be noticed.
+  merge_residue: 2.8,
   branch_deleted: 2.5,
   direct_push: 1.5,
   large_diff: 1.2,
