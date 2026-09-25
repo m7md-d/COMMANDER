@@ -8,7 +8,6 @@ import {
   weighPush,
   type Commendation,
   type NormalizedPush,
-  type PushWeight,
   type Repository,
   type Settings,
   type StructureDigest,
@@ -16,7 +15,7 @@ import {
   type Watcher,
 } from "@commander/shared";
 import { createLogger } from "@/core/logger/logger.js";
-import { evaluateRules } from "@/domain/violations/engine.js";
+import { evaluateRules, type RuleErrorReporter } from "@/domain/violations/engine.js";
 import {
   buildPromptValues,
   type HistoryRecord,
@@ -47,24 +46,20 @@ export interface ComposedReport {
   model: string;
 }
 
-export function detectViolations(input: {
-  push: NormalizedPush;
-  repository: Repository;
-  settings: Settings;
-  /** What the push brought rather than what it carries. Absent for a preview,
-   *  which has no repository history to weigh a sample against. */
-  weight?: PushWeight;
-}) {
+/** The domain layer stays pure; logging a rule that threw is the caller's job (§6). */
+export const logRuleError: RuleErrorReporter = (ruleId, error) =>
+  log.error("rule threw", { ruleId, error: String(error) });
+
+/**
+ * The rules alone, for the preview. The worker's charges come from `judgePush`,
+ * which evaluates the same rules on a push weighed against the real history.
+ */
+export function detectViolations(input: { push: NormalizedPush; repository: Repository; settings: Settings }) {
   const { push, repository, settings } = input;
   return evaluateRules(
-    {
-      push,
-      timezoneOffset: settings.timezoneOffset,
-      weight: input.weight ?? weighPush({ push, knownShas: EMPTY_HISTORY }),
-    },
+    { push, timezoneOffset: settings.timezoneOffset, weight: weighPush({ push, knownShas: EMPTY_HISTORY }) },
     repository.rules,
-    // The domain layer stays pure; logging the failure is the caller's job (§6).
-    (ruleId, error) => log.error("rule threw", { ruleId, error: String(error) }),
+    logRuleError,
   );
 }
 

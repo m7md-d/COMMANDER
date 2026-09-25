@@ -16,7 +16,12 @@ deliver`. Nothing in the first waits on the second.
    [outbox.service.ts](../../apps/api/src/queue/outbox.service.ts) claims rows with raw-SQL
    `FOR UPDATE SKIP LOCKED` so replicas take disjoint batches instead of racing.
    [delivery.processor.ts](../../apps/api/src/queue/delivery.processor.ts) **never throws** — a
-   throw strands its row in `processing` forever.
+   throw strands its row in `processing` forever. **It makes no decision either.** Which pushes
+   are read and judged, what each is charged with, who answers for it, and whether it is
+   recorded and sent are `admitPush` and `judgePush` in
+   [domain/judgement/](../../apps/api/src/domain/judgement/): pure, and called as they are by
+   the scenario reference. A gate added to the processor instead is one the reference cannot
+   see.
 4. **Retry policy lives in `packages/shared/src/domain/delivery.ts`.** `NON_RETRYABLE_REASONS`
    exists because retrying a deleted webhook or an unregistered repo cannot change the outcome.
 5. **[report.pipeline.ts](../../apps/api/src/queue/report.pipeline.ts) is shared** by the worker
@@ -64,8 +69,8 @@ packages/shared/     contracts (zod) · domain (rules, checks, ledger, schedule,
 apps/api/src/
   config/            env validated at boot, constants
   core/              errors · responses · logger · crypto · the JSON boundary
-  domain/            violation rules · prompt builder · sanitizer      (pure, no I/O)
-  integrations/      openrouter · discord · github                     (return Results)
+  domain/            judgement · violation rules · prompt builder · sanitizer   (pure, no I/O)
+  integrations/      openrouter · discord · github                              (return Results)
   modules/           auth · repositories · prompts · settings · models · stats
                      deliveries · webhook · tree · checks · todos · digest · dossier
   queue/             outbox · worker · processor · reconciler · report + digest pipelines

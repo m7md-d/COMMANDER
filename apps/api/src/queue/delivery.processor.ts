@@ -7,17 +7,18 @@ import type {
   ViolationHit,
   Watcher,
 } from "@commander/shared";
-import { branchIsWatched, readOccasion, resolveWatcher } from "@commander/shared";
+import { readOccasion, resolveWatcher } from "@commander/shared";
 import { fromJson } from "@/core/json.js";
 import { env } from "@/config/env.js";
 import { createLogger, describeError } from "@/core/logger/logger.js";
+import { admitPush, judgePush, type Judgement } from "@/domain/judgement/judgement.js";
 import { findByFullName } from "@/modules/repositories/repositories.service.js";
 import { getDefaultPrompt, getPrompt } from "@/modules/prompts/prompts.service.js";
 import { getSettings } from "@/modules/settings/settings.service.js";
 import { recordPush } from "@/modules/stats/stats.service.js";
 import { reviewPushCommits } from "@/modules/dossier/review.service.js";
-import { weighAgainstHistory } from "@/modules/dossier/dossier.ledger.js";
-import { composeReport, detectViolations } from "./report.pipeline.js";
+import { recordedShas } from "@/modules/dossier/dossier.ledger.js";
+import { composeReport, logRuleError } from "./report.pipeline.js";
 import { refreshTodos, refreshTree, runChecks } from "./delivery.checks.js";
 import { writeLedger } from "./delivery.ledger.js";
 import { deliver } from "./delivery.dispatch.js";
@@ -62,63 +63,51 @@ function resolvePrompt(promptId: string | null) {
   return promptId ? getPrompt(promptId) : getDefaultPrompt();
 }
 
+/**
+ * Gathers the facts and does what `admitPush` and `judgePush` decide. Every
+ * branch below acts on a decision; none of them makes one.
+ */
 async function run(job: PrismaDelivery, received: NormalizedPush): Promise<void> {
-  let push = received;
   const settings = await getSettings();
+  if (settings.paused) return markSkipped(job.id, "system_paused");
 
-  if (settings.paused) {
-    await markSkipped(job.id, "system_paused");
-    return;
-  }
-
-  const repository = await findByFullName(push.repoFullName);
+  const repository = await findByFullName(received.repoFullName);
   if (!repository) return markSkipped(job.id, "repo_not_configured");
-  if (!repository.enabled) return markSkipped(job.id, "repo_disabled");
-  if (!branchIsWatched(repository.branches, push.branch)) {
-    return markSkipped(job.id, "branch_not_watched");
-  }
-  // Before the gates below, not after: a push we choose not to report still
+
+  const admission = admitPush({ repository, push: received });
+  if (!admission.read) return markSkipped(job.id, admission.reason);
+  // Before the judging gate, not after: a push we choose not to judge still
   // moved the code, and a snapshot that skips those pushes would drift until the
   // next reconcile and blame the wrong person for what it then finds.
   const touched = await refreshTree(repository.id);
-
-  // A branch deletion carries no commits but is still worth reporting.
-  if (push.commits.length === 0 && !push.deleted) return markSkipped(job.id, "no_commits");
+  if (!admission.judged) return markSkipped(job.id, admission.reason);
 
   // Real file and line counts before either the rules or the report read them.
-  push = await enrichPush(repository, push);
-  const weight = await weighAgainstHistory(repository.id, push);
-
+  const push = await enrichPush(repository, received);
+  const knownShas = await recordedShas(repository.id, push);
   // Rules read the push, checks read the tree — and from here down the charges
   // are one list, so the tone, the embed and the dossier need to know about
   // neither. What was earned travels separately; see runChecks.
-  const checked = await runChecks(repository, touched);
+  const checks = await runChecks(repository, touched);
   // After the measurement, which is what fills in the notes it reads.
   await refreshTodos(repository.id, touched);
-  const violations = [
-    ...detectViolations({ push, repository, settings, weight }),
-    ...checked.violations,
-  ];
 
-  // A push that only fixed things is not a clean push in the sense this flag
-  // means. The setting exists to stop routine work filling a channel, and
-  // someone taking a file back under its limit is the one thing here worth
-  // interrupting for.
-  if (repository.silentWhenClean && violations.length === 0 && checked.commendations.length === 0) {
-    return markSkipped(job.id, "clean_and_silent");
-  }
+  const webhookUrl = repository.discordWebhookUrl || env.DISCORD_WEBHOOK_URL || "";
+  const judgement = judgePush(
+    {
+      push,
+      knownShas,
+      rules: repository.rules,
+      timezoneOffset: settings.timezoneOffset,
+      checks,
+      silentWhenClean: repository.silentWhenClean,
+      hasChannel: webhookUrl !== "",
+    },
+    logRuleError,
+  );
+  if (judgement.withheld !== null) return markSkipped(job.id, judgement.withheld);
 
-  const webhookUrl = repository.discordWebhookUrl || env.DISCORD_WEBHOOK_URL;
-  if (!webhookUrl) return markSkipped(job.id, "discord_missing");
-
-  await record(job, {
-    push,
-    repository,
-    settings,
-    violations,
-    commendations: checked.commendations,
-    webhookUrl,
-  });
+  await record(job, { push, repository, settings, judgement, webhookUrl });
 }
 
 /**
@@ -133,37 +122,31 @@ async function record(
     push: NormalizedPush;
     repository: Repository;
     settings: Settings;
-    violations: ViolationHit[];
-    commendations: Commendation[];
+    judgement: Judgement;
     webhookUrl: string;
   },
 ): Promise<void> {
-  const { push, repository, violations } = ctx;
+  const { push, repository, settings, webhookUrl } = ctx;
+  const { violations, commendations, login } = ctx.judgement;
 
   const history = await recordPush({
     repositoryId: repository.id,
-    login: push.actorLogin,
+    login,
     commitCount: push.commits.length,
     violations,
   });
 
-  await writeLedger({
-    repositoryId: repository.id,
-    push,
-    violations,
-    commendations: ctx.commendations,
-    deliveryId: job.id,
-  });
+  await writeLedger({ repositoryId: repository.id, login, push, violations, commendations, deliveryId: job.id });
 
   const watcher = resolveWatcher(repository.watchers, push.branch);
-  await report(job, { ...ctx, history, watcher });
+  await report(job, { push, repository, settings, violations, commendations, history, webhookUrl, watcher });
 }
 
 /**
- * Generation and delivery. Split from the gates above so each half stays legible:
- * `run` decides *whether* this push is reportable, this decides *what the report
- * says* — and it is here that the code review runs, before the model writes a
- * word about work it would otherwise only see the commit titles of.
+ * Generation and delivery. `judgePush` decided *whether* this push is reported;
+ * this decides *what the report says* — and it is here that the code review
+ * runs, before the model writes a word about work it would otherwise only see
+ * the commit titles of.
  */
 async function report(
   job: PrismaDelivery,

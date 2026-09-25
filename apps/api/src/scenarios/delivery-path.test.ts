@@ -12,6 +12,7 @@ import { CLEAN, charged, runCatalog, type Scenario } from "./judge.test.kit.js";
 import { seed, work, type Story } from "./story.test.kit.js";
 
 const FEATURE = "feature/export";
+const RELEASE = "release/1.0";
 
 /** Seed; Sara's six-commit, 45-file branch, pushed; Omar merges it — its webhook lost when `lost`. */
 async function prMerged(story: Story, lost: boolean) {
@@ -62,6 +63,26 @@ const scenarios: Scenario[] = [
       story.reconcile();
     },
     expect: charged("direct_push@sara"),
+  },
+  {
+    // The recovered pushes are queued and admitted like live ones, so a road
+    // that reads the wrong branch loses the push outright.
+    id: "lost-push-on-a-wildcard-front",
+    title: "a push to release/1.0 whose webhook is lost, on a front that watches release/* only",
+    front: { watch: ["release/*"] },
+    story: async (story) => {
+      await seed(story);
+      await story.branch(RELEASE, "main");
+      await story.commit({ on: RELEASE, by: OMAR, title: "fix", write: { "src/core/m003.ts": 'export const part3 = "rounded";\n' } });
+      await story.push(RELEASE, OMAR, { lost: true });
+      story.reconcile();
+    },
+    expect: charged("lazy_message@omar"),
+    defect: {
+      observed: CLEAN,
+      because:
+        "A wildcard is not a branch the commits API can read, so the reconciler reads the default branch instead — which release/* does not cover. Everything it recovers is skipped as unwatched, and release/1.0 is never read. (reconciler.ts resolveBranches)",
+    },
   },
   {
     id: "merge-without-the-app",

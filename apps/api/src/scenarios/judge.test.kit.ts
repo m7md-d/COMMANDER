@@ -1,23 +1,21 @@
 /**
  * From "GitHub sent this" to "these people were charged with this", on the
- * production code itself: the payload mapper, the enrichment, the weighing and
- * the rules are the real functions. Only the *order* they are called in is
- * written here — mirroring `delivery.processor.ts` and `reconciler.ts`, and each
- * mirrored step says which. When one of those files changes its order or its
- * gates, this file is the one that has to follow.
+ * production code itself. The payload mapper, the enrichment and the decision —
+ * `admitPush` and `judgePush`, the functions the processor calls — are the real
+ * ones. What is written here is only the I/O around them, each step naming the
+ * file it follows: what GitHub is asked, what the record keeps, what the
+ * reconciler replays. A gate, a charge or an attribution is never written here,
+ * so a change to one reaches this reference on its own.
  *
  * No model is called, anywhere. A verdict here is arithmetic on a repository.
  */
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  branchIsWatched,
-  weighPush,
-  type NormalizedPush,
-  type RuleConfigMap,
-} from "@commander/shared";
-import { evaluateRules, mergeWithDefaults } from "@/domain/violations/engine.js";
+import type { NormalizedPush, RuleConfigMap } from "@commander/shared";
+import { RECONCILE_LOOKBACK_MS } from "@/config/constants.js";
+import { admitPush, judgePush } from "@/domain/judgement/judgement.js";
+import { mergeWithDefaults } from "@/domain/violations/engine.js";
 import { toCommitDetail, toCommitListEntry } from "@/integrations/github/commit.mapper.js";
 import { isBranchRef, normalizePush } from "@/modules/webhook/push.mapper.js";
 import { enrichWith } from "@/queue/push.detail.js";
@@ -42,9 +40,10 @@ export const SUITE_RULES: RuleConfigMap = mergeWithDefaults({ large_diff: { enab
 
 const DEFAULT_FRONT: Front = { watch: [], app: true, rules: SUITE_RULES };
 const TIMEZONE_OFFSET = 3;
-/** reconciler.ts — `RECONCILE_LOOKBACK_MS` and the minute of overlap. */
-const LOOKBACK_MS = 3 * 24 * 60 * 60 * 1_000;
+/** reconciler.ts `computeSince` — the minute of overlap against clock skew. */
 const OVERLAP_MS = 60_000;
+/** The checks measure the stored tree, which the reference does not model. */
+const NO_CHECKS = { violations: [], commendations: [] };
 
 export type Outcome = "judged" | "ignored" | "unwatched" | "skipped" | "lost";
 
@@ -113,34 +112,38 @@ async function receive(run: Run, event: PushEvent): Promise<Verdict> {
   const payload = await run.view.webhook(event);
   // webhook.controller.ts — tag pushes arrive as pushes and are dropped.
   if (!isBranchRef(payload.ref)) return IGNORED;
-
-  const push = normalizePush(payload);
-  // delivery.processor.ts — the branch gate, then the empty-push gate.
-  if (!branchIsWatched(run.front.watch, push.branch)) return UNWATCHED;
-  if (push.commits.length === 0 && !push.deleted) return SKIPPED;
-
-  return { outcome: "judged", charges: await charge(run, push) };
+  return handle(run, normalizePush(payload));
 }
 
 /**
- * delivery.processor.ts `run` from enrichment on: enrich, weigh against what is
- * on record, evaluate, record. Recording always follows here because this front
- * is neither silent nor without a channel — the two gates in `run` that stop a
- * judged push from ever being written down.
+ * delivery.processor.ts `run`: admit, enrich, read what is on record, judge,
+ * record. This front is never silent and always has a channel; what the
+ * judgement then says about recording is taken as it says it.
  */
-async function charge(run: Run, received: NormalizedPush): Promise<string[]> {
+async function handle(run: Run, received: NormalizedPush): Promise<Verdict> {
+  const admission = admitPush({ repository: { enabled: true, branches: run.front.watch }, push: received });
+  if (!admission.read) return UNWATCHED;
+  if (!admission.judged) return SKIPPED;
+
   const push = run.front.app
     ? (await enrichWith(received, async (sha) => ({ ok: true, data: toCommitDetail(await run.view.commit(sha)) }))).push
     : received;
 
-  const weight = weighPush({ push, knownShas: new Set(run.known.keys()) });
-  const hits = evaluateRules({ push, timezoneOffset: TIMEZONE_OFFSET, weight }, run.front.rules, (id, error) => {
+  const facts = {
+    push,
+    knownShas: new Set(run.known.keys()),
+    rules: run.front.rules,
+    timezoneOffset: TIMEZONE_OFFSET,
+    checks: NO_CHECKS,
+    silentWhenClean: false,
+    hasChannel: true,
+  };
+  const judgement = judgePush(facts, (id, error) => {
     throw new Error(`rule ${id} threw`, { cause: error });
   });
 
-  remember(run.known, push);
-  // delivery.ledger.ts — every entry is written against the push's actor.
-  return hits.map((hit) => `${hit.ruleId}@${push.actorLogin}`).sort();
+  if (judgement.recorded) remember(run.known, push);
+  return charged(...judgement.violations.map((hit) => `${hit.ruleId}@${judgement.login}`));
 }
 
 /** dossier.ledger.ts `recordCommits`: first write wins, unparseable dates are skipped. */
@@ -152,7 +155,10 @@ function remember(known: Map<string, number>, push: NormalizedPush): void {
   }
 }
 
-/** reconciler.ts `reconcileRepo`, from the branch list to the synthetic pushes. */
+/**
+ * reconciler.ts `reconcileRepo`, from the branch list to the synthetic pushes —
+ * which it queues, so each is handled exactly as a live push is.
+ */
 async function reconcile(run: Run): Promise<Verdict> {
   const concrete = run.front.watch.filter((branch) => branch.length > 0 && !branch.includes("*"));
   const branches = concrete.length > 0 ? concrete : ["main"];
@@ -166,7 +172,7 @@ async function reconcile(run: Run): Promise<Verdict> {
     // reconcileBranch — drop what is on record, then oldest first.
     const fresh = listed.filter((entry) => !run.known.has(entry.sha)).reverse();
     for (const push of buildSyntheticPushes({ fullName: REPOSITORY }, branch, fresh)) {
-      charges.push(...(await charge(run, push)));
+      charges.push(...(await handle(run, push)).charges);
     }
   }
   return { outcome: "judged", charges: charges.sort() };
@@ -174,7 +180,7 @@ async function reconcile(run: Run): Promise<Verdict> {
 
 /** reconciler.ts `computeSince`. */
 function cursor(run: Run): number {
-  const floor = run.story.git.clock - LOOKBACK_MS;
+  const floor = run.story.git.clock - RECONCILE_LOOKBACK_MS;
   const newest = Math.max(floor, ...run.known.values());
   return Math.max(newest - OVERLAP_MS, floor);
 }

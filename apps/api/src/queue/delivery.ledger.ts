@@ -22,21 +22,25 @@ const log = createLogger("processor");
  * Evidence ledger: individual timestamped rows, which is what lets the dossier
  * decay and discount later. A failure here must not lose the report, so it is
  * logged rather than thrown — the score can be rebuilt, the communiqué cannot.
+ *
+ * Every row goes to the `login` the judgement named. Who answers for a push is
+ * a decision, and decisions are `judgePush`'s — this file only writes it down.
  */
 export async function writeLedger(input: {
   repositoryId: string;
+  login: string;
   push: NormalizedPush;
   violations: ViolationHit[];
   commendations: Commendation[];
   deliveryId: string;
 }): Promise<void> {
-  const { repositoryId, push, violations, commendations, deliveryId } = input;
+  const { repositoryId, login, push, violations, commendations, deliveryId } = input;
   const when = new Date();
 
   await Promise.all([
     recordViolations({
       repositoryId,
-      login: push.actorLogin,
+      login,
       entries: violations,
       occurredAt: when,
       deliveryId,
@@ -46,14 +50,14 @@ export async function writeLedger(input: {
     // show a person fixing something before they were charged for it.
     recordCommendations({
       repositoryId,
-      login: push.actorLogin,
+      login,
       entries: commendations,
       occurredAt: when,
       deliveryId,
     }),
     recordCommits({
       repositoryId,
-      login: push.actorLogin,
+      login,
       commits: push.commits.map((commit) => ({
         sha: commit.sha,
         title: commit.title,
