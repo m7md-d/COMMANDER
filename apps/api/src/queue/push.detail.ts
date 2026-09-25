@@ -9,7 +9,7 @@
  */
 
 import type { NormalizedCommit, NormalizedPush } from "@commander/shared";
-import type { CommitDetail, Result } from "@/integrations/github/github.client.js";
+import type { CommitDetail, CommitFileChange, Result } from "@/integrations/github/github.client.js";
 
 /**
  * Bounds the API calls one push may cost. The number came from the 20-commit cap
@@ -61,8 +61,20 @@ export function applyDetail(commit: NormalizedCommit, detail: CommitDetail): Nor
     // lets a merge be weighed on what it introduced rather than on the whole
     // branch it carries — see weighPush.
     parents: detail.parents,
-    paths: detail.files.map((file) => file.path),
+    paths: touchedPaths(detail.files),
   };
+}
+
+/**
+ * A rename touches two paths: the one it left and the one it made. Keeping only
+ * the new one let a merge's net deletion of the old path read as the merge's own
+ * work, and charged whoever merged it (scenario `rename-then-rewrite-merged`).
+ */
+function touchedPaths(files: CommitFileChange[]): string[] {
+  const paths = files.flatMap((file) =>
+    file.previousPath === undefined ? [file.path] : [file.path, file.previousPath],
+  );
+  return [...new Set(paths)];
 }
 
 function countByStatus(files: { status: string }[]) {

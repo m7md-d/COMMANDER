@@ -29,10 +29,10 @@ export interface NormalizedCommit {
    */
   parents?: string[];
   /**
-   * The paths this commit touched. Undefined until enrichment: the push payload
-   * carries them but the mapper keeps only counts, and the API view is the one
-   * that also covers a reconciled push. Needed to answer what a merge commit
-   * contains that the commits it brings in do not.
+   * The paths this commit touched — both sides of a rename. Undefined until
+   * enrichment: the push payload carries them but the mapper keeps only counts,
+   * and the API view is the one that also covers a reconciled push. Needed to
+   * answer what a merge commit contains that the commits it brings in do not.
    */
   paths?: string[];
 }

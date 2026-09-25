@@ -18,6 +18,8 @@ export interface CommitFileChange {
   status: string;
   /** The unified diff for this file. Absent for binary or very large files. */
   patch?: string;
+  /** Where a renamed file came from. GitHub sets it only on a rename. */
+  previousPath?: string;
 }
 
 export interface CommitDetail {

@@ -80,6 +80,14 @@ const scenarios: Scenario[] = [
     expect: charged("direct_push@omar", "merge_residue@omar"),
   },
   {
+    // A branch's rename counts both of its paths as carried; a rename the merge
+    // made by itself is still residue, both paths of it.
+    id: "merge-renames-an-untouched-file",
+    title: "a local merge that renames a file neither side touched",
+    story: (story) => mergeLocally(story, { move: [["src/core/m007.ts", "src/core/m007-archived.ts"]] }),
+    expect: charged("direct_push@omar", "merge_residue@omar"),
+  },
+  {
     id: "clean-local-merge",
     title: "a local merge that adds nothing of its own",
     story: (story) => mergeLocally(story),
@@ -126,11 +134,6 @@ const scenarios: Scenario[] = [
     title: "PR that renames a file and then rewrites it, merged",
     story: (story) => renamedOnBranch(story, true),
     expect: CLEAN,
-    defect: {
-      observed: charged("merge_residue@omar"),
-      because:
-        "A false accusation. The branch's rename is listed by its new name only — the client drops previous_filename — while the merge's net diff shows the old path deleted, so that deletion reads as the merge's own. (0009 §6)",
-    },
   },
   {
     id: "three-hundred-file-page",

@@ -1,0 +1,46 @@
+/**
+ * What a commit's API view puts into the push the rules read. The paths decide a
+ * merge's residue: a path missing here is a path the merge appears to have
+ * written by itself, and the rule charges whoever merged it.
+ */
+
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type { NormalizedCommit } from "@commander/shared";
+import type { CommitFileChange } from "@/integrations/github/github.client.js";
+import { applyDetail } from "@/queue/push.detail.js";
+
+const COMMIT: NormalizedCommit = {
+  sha: "c1",
+  title: "Give the totals module its name",
+  url: "",
+  timestamp: "2026-08-10T10:00:00+03:00",
+  filesAdded: 0,
+  filesRemoved: 0,
+  filesModified: 0,
+  authorLogin: "sara",
+  committerLogin: "sara",
+};
+
+const file = (path: string, status: string, previousPath?: string): CommitFileChange => ({
+  path,
+  status,
+  additions: 1,
+  deletions: 0,
+  ...(previousPath !== undefined && { previousPath }),
+});
+
+const pathsOf = (files: CommitFileChange[]) =>
+  applyDetail(COMMIT, { sha: "c1", additions: 1, deletions: 0, parents: ["p0"], files }).paths;
+
+test("a rename touches the path it left as well as the one it made", () => {
+  const paths = pathsOf([file("src/totals.ts", "renamed", "src/totals-legacy.ts")]);
+
+  assert.deepEqual(paths, ["src/totals.ts", "src/totals-legacy.ts"]);
+});
+
+test("a path renamed away and written again in the same commit is listed once", () => {
+  const paths = pathsOf([file("src/b.ts", "renamed", "src/a.ts"), file("src/a.ts", "added")]);
+
+  assert.deepEqual(paths, ["src/b.ts", "src/a.ts"]);
+});

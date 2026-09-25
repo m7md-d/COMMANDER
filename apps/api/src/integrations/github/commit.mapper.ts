@@ -23,6 +23,7 @@ export interface RawCommit {
     deletions?: number;
     status?: string;
     patch?: string;
+    previous_filename?: string;
   }[];
 }
 
@@ -47,6 +48,7 @@ export function toCommitDetail(raw: RawCommit): CommitDetail {
       deletions: file.deletions ?? 0,
       status: file.status ?? "modified",
       ...(file.patch !== undefined && { patch: file.patch }),
+      ...(file.previous_filename !== undefined && { previousPath: file.previous_filename }),
     })),
   };
 }
