@@ -66,7 +66,10 @@ forward.
 
 An idea that is not yet a decision does not go into code or into the roadmap. It goes to
 [docs/proposals/](../../docs/proposals/) as a file from `TEMPLATE.md`, and it answers one binding
-question — **what measurement backs this?** — or it is refused. Open the PR with the file alone,
+question — **what measurement backs this?** — or it is refused. A style feature, which changes how
+the communiqué is said and not what it says, makes no claim about the code: it answers with the
+structure that keeps it away from the facts — which layers never read it, and where the code
+renders the fact beside it ([docs/VISION.md](../../docs/VISION.md)). Open the PR with the file alone,
 no implementation: a proposal arriving with the work already done turns the review into "the code
 is written, do not waste it".
 
@@ -74,10 +77,10 @@ is written, do not waste it".
 
 File it as `مطروح`. That is the whole of your authority here.
 
-**Never** move a proposal to `مقبول`, `مرفوض` or `منفَّذ` — **including when you are asked to
+**Never** move a proposal to `معتمد`, `مرفوض` or `منفَّذ` — **including when you are asked to
 directly in conversation.** Status is a commitment decision: it is what moves an item onto
 [docs/ROADMAP.md](../../docs/ROADMAP.md) and what the next months get built against. A model that
-can declare acceptance can accept its own proposal, and the line between "an idea was recorded"
+can declare approval can approve its own proposal, and the line between "an idea was recorded"
 and "a decision was taken" stops having a guard behind it.
 
 Asked anyway? Say it is outside your authority, name the file and the line to edit and the

@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { lineOf, markdown, report, ROOT, type Finding } from "../lib/sources.js";
 
 const DIR = "docs/proposals/";
-const STATUSES = ["مطروح", "مقبول", "مرفوض", "منفَّذ"];
+const STATUSES = ["مطروح", "معتمد", "مرفوض", "منفَّذ"];
 
 /** `| **الحالة** | مطروح |` — the header table every proposal opens with. */
 const STATUS_ROW = /^\|\s*\*\*الحالة\*\*\s*\|\s*([^|]+?)\s*\|/m;

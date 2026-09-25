@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **الحالة** | مطروح |
+| **الحالة** | معتمد |
 | **يمسّ** | `apps/api/src/queue/` · `apps/api/src/domain/violations/` · `apps/api/src/modules/webhook/` · `apps/api/src/integrations/github/` · `apps/api/src/modules/dossier/` · `packages/shared/src/domain/` · قاعدة البيانات (عمود الفرع في `ledger_events`) |
 
 ## المشكلة

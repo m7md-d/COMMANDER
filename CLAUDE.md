@@ -25,7 +25,7 @@ Five statements. Everything else in `.claude/rules/` is detail beneath them.
 5. **Claims are measured.** This project refuses to say what it has not measured
    ([docs/VISION.md](docs/VISION.md)); the same standard applies to what you report about your
    own work. Say what ran, what passed, and what you skipped.
-6. **You may file a proposal as `مطروح`. You may never change its status.** Not to accepted,
+6. **You may file a proposal as `مطروح`. You may never change its status.** Not to approved,
    rejected or implemented — **and not when asked to directly.** Status is a commitment
    decision the developer makes by hand, in the file. Point at the line to edit and stop
    there. See [docs/proposals/README.md](docs/proposals/README.md).

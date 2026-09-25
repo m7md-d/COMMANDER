@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **الحالة** | مطروح |
+| **الحالة** | معتمد |
 | **يمسّ** | `packages/shared/src/domain/check-defaults.ts` · `packages/shared/src/domain/checks.ts` · `apps/api/src/modules/checks/` · `apps/web/src/features/repositories/components/CheckFields.tsx` · الواجهة |
 
 ## المشكلة

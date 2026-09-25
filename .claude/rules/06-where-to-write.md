@@ -6,7 +6,7 @@ contradict itself within months, and then nobody can tell which line is still tr
 | What you have | Where it goes |
 |---|---|
 | An idea, not yet decided | [docs/proposals/](../../docs/proposals/) — a file from `TEMPLATE.md`. It answers "what measurement backs this?" or it is refused |
-| An accepted item, not yet built | a row in [docs/ROADMAP.md](../../docs/ROADMAP.md) |
+| An approved item, not yet built | a row in [docs/ROADMAP.md](../../docs/ROADMAP.md) |
 | Something just built, and how it departed from the plan | [docs/CHECKS-ROADMAP.md](../../docs/CHECKS-ROADMAP.md) (engine) or [docs/UI-AUDIT.md](../../docs/UI-AUDIT.md) (panel) |
 | A UI observation | [docs/UI-AUDIT.md](../../docs/UI-AUDIT.md), **at the moment you meet it** — not gathered later from memory |
 | A rule binding all future code | the constitution, amended under §9 |

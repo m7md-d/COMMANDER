@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **الحالة** | مطروح |
+| **الحالة** | معتمد |
 | **يمسّ** | `prompts` · `packages/shared/src/i18n/` · `domain/report/` · `embed.builder.ts` |
 
 ## المشكلة
