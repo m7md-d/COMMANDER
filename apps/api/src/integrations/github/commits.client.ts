@@ -6,14 +6,7 @@
  */
 
 import { request, type Result } from "./github.client.js";
-
-interface RawListCommit {
-  sha: string;
-  html_url?: string;
-  commit?: { message?: string; author?: { date?: string }; committer?: { date?: string } };
-  author?: { login?: string } | null;
-  committer?: { login?: string } | null;
-}
+import { toCommitListEntry, type RawListCommit } from "./commit.mapper.js";
 
 export interface CommitListEntry {
   sha: string;
@@ -47,21 +40,7 @@ export async function listCommits(input: {
     `/repos/${repoFullName}/commits?${params.toString()}`,
   );
   if (!result.ok) return result;
-
-  return {
-    ok: true,
-    data: result.data.map((raw) => {
-      const message = String(raw.commit?.message ?? "");
-      return {
-        sha: raw.sha,
-        url: raw.html_url ?? "",
-        title: message.split("\n")[0]?.trim() ?? "",
-        timestamp: raw.commit?.committer?.date ?? raw.commit?.author?.date ?? "",
-        authorLogin: raw.author?.login ?? "",
-        committerLogin: raw.committer?.login ?? "",
-      };
-    }),
-  };
+  return { ok: true, data: result.data.map(toCommitListEntry) };
 }
 
 interface RawTree {

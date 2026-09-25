@@ -62,16 +62,3 @@ export function toRepositoryDto(row: RepositoryRow): Repository {
     updatedAt: row.updatedAt.toISOString(),
   };
 }
-
-/** An empty branch list means "every branch"; a trailing * is the only wildcard. */
-export function branchIsWatched(branches: string[], branch: string): boolean {
-  if (branches.length === 0) return true;
-
-  return branches.some((pattern) => {
-    const clean = pattern.trim();
-    if (!clean) return false;
-    if (clean === "*") return true;
-    if (clean.endsWith("*")) return branch.startsWith(clean.slice(0, -1));
-    return clean === branch;
-  });
-}

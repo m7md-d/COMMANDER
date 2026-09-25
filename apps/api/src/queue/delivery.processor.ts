@@ -7,11 +7,10 @@ import type {
   ViolationHit,
   Watcher,
 } from "@commander/shared";
-import { readOccasion, resolveWatcher } from "@commander/shared";
+import { branchIsWatched, readOccasion, resolveWatcher } from "@commander/shared";
 import { fromJson } from "@/core/json.js";
 import { env } from "@/config/env.js";
 import { createLogger, describeError } from "@/core/logger/logger.js";
-import { branchIsWatched } from "@/modules/repositories/repositories.mapper.js";
 import { findByFullName } from "@/modules/repositories/repositories.service.js";
 import { getDefaultPrompt, getPrompt } from "@/modules/prompts/prompts.service.js";
 import { getSettings } from "@/modules/settings/settings.service.js";

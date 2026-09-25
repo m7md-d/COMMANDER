@@ -10,79 +10,32 @@
  *
  * Best-effort (§6): with no App, or on any API failure, the push is returned
  * untouched and the report omits line counts rather than inventing them.
+ *
+ * This file is the wiring — the App check, the network, the log line. What the
+ * details *do* to a push lives in `push.detail.ts`, where it can be tested
+ * against real repositories without either.
  */
 
-import type { NormalizedCommit, NormalizedPush } from "@commander/shared";
+import type { NormalizedPush } from "@commander/shared";
 import { createLogger } from "@/core/logger/logger.js";
 import { isGitHubAppConfigured } from "@/integrations/github/app-auth.js";
-import { fetchCommitDetail, type CommitDetail } from "@/integrations/github/github.client.js";
+import { fetchCommitDetail } from "@/integrations/github/github.client.js";
+import { enrichWith } from "./push.detail.js";
 
 const log = createLogger("push-enrich");
-
-/** GitHub caps a push payload at 20 commits; the same ceiling bounds the cost. */
-const MAX_COMMITS = 20;
 
 export async function enrichPush(
   repository: { fullName: string; githubInstallationId: string },
   push: NormalizedPush,
 ): Promise<NormalizedPush> {
   if (!isGitHubAppConfigured() || !repository.githubInstallationId) return push;
-  if (push.commits.length === 0) return push;
 
-  const commits: NormalizedCommit[] = [];
-  let enriched = 0;
+  const result = await enrichWith(push, (sha) =>
+    fetchCommitDetail(repository.githubInstallationId, repository.fullName, sha),
+  );
 
-  for (const commit of push.commits.slice(0, MAX_COMMITS)) {
-    const detail = await fetchCommitDetail(
-      repository.githubInstallationId,
-      repository.fullName,
-      commit.sha,
-    );
-
-    if (!detail.ok) {
-      commits.push(commit);
-      continue;
-    }
-
-    commits.push(applyDetail(commit, detail.data));
-    enriched += 1;
+  if (result.enriched > 0) {
+    log.info("push enriched", { repo: repository.fullName, enriched: result.enriched });
   }
-
-  commits.push(...push.commits.slice(MAX_COMMITS));
-  if (enriched > 0) log.info("push enriched", { repo: repository.fullName, enriched });
-
-  return { ...push, commits };
-}
-
-/**
- * Line counts always come from the API — nothing else has them. File counts are
- * filled only when the push carries none, so a webhook's own authoritative
- * numbers are never overwritten by a later API view of the same commit.
- */
-function applyDetail(commit: NormalizedCommit, detail: CommitDetail): NormalizedCommit {
-  const counted = commit.filesAdded + commit.filesRemoved + commit.filesModified;
-
-  return {
-    ...commit,
-    ...(counted === 0 && countByStatus(detail.files)),
-    additions: detail.additions,
-    deletions: detail.deletions,
-    // Both were already in this response and were being dropped. They are what
-    // lets a merge be weighed on what it introduced rather than on the whole
-    // branch it carries — see weighPush.
-    parents: detail.parents,
-    paths: detail.files.map((file) => file.path),
-  };
-}
-
-function countByStatus(files: { status: string }[]) {
-  const isAdded = (status: string) => status === "added";
-  const isRemoved = (status: string) => status === "removed";
-
-  return {
-    filesAdded: files.filter((file) => isAdded(file.status)).length,
-    filesRemoved: files.filter((file) => isRemoved(file.status)).length,
-    // renamed, copied and changed are all edits to a path that already existed.
-    filesModified: files.filter((file) => !isAdded(file.status) && !isRemoved(file.status)).length,
-  };
+  return result.push;
 }

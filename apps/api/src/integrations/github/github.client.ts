@@ -5,6 +5,7 @@
 
 import { createLogger } from "@/core/logger/logger.js";
 import { getInstallationToken } from "./app-auth.js";
+import { toCommitDetail, type RawCommit } from "./commit.mapper.js";
 
 const log = createLogger("github");
 const API = "https://api.github.com";
@@ -79,19 +80,6 @@ export async function request<T>(
   }
 }
 
-interface RawCommit {
-  sha: string;
-  parents?: { sha?: string }[];
-  stats?: { additions?: number; deletions?: number };
-  files?: {
-    filename: string;
-    additions?: number;
-    deletions?: number;
-    status?: string;
-    patch?: string;
-  }[];
-}
-
 /**
  * The push webhook carries file *paths* only. This is the call that turns them
  * into line counts, which is the whole basis of "who wrote how much of what".
@@ -103,24 +91,7 @@ export async function fetchCommitDetail(
 ): Promise<Result<CommitDetail>> {
   const result = await request<RawCommit>(installationId, `/repos/${repoFullName}/commits/${sha}`);
   if (!result.ok) return result;
-
-  const raw = result.data;
-  return {
-    ok: true,
-    data: {
-      sha: raw.sha,
-      parents: (raw.parents ?? []).map((parent) => parent.sha ?? "").filter(Boolean),
-      additions: raw.stats?.additions ?? 0,
-      deletions: raw.stats?.deletions ?? 0,
-      files: (raw.files ?? []).map((file) => ({
-        path: file.filename,
-        additions: file.additions ?? 0,
-        deletions: file.deletions ?? 0,
-        status: file.status ?? "modified",
-        ...(file.patch !== undefined && { patch: file.patch }),
-      })),
-    },
-  };
+  return { ok: true, data: toCommitDetail(result.data) };
 }
 
 interface RawContent {

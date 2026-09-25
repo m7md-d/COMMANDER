@@ -14,5 +14,7 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+  /* `*.test.kit.ts` is test support — the scenario sandbox and emulator. The
+     infix keeps it out of the image, and the guards read `.test.` as test code. */
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.test.*.ts"]
 }

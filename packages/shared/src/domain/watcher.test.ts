@@ -7,7 +7,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveWatcher, type Watcher } from "./watcher.js";
+import { branchIsWatched, resolveWatcher, type Watcher } from "./watcher.js";
 
 function watcher(pattern: string, gravity: Watcher["gravity"]): Watcher {
   return { pattern, gravity, promptId: null, model: "" };
@@ -43,4 +43,15 @@ test("a branch matching nothing falls back rather than being left unwatched", ()
   const partial = [watcher("main", "critical")];
 
   assert.equal(resolveWatcher(partial, "dev").gravity, "routine");
+});
+
+test("an empty watch list admits every branch; a list admits only what it matches", () => {
+  assert.equal(branchIsWatched([], "feature/anything"), true);
+
+  const list = ["main", " release/* ", ""];
+  assert.equal(branchIsWatched(list, "main"), true);
+  assert.equal(branchIsWatched(list, "release/2.0"), true, "patterns are trimmed");
+  assert.equal(branchIsWatched(list, "feature/x"), false);
+  assert.equal(branchIsWatched(list, "mainline"), false, "exact names are not prefixes");
+  assert.equal(branchIsWatched([""], "main"), false, "a blank pattern watches nothing");
 });

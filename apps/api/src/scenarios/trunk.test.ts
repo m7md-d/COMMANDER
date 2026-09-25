@@ -1,0 +1,229 @@
+/**
+ * Work that reaches the trunk without a pull request — the thing `direct_push`
+ * exists to see, in every shape it actually arrives in.
+ *
+ * The policy: anything that lands on the trunk without passing through a pull
+ * request is a direct push, whatever its commit message says. A merge made on a
+ * laptop and pushed is a merge nobody reviewed. Whether something is a merge is
+ * decided by its parents, never by its title.
+ */
+
+import { LINA, OMAR, SARA } from "./git.test.kit.js";
+import { CLEAN, charged, runCatalog, SKIPPED, type Scenario } from "./judge.test.kit.js";
+import { modules, REPOSITORY, seed, work } from "./story.test.kit.js";
+
+const FEATURE = "feature/export";
+
+const scenarios: Scenario[] = [
+  {
+    id: "two-commits-pushed-to-main",
+    title: "two local commits pushed straight to main",
+    story: async (story) => {
+      await seed(story);
+      await work(story, { on: "main", by: SARA, commits: 2, width: 3 });
+      await story.push("main", SARA);
+    },
+    expect: charged("direct_push@sara"),
+  },
+  {
+    id: "seven-commits-pushed-to-main",
+    title: "seven local commits pushed to main at once",
+    story: async (story) => {
+      await seed(story);
+      await work(story, { on: "main", by: SARA, commits: 7, width: 2 });
+      await story.push("main", SARA);
+    },
+    expect: charged("batch_dump@sara", "direct_push@sara"),
+  },
+  {
+    id: "same-files-edited-three-times",
+    title: "three commits editing the same 15 files, pushed to main",
+    story: async (story) => {
+      await seed(story);
+      for (const round of [1, 2, 3]) {
+        const write = modules({ dir: "src/reports", count: 15, stamp: `round-${round}` });
+        await story.commit({ on: "main", by: SARA, title: `Tune the report layout, pass ${round}`, write });
+      }
+      await story.push("main", SARA);
+    },
+    expect: charged("direct_push@sara"),
+    defect: {
+      observed: charged("direct_push@sara", "large_diff@sara"),
+      because:
+        "weighPush sums files per commit, so 15 files edited three times count as 45 — while large_diff is defined as files touched. (0009 §6)",
+    },
+  },
+  {
+    id: "commit-titled-merge",
+    title: "an ordinary commit whose title begins with 'Merge', pushed to main",
+    story: async (story) => {
+      await seed(story);
+      await story.commit({ on: "main", by: SARA, title: "Merge the export fixes", write: modules({ dir: "src/export", count: 2, stamp: "fix" }) });
+      await story.push("main", SARA);
+    },
+    expect: charged("direct_push@sara"),
+    defect: {
+      observed: CLEAN,
+      because:
+        "direct_push exempts any push holding a commit whose title starts with 'Merge' (isMergeCommit is a title regex), so typing the word is enough. (0009 §2)",
+    },
+  },
+  {
+    id: "local-merge-default-message",
+    title: "branch merged on a laptop with git's default message, pushed to main",
+    story: async (story) => {
+      await branchPushed(story);
+      await story.merge({ into: "main", from: FEATURE, by: SARA, message: `Merge branch '${FEATURE}'` });
+      await story.push("main", SARA);
+    },
+    expect: charged("direct_push@sara"),
+    defect: {
+      observed: CLEAN,
+      because:
+        "git's own merge message starts with 'Merge', which exempts the push; the same merge under another message is charged (local-merge-own-message). The verdict hangs on the text. (0009 §2)",
+    },
+  },
+  {
+    id: "local-merge-own-message",
+    title: "the same local merge, written with a message of Sara's own",
+    story: async (story) => {
+      await branchPushed(story);
+      await story.merge({ into: "main", from: FEATURE, by: SARA, message: "Integrate the export feature" });
+      await story.push("main", SARA);
+    },
+    expect: charged("direct_push@sara"),
+  },
+  {
+    id: "octopus-merge-on-a-laptop",
+    title: "two branches merged at once (three parents) and pushed to main",
+    story: async (story) => {
+      await seed(story);
+      for (const name of ["feature/a", "feature/b"]) {
+        await story.branch(name, "main");
+        await work(story, { on: name, by: SARA, commits: 2, width: 2 });
+        await story.push(name, SARA);
+      }
+      await story.merge({ into: "main", from: ["feature/a", "feature/b"], by: SARA, message: "Merge branches 'feature/a' and 'feature/b'" });
+      await story.push("main", SARA);
+    },
+    expect: charged("direct_push@sara"),
+    defect: {
+      observed: CLEAN,
+      because:
+        "Exempted by its title, like every local merge git names itself. (0009 §2)",
+    },
+  },
+  {
+    id: "git-pull-merge-then-push",
+    title: "Sara pulls Lina's 48-file change with a merge, then pushes her two commits",
+    story: async (story) => {
+      await seed(story);
+      await story.branch("sara-clone", "main");
+      await work(story, { on: "main", by: LINA, commits: 3, width: 20, dir: "src/reports" });
+      await story.push("main", LINA);
+      await work(story, { on: "sara-clone", by: SARA, commits: 2, width: 2, dir: "src/export" });
+      await story.merge({ into: "sara-clone", from: "main", by: SARA, message: `Merge branch 'main' of github.com:${REPOSITORY}` });
+      await story.push("sara-clone", SARA, { to: "main" });
+    },
+    expect: charged("direct_push@sara"),
+    defect: {
+      observed: charged("large_diff@sara"),
+      because:
+        "Two errors. The pull merge's title exempts the push from direct_push; and its second parent is outside the push, so the push goes unweighed and Lina's 48 files, brought in by the pull, are charged to Sara. (0009 §2, §4)",
+    },
+  },
+  {
+    id: "foxtrot-merge",
+    title: "main merged into a feature, and the feature pushed over main",
+    story: async (story) => {
+      await branchPushed(story);
+      await work(story, { on: "main", by: LINA, commits: 3, width: 20, dir: "src/reports" });
+      await story.push("main", LINA);
+      await story.merge({ into: FEATURE, from: "main", by: SARA, message: `Merge branch 'main' into ${FEATURE}` });
+      await story.push(FEATURE, SARA, { to: "main" });
+    },
+    expect: charged("direct_push@sara"),
+    defect: {
+      observed: charged("large_diff@sara"),
+      because:
+        "The pull merge's shape again: exempted by its title, then charged with Lina's 48 files, because the merge's first-parent diff is main's work. (0009 §2, §4)",
+    },
+  },
+  {
+    id: "edited-in-the-browser",
+    title: "a file edited with GitHub's pencil, committed straight to main",
+    story: async (story) => {
+      await seed(story);
+      const write = { "src/core/m000.ts": 'export const part0 = "edited in the browser";\n' };
+      await story.editOnGitHub({ on: "main", by: SARA, title: "Correct the ledger header", write });
+    },
+    expect: charged("direct_push@sara"),
+    defect: {
+      observed: CLEAN,
+      because:
+        "A web-flow committer is read as 'arrived through a pull request', but the pencil commits straight to main with no pull request at all. (0009 §2)",
+    },
+  },
+  {
+    id: "cherry-pick-to-main",
+    title: "one commit of a pushed branch cherry-picked onto main",
+    story: async (story) => {
+      const [first] = await branchPushed(story);
+      await story.git.cherryPick({ onto: "main", shas: [first ?? ""], committer: SARA });
+      await story.push("main", SARA);
+    },
+    expect: charged("direct_push@sara"),
+  },
+  {
+    id: "merge-reverted-on-main",
+    title: "a merged 45-file PR reverted with git revert -m 1 and pushed",
+    story: async (story) => {
+      await branchPushed(story, { commits: 6, width: 10 });
+      await story.mergePullRequest({ number: 12, head: FEATURE, base: "main", author: SARA, by: OMAR, style: "merge" });
+      await story.git.revertMerge({ on: "main", merge: await story.git.resolve("main"), by: SARA });
+      await story.push("main", SARA);
+    },
+    expect: charged("direct_push@sara", "large_diff@sara"),
+  },
+  {
+    id: "main-rewound-by-force",
+    title: "main forced back two commits — history deleted, nothing added",
+    story: async (story) => {
+      await seed(story);
+      const [first] = await work(story, { on: "main", by: SARA, commits: 3, width: 2 });
+      await story.push("main", SARA);
+      await story.git.reset({ branch: "main", to: first ?? "" });
+      await story.push("main", SARA);
+    },
+    expect: charged("force_push@sara"),
+    defect: {
+      observed: SKIPPED,
+      because:
+        "A force push that only removes commits carries none, and the processor skips a push without commits before any rule runs — so deleting history from main is never reported. (0009 §2)",
+    },
+  },
+  {
+    id: "main-rewritten-by-force",
+    title: "main's last commit replaced and force-pushed",
+    story: async (story) => {
+      await seed(story);
+      const [first] = await work(story, { on: "main", by: SARA, commits: 2, width: 2 });
+      await story.push("main", SARA);
+      await story.git.reset({ branch: "main", to: first ?? "" });
+      await story.commit({ on: "main", by: SARA, title: "Rework the second export step", write: modules({ dir: "src/main", from: 50, count: 2, stamp: "rework" }) });
+      await story.push("main", SARA);
+    },
+    expect: charged("direct_push@sara", "force_push@sara"),
+  },
+];
+
+/** Seed, then Sara's feature branch — two small commits by default — pushed. */
+async function branchPushed(story: Parameters<Scenario["story"]>[0], size = { commits: 2, width: 3 }) {
+  await seed(story);
+  await story.branch(FEATURE, "main");
+  const shas = await work(story, { on: FEATURE, by: SARA, ...size });
+  await story.push(FEATURE, SARA);
+  return shas;
+}
+
+runCatalog("Straight onto the trunk", scenarios);

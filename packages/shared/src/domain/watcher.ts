@@ -43,6 +43,20 @@ export function patternMatches(pattern: string, branch: string): boolean {
 }
 
 /**
+ * Whether a push to `branch` is processed at all. An empty list means every
+ * branch — the shipped default.
+ *
+ * Lives beside `patternMatches` because it is the same matching. It used to be a
+ * second copy in the API's repository mapper, which nothing can import without
+ * a database — so the scenario reference would have had to copy it again, and a
+ * copy is a rule the worker does not run.
+ */
+export function branchIsWatched(branches: string[], branch: string): boolean {
+  if (branches.length === 0) return true;
+  return branches.some((pattern) => patternMatches(pattern, branch));
+}
+
+/**
  * The watcher governing this branch. With no list configured every branch is
  * routine and the repository's own prompt and model apply — so adding the
  * feature changes nothing until someone deliberately marks a branch.
