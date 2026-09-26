@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { GITHUB_UI_COMMITTER } from "@commander/shared";
 import type { CommitListEntry } from "@/integrations/github/commits.client.js";
-import { buildSyntheticPushes } from "@/queue/reconciler.mapper.js";
+import { branchesToReconcile, buildSyntheticPushes } from "@/queue/reconciler.mapper.js";
 
 const REPO = { fullName: "team/repo" };
 
@@ -72,4 +72,43 @@ test("commit order within a push is preserved, and file counts are unknown", () 
   assert.deepEqual(push.commits.map((commit) => commit.sha), ["old", "new"]);
   // The list endpoint carries no file data; enrichment backfills it later.
   assert.equal(push.commits[0]?.filesAdded, 0);
+});
+
+const BRANCHES = ["main", "release/1.0", "release/2.0", "feature/export"];
+const BY_TIME = (branch: string) => ({ branch, beyond: null });
+const BEYOND_MAIN = (branch: string) => ({ branch, beyond: "main" });
+
+test("a front that watches every branch is read on its default branch alone, by its history", () => {
+  for (const watch of [[], ["*"]]) {
+    assert.deepEqual(branchesToReconcile({ watch, existing: BRANCHES, defaultBranch: "main" }), [BY_TIME("main")]);
+  }
+});
+
+test("any other branch is read only beyond the default, never on the default in its place", () => {
+  assert.deepEqual(branchesToReconcile({ watch: ["release/*"], existing: BRANCHES, defaultBranch: "main" }), [
+    BEYOND_MAIN("release/1.0"),
+    BEYOND_MAIN("release/2.0"),
+  ]);
+  assert.deepEqual(branchesToReconcile({ watch: ["main", "release/*"], existing: BRANCHES, defaultBranch: "main" }), [
+    BY_TIME("main"),
+    BEYOND_MAIN("release/1.0"),
+    BEYOND_MAIN("release/2.0"),
+  ]);
+});
+
+test("a named branch that does not exist is not read", () => {
+  const reads = branchesToReconcile({ watch: ["main", "develop"], existing: BRANCHES, defaultBranch: "main" });
+
+  assert.deepEqual(reads, [BY_TIME("main")]);
+});
+
+test("without a listing, the named branches are read and the patterns are not", () => {
+  const reads = branchesToReconcile({ watch: ["release/1.0", "release/*"], existing: null, defaultBranch: "main" });
+
+  assert.deepEqual(reads, [BEYOND_MAIN("release/1.0")]);
+});
+
+test("without the default branch nothing is read: inherited work could not be told from pushed work", () => {
+  assert.deepEqual(branchesToReconcile({ watch: [], existing: BRANCHES, defaultBranch: null }), []);
+  assert.deepEqual(branchesToReconcile({ watch: ["release/*"], existing: BRANCHES, defaultBranch: null }), []);
 });

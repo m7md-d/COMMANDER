@@ -167,7 +167,8 @@ openssl rand -hex 16   # POSTGRES_PASSWORD  (ضعه أيضاً داخل DATABASE
 
 بلا رابط عام يصل، تبقى المصالحة ([`reconciler.ts`](../apps/api/src/queue/reconciler.ts))
 تسحب الكوميتات عبر الـApp وتعوّض الفجوة — لكنها `best-effort`: لا ترى فرعاً حُذف
-أثناء الانقطاع ولا تاريخاً محاه force push.
+أثناء الانقطاع ولا تاريخاً محاه force push، وفي جبهةٍ تراقب كل الفروع لا تقرأ إلا
+الفرع الافتراضي (الحدود المعروفة في [SETUP.md](SETUP.md)).
 
 ---
 

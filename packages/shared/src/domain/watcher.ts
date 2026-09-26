@@ -57,6 +57,17 @@ export function branchIsWatched(branches: string[], branch: string): boolean {
 }
 
 /**
+ * Whether a watch list admits every branch: empty, or holding a lone `*`.
+ *
+ * The reconciler has to know without a branch in hand. It reads such a front on
+ * its default branch alone, because reading every branch would cost a request
+ * per branch on each pass, stale branches included.
+ */
+export function watchesEverything(branches: string[]): boolean {
+  return branches.length === 0 || branches.some((pattern) => pattern.trim() === "*");
+}
+
+/**
  * The watcher governing this branch. With no list configured every branch is
  * routine and the repository's own prompt and model apply — so adding the
  * feature changes nothing until someone deliberately marks a branch.

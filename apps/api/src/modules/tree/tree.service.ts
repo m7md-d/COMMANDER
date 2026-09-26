@@ -17,12 +17,8 @@ import { prisma } from "@/db/prisma.js";
 import { createLogger } from "@/core/logger/logger.js";
 import { NotFoundError } from "@/core/errors/app-error.js";
 import { isGitHubAppConfigured } from "@/integrations/github/app-auth.js";
-import {
-  fetchDefaultBranch,
-  fetchRepoTree,
-  type RepoTree,
-  type RepoTreeEntry,
-} from "@/integrations/github/commits.client.js";
+import { fetchDefaultBranch } from "@/integrations/github/branches.client.js";
+import { fetchRepoTree, type RepoTree, type RepoTreeEntry } from "@/integrations/github/commits.client.js";
 import { diffTree, type TouchedFile, type TreeChanges } from "@/domain/tree/diff.js";
 import { stampRepository, writeFiles, writeMetrics } from "./tree.write.js";
 

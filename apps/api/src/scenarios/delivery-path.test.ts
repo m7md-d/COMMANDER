@@ -65,23 +65,69 @@ const scenarios: Scenario[] = [
     expect: charged("direct_push@sara"),
   },
   {
-    // The recovered pushes are queued and admitted like live ones, so a road
-    // that reads the wrong branch loses the push outright.
+    // A pattern is not a branch the commits API can read; the reconciler matches
+    // it against the branches there are. An edit made on GitHub keeps direct_push
+    // out of the verdict, so the road is the only thing under test.
     id: "lost-push-on-a-wildcard-front",
-    title: "a push to release/1.0 whose webhook is lost, on a front that watches release/* only",
+    title: "an edit to release/1.0 on GitHub whose webhook is lost, on a front that watches release/* only",
     front: { watch: ["release/*"] },
     story: async (story) => {
       await seed(story);
       await story.branch(RELEASE, "main");
-      await story.commit({ on: RELEASE, by: OMAR, title: "fix", write: { "src/core/m003.ts": 'export const part3 = "rounded";\n' } });
-      await story.push(RELEASE, OMAR, { lost: true });
+      await story.push(RELEASE, OMAR);
+      await story.editOnGitHub({ on: RELEASE, by: OMAR, title: "fix", write: { "src/core/m003.ts": 'export const part3 = "rounded";\n' }, lost: true });
       story.reconcile();
     },
     expect: charged("lazy_message@omar"),
+  },
+  {
+    // Nothing was lost here. The branch's history holds main's commits, and a
+    // front that does not watch main never recorded them.
+    id: "branch-cut-from-an-unwatched-main",
+    title: "release/1.0 cut from main on a front that watches release/1.0 only; the reconciler passes",
+    front: { watch: [RELEASE] },
+    story: async (story) => {
+      await seed(story);
+      await story.branch(RELEASE, "main");
+      await story.push(RELEASE, OMAR);
+      story.reconcile();
+    },
+    expect: CLEAN,
+  },
+  {
+    id: "lost-push-on-a-branch-of-an-all-branch-front",
+    title: "an edit to feature/export on GitHub whose webhook is lost, on the shipped front that watches every branch",
+    story: async (story) => {
+      await seed(story);
+      await story.branch(FEATURE, "main");
+      await story.push(FEATURE, SARA);
+      await story.editOnGitHub({ on: FEATURE, by: SARA, title: "wip", write: { "src/core/m004.ts": 'export const part4 = "draft";\n' }, lost: true });
+      story.reconcile();
+    },
+    expect: charged("lazy_message@sara"),
     defect: {
       observed: CLEAN,
       because:
-        "A wildcard is not a branch the commits API can read, so the reconciler reads the default branch instead — which release/* does not cover. Everything it recovers is skipped as unwatched, and release/1.0 is never read. (reconciler.ts resolveBranches)",
+        "A front that watches every branch is reconciled on its default branch alone: reading them all costs a request per branch on every pass, stale ones included. A push lost anywhere else stays lost. A cost bound, chosen — reconciler.mapper.ts branchesToReconcile.",
+    },
+  },
+  {
+    id: "lost-push-overtaken-by-a-later-one",
+    title: "Sara's push to main is lost; Omar's later push to his branch arrives before the reconciler passes",
+    story: async (story) => {
+      await seed(story);
+      await story.branch(FEATURE, "main");
+      await work(story, { on: "main", by: SARA, commits: 2, width: 3 });
+      await story.push("main", SARA, { lost: true });
+      await work(story, { on: FEATURE, by: OMAR, commits: 1, width: 2 });
+      await story.push(FEATURE, OMAR);
+      story.reconcile();
+    },
+    expect: charged("direct_push@sara"),
+    defect: {
+      observed: CLEAN,
+      because:
+        "The cursor is the newest commit on record anywhere in the repository. Omar's later push moved it past Sara's lost commits, so main is read from after them. Reading a branch back to the first commit on record, rather than by date, would not skip them. (reconciler.ts computeSince)",
     },
   },
   {

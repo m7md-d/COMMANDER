@@ -136,9 +136,10 @@ export class Story {
   }
 
   /** The pencil icon: a file edited in the browser and committed straight to a branch. */
-  async editOnGitHub(spec: { on: string; by: Person; title: string } & Change): Promise<void> {
-    await this.git.commit({ ...spec, committer: WEB_FLOW });
-    await this.push(spec.on, spec.by);
+  async editOnGitHub(spec: { on: string; by: Person; title: string; lost?: boolean } & Change): Promise<void> {
+    const { lost, ...edit } = spec;
+    await this.git.commit({ ...edit, committer: WEB_FLOW });
+    await this.push(spec.on, spec.by, { lost: lost ?? false });
   }
 
   private record(event: Omit<PushEvent, "kind" | "before" | "heads">, branch: string): void {

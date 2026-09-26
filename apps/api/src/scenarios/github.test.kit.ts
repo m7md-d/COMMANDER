@@ -16,6 +16,7 @@
  * | commit API `files`      | the first page — 300 — with `previous_filename`   | GitHub docs, "Get a commit" |
  * | `timestamp`             | the author date                                   | assumption |
  * | list API `since`        | compared with the committer date                  | assumption |
+ * | compare API `commits`   | the base..head set, oldest first, never cut        | GitHub docs, "Compare two commits": `git log BASE..HEAD`, chronological; 250 without paging |
  * | `username` / `login`    | `<login>@users.noreply.github.com`; GitHub's own address is `web-flow` | fixture convention |
  */
 
@@ -134,17 +135,14 @@ export class GitHubView {
   async list(head: string, since: number) {
     const metas = parseMetas(await this.git.run(["log", `--format=${FORMAT}`, head]));
     metas.forEach((meta) => this.metas.set(meta.sha, meta));
+    return metas.filter((meta) => Date.parse(meta.committer.date) >= since).map(listed);
+  }
 
-    return metas
-      .filter((meta) => Date.parse(meta.committer.date) >= since)
-      .map((meta) => ({
-        sha: meta.sha,
-        html_url: `${WEB}/commit/${meta.sha}`,
-        commit: { message: meta.message, author: meta.author, committer: meta.committer },
-        author: account(meta.author.email),
-        committer: account(meta.committer.email),
-        parents: meta.parents.map((parent) => ({ sha: parent })),
-      }));
+  /** `GET /repos/{owner}/{repo}/compare/{base}...{head}`: the base..head set, oldest first. */
+  async compare(base: string, head: string) {
+    const metas = parseMetas(await this.git.run(["log", "--reverse", `--format=${FORMAT}`, `${base}..${head}`]));
+    metas.forEach((meta) => this.metas.set(meta.sha, meta));
+    return { total_commits: metas.length, commits: metas.map(listed) };
   }
 
   /** before..after, or — for a new branch — everything no other head reaches. */
@@ -306,6 +304,18 @@ function login(email: string): string | undefined {
 function account(email: string): { login: string } | null {
   const name = login(email);
   return name ? { login: name } : null;
+}
+
+/** One commit as the list and compare endpoints both show it. */
+function listed(meta: Meta) {
+  return {
+    sha: meta.sha,
+    html_url: `${WEB}/commit/${meta.sha}`,
+    commit: { message: meta.message, author: meta.author, committer: meta.committer },
+    author: account(meta.author.email),
+    committer: account(meta.committer.email),
+    parents: meta.parents.map((parent) => ({ sha: parent })),
+  };
 }
 
 function identity(who: Who) {

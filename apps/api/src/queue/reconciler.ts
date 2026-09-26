@@ -9,19 +9,20 @@
  * Gated on the GitHub App: with no installation token there is no way to read a
  * repo's history, so without it this is a no-op and missed pushes stay missed.
  * Best-effort — it cannot see a branch deleted during downtime, nor history a
- * force push overwrote.
+ * force push overwrote, and a front that watches every branch is read on its
+ * default branch alone (see branchesToReconcile).
  */
 
-import type { NormalizedPush } from "@commander/shared";
+import { watchesEverything, type NormalizedPush } from "@commander/shared";
 import { prisma } from "@/db/prisma.js";
 import { createLogger, describeError } from "@/core/logger/logger.js";
 import { fromJson } from "@/core/json.js";
 import { RECONCILE_LOOKBACK_MS } from "@/config/constants.js";
 import { isGitHubAppConfigured } from "@/integrations/github/app-auth.js";
-import { fetchDefaultBranch, listCommits } from "@/integrations/github/commits.client.js";
 import { syncTree } from "@/modules/tree/tree.service.js";
 import { enqueue } from "./outbox.service.js";
-import { buildSyntheticPushes } from "./reconciler.mapper.js";
+import { branchesToReconcile, buildSyntheticPushes, type BranchRead } from "./reconciler.mapper.js";
+import { readBranches, readDefaultBranch, readMissed } from "./reconciler.read.js";
 import { sweepMeasurements } from "./reconciler.sweep.js";
 
 const log = createLogger("reconciler");
@@ -67,28 +68,30 @@ async function reconcileRepo(repo: RepoTarget): Promise<number> {
   // a project is filled in here, a batch at a time, until it is complete.
   await sweepMeasurements(repo);
 
-  const branches = await resolveBranches(repo);
-  if (branches.length === 0) return 0;
+  const reads = await resolveBranches(repo);
+  if (reads.length === 0) return 0;
 
   const since = await computeSince(repo.id);
   let recovered = 0;
-  for (const branch of branches) {
-    recovered += await reconcileBranch(repo, branch, since);
+  for (const read of reads) {
+    recovered += await reconcileBranch(repo, read, since);
   }
   return recovered;
 }
 
 /**
- * Concrete watched branches, or the repo's default branch when it watches every
- * branch (empty list) or only wildcards — the commits API needs a real branch
- * name, which a wildcard is not.
+ * Which branches to read, and how, is `branchesToReconcile`'s decision. This
+ * fetches what it needs: the default branch always — it is what every other
+ * branch is read against — and the branch listing unless the front watches
+ * every branch.
  */
-async function resolveBranches(repo: RepoTarget): Promise<string[]> {
-  const concrete = repo.branches.filter((b) => b.length > 0 && !b.includes("*"));
-  if (concrete.length > 0) return concrete;
-
-  const meta = await fetchDefaultBranch(repo.githubInstallationId, repo.fullName);
-  return meta.ok && meta.data ? [meta.data] : [];
+async function resolveBranches(repo: RepoTarget): Promise<BranchRead[]> {
+  const everything = watchesEverything(repo.branches);
+  const [defaultBranch, existing] = await Promise.all([
+    readDefaultBranch(repo),
+    everything ? null : readBranches(repo),
+  ]);
+  return branchesToReconcile({ watch: repo.branches, existing, defaultBranch });
 }
 
 /**
@@ -107,36 +110,22 @@ async function computeSince(repositoryId: string): Promise<Date> {
   return new Date(Math.max(cursor - 60_000, floor));
 }
 
-async function reconcileBranch(repo: RepoTarget, branch: string, since: Date): Promise<number> {
-  const result = await listCommits({
-    installationId: repo.githubInstallationId,
-    repoFullName: repo.fullName,
-    branch,
-    since,
-  });
-  if (!result.ok) {
-    if (!result.notFound) {
-      log.warn("list commits failed", { repo: repo.fullName, branch, error: result.error });
-    }
-    return 0;
-  }
-  if (result.data.length === 0) return 0;
+async function reconcileBranch(repo: RepoTarget, read: BranchRead, since: Date): Promise<number> {
+  const listed = await readMissed(repo, read, since);
+  if (listed.length === 0) return 0;
 
-  const known = await knownShas(repo.id, result.data.map((commit) => commit.sha));
-  const fresh = result.data.filter((commit) => !known.has(commit.sha));
+  const known = await knownShas(repo.id, listed.map((commit) => commit.sha));
+  const fresh = listed.filter((commit) => !known.has(commit.sha));
   if (fresh.length === 0) return 0;
 
-  // The API returns newest-first; the pipeline and ledger read oldest-first.
-  fresh.reverse();
-
-  const pushes = buildSyntheticPushes(repo, branch, fresh);
+  const pushes = buildSyntheticPushes(repo, read.branch, fresh);
   for (const push of pushes) {
     await enqueue({ occasion: { kind: "push", push }, repositoryId: repo.id });
   }
 
   log.info("recovered missed commits", {
     repo: repo.fullName,
-    branch,
+    branch: read.branch,
     commits: fresh.length,
     pushes: pushes.length,
   });

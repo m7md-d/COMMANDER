@@ -137,21 +137,3 @@ export async function fetchContributors(
       })),
   };
 }
-
-interface RawRepoMeta {
-  default_branch?: string;
-}
-
-/**
- * The repo's default branch, needed when a repository watches "every branch"
- * (empty list) or only wildcards: the commits API takes a concrete branch name,
- * which a wildcard is not.
- */
-export async function fetchDefaultBranch(
-  installationId: string,
-  repoFullName: string,
-): Promise<Result<string>> {
-  const result = await request<RawRepoMeta>(installationId, `/repos/${repoFullName}`);
-  if (!result.ok) return result;
-  return { ok: true, data: result.data.default_branch ?? "" };
-}

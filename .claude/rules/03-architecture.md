@@ -34,9 +34,14 @@ deliver`. Nothing in the first waits on the second.
    is drawn from, which is why a moved file is `update`d and never replaced.
 7. **[reconciler.ts](../../apps/api/src/queue/reconciler.ts) pulls what push missed.** Nothing
    guarantees the host was awake, and GitHub gives up after a few retries. It asks the GitHub App
-   for commits newer than the last on record and replays the gap through the same pipeline. Gated
-   on the App: with no installation token it is a no-op, and it is `best-effort` by nature — it
-   cannot see a branch deleted during downtime, nor history a force push overwrote.
+   for commits newer than the last on record and replays the gap through the same pipeline. The
+   default branch is read by its history; any other watched branch only for what it has beyond
+   the default, because its history also holds everything it inherited when it was cut — read by
+   date, that came back as pushes nobody made. Which branches and how is `branchesToReconcile`,
+   pure and called as it is by the scenario reference. Gated on the App: with no installation
+   token it is a no-op, and it is `best-effort` by nature — it cannot see a branch deleted during
+   downtime, nor history a force push overwrote, and a front that watches every branch is read on
+   its default branch alone.
 
 ## The dependency rule
 

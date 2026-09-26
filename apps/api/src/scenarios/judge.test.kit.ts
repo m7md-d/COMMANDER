@@ -19,7 +19,8 @@ import { mergeWithDefaults } from "@/domain/violations/engine.js";
 import { toCommitDetail, toCommitListEntry } from "@/integrations/github/commit.mapper.js";
 import { isBranchRef, normalizePush } from "@/modules/webhook/push.mapper.js";
 import { enrichWith } from "@/queue/push.detail.js";
-import { buildSyntheticPushes } from "@/queue/reconciler.mapper.js";
+import type { CommitListEntry } from "@/integrations/github/commits.client.js";
+import { branchesToReconcile, buildSyntheticPushes, type BranchRead } from "@/queue/reconciler.mapper.js";
 import { GitHubView } from "./github.test.kit.js";
 import { REPOSITORY, Story, type PushEvent, type RemoteEvent } from "./story.test.kit.js";
 
@@ -160,22 +161,31 @@ function remember(known: Map<string, number>, push: NormalizedPush): void {
  * which it queues, so each is handled exactly as a live push is.
  */
 async function reconcile(run: Run): Promise<Verdict> {
-  const concrete = run.front.watch.filter((branch) => branch.length > 0 && !branch.includes("*"));
-  const branches = concrete.length > 0 ? concrete : ["main"];
+  const existing = [...run.story.remote.keys()];
+  const reads = branchesToReconcile({ watch: run.front.watch, existing, defaultBranch: "main" });
   const since = cursor(run);
   const charges: string[] = [];
 
-  for (const branch of branches) {
-    const head = run.story.remote.get(branch);
-    if (!head) continue;
-    const listed = (await run.view.list(head, since)).map(toCommitListEntry);
-    // reconcileBranch — drop what is on record, then oldest first.
-    const fresh = listed.filter((entry) => !run.known.has(entry.sha)).reverse();
-    for (const push of buildSyntheticPushes({ fullName: REPOSITORY }, branch, fresh)) {
+  for (const read of reads) {
+    // reconcileBranch — drop what is on record.
+    const fresh = (await missed(run, read, since)).filter((entry) => !run.known.has(entry.sha));
+    for (const push of buildSyntheticPushes({ fullName: REPOSITORY }, read.branch, fresh)) {
       charges.push(...(await handle(run, push)).charges);
     }
   }
   return { outcome: "judged", charges: charges.sort() };
+}
+
+/** reconciler.read.ts `readMissed`, oldest first: the default branch by its history, any other beyond it. */
+async function missed(run: Run, read: BranchRead, since: number): Promise<CommitListEntry[]> {
+  const head = run.story.remote.get(read.branch);
+  if (!head) return [];
+  if (read.beyond === null) return (await run.view.list(head, since)).map(toCommitListEntry).reverse();
+
+  const base = run.story.remote.get(read.beyond);
+  if (!base) return [];
+  const { commits } = await run.view.compare(base, head);
+  return commits.map(toCommitListEntry).filter((entry) => Date.parse(entry.timestamp) >= since);
 }
 
 /** reconciler.ts `computeSince`. */

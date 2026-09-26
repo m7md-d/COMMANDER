@@ -203,6 +203,13 @@ export class Git {
       const child = execFile("git", args, { cwd: this.dir, env, maxBuffer: MAX_BUFFER }, (error, stdout) =>
         error ? reject(Object.assign(error, { stdout })) : resolve(stdout),
       );
+      // Most commands never read their input, and under load one can exit before
+      // it is written: the closed pipe then raises EPIPE here, which failed
+      // unrelated scenarios at random. The command's own result still arrives
+      // through the callback above, so that is where a real failure is reported.
+      child.stdin?.on("error", (error: NodeJS.ErrnoException) => {
+        if (error.code !== "EPIPE") reject(error);
+      });
       child.stdin?.end(options.input ?? "");
     });
   }
