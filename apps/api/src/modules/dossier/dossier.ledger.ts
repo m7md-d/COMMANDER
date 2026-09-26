@@ -20,6 +20,9 @@ interface LedgerWrite {
   entries: (ViolationHit | Commendation)[];
   occurredAt: Date;
   deliveryId: string;
+  /** The branch, and whether it was a main line when the push landed (0009 §3). */
+  branch: string;
+  mainLine: boolean;
 }
 
 /**
@@ -48,6 +51,8 @@ async function record(kind: LedgerKind, input: LedgerWrite): Promise<void> {
       occurredAt: input.occurredAt,
       detail: toJson(entry.detail),
       deliveryId: input.deliveryId,
+      branch: input.branch,
+      mainLine: input.mainLine,
     })),
   });
 }

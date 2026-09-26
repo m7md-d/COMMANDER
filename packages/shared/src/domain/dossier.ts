@@ -7,7 +7,8 @@
  * good history. So the score is a function of *when* things happened, not just
  * how many.
  *
- * Three mechanisms, in order of importance:
+ * Where it happened moves every weight: a charge on a main line counts double
+ * (MAIN_LINE_WEIGHT). Then three mechanisms, in order of importance:
  *   1. Exponential decay  — every event's weight halves every HALF_LIFE_DAYS.
  *   2. Burst discount     — a cluster that never repeated is treated as an
  *                           anomaly and discounted, not as a pattern.
@@ -22,6 +23,7 @@ import type { ViolationId } from "./violations.js";
 import {
   BURST_DISCOUNT,
   HALF_LIFE_DAYS,
+  MAIN_LINE_WEIGHT,
   RULE_SEVERITY,
   type ScoredEvent,
   type ToleranceTier,
@@ -92,6 +94,7 @@ export function scoreDossier(
     const isAnomaly = anomalies.has(index);
     const weight =
       (RULE_SEVERITY[event.ruleId] ?? 1) *
+      (event.mainLine === true ? MAIN_LINE_WEIGHT : 1) *
       decayFactor(ageDays, halfLife) *
       (isAnomaly ? BURST_DISCOUNT : 1);
 

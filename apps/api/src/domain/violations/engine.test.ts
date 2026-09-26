@@ -39,6 +39,7 @@ const UNREADABLE: NormalizedPush = {
 const CONTEXT: RuleContext = {
   push: UNREADABLE,
   kind: "rewrite",
+  trunk: true,
   timezoneOffset: 3,
   weight: UNWEIGHED,
   landed: [],

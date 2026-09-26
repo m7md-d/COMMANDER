@@ -4,8 +4,9 @@
  * A push to `main` is not a push to `feature/spike`, but the difference is
  * **gravity, never rigour** — the same model reads the same diff at the same
  * depth on every branch, because the point of the platform is clean work, not
- * cheap coverage. What gravity changes is how formally the communiqué is worded
- * and how much a violation on that branch weighs.
+ * cheap coverage. What gravity changes is how formally the communiqué is worded,
+ * and — `guarded` or `critical` — whether the branch is a main line (`isTrunk`):
+ * where the rules about how work lands apply, and a charge weighs double.
  *
  * Resolution is first-match-wins over an ordered list, which is why the list is
  * ordered and not a map: `main` must be able to win before `*` catches the rest.

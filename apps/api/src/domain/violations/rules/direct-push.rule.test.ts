@@ -48,7 +48,7 @@ const PUSH: NormalizedPush = {
 const UNWEIGHED: PushWeight = { newCommits: 0, filesTouched: 0, work: [], measured: false };
 
 const evaluate = (kind: PushKind) =>
-  directPushRule({ push: PUSH, kind, timezoneOffset: 3, weight: UNWEIGHED, commits: PUSH.commits, landed: [] }, ENABLED);
+  directPushRule({ push: PUSH, kind, trunk: true, timezoneOffset: 3, weight: UNWEIGHED, commits: PUSH.commits, landed: [] }, ENABLED);
 
 test("work that landed with no pull request is a direct push, however it was made", () => {
   for (const kind of ["direct_push", "local_merge", "web_edit", "rewrite"] as const) {

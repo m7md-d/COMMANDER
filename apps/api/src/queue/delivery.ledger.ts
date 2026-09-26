@@ -32,11 +32,11 @@ const log = createLogger("processor");
 export async function writeLedger(input: {
   repositoryId: string;
   push: NormalizedPush;
-  judgement: Pick<Judgement, "violations" | "commendations" | "unattributed">;
+  judgement: Pick<Judgement, "violations" | "commendations" | "unattributed" | "mainLine">;
   deliveryId: string;
 }): Promise<void> {
   const { repositoryId, push, judgement, deliveryId } = input;
-  const when = new Date();
+  const row = { repositoryId, occurredAt: new Date(), deliveryId, branch: push.branch, mainLine: judgement.mainLine };
 
   if (judgement.unattributed.length > 0) {
     // For the operator: found, and charged to nobody, because nothing named anyone.
@@ -48,11 +48,11 @@ export async function writeLedger(input: {
   }
 
   await Promise.all([
-    recordViolations({ repositoryId, entries: judgement.violations, occurredAt: when, deliveryId }),
+    recordViolations({ ...row, entries: judgement.violations }),
     // The same timestamp and the same delivery id: both directions of one push
     // are one event in the record, and dating them apart would let the timeline
     // show a person fixing something before they were charged for it.
-    recordCommendations({ repositoryId, entries: judgement.commendations, occurredAt: when, deliveryId }),
+    recordCommendations({ ...row, entries: judgement.commendations }),
     recordCommits({
       repositoryId,
       commits: push.commits.map((commit) => ({

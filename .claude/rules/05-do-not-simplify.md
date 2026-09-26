@@ -59,6 +59,17 @@ code.
 - **A finding the evidence names nobody for is charged to nobody** (`unattributed`): an author
   address tied to no account, a file two people changed in one push, the pusher of a recovered
   push. Falling back to whoever pushed is a guess, and it lands on the person nearest the button.
+- **Every rule declares where it applies** (`RULE_SCOPE`, 0009 §3). The rules about how work
+  lands — direct push, force push, deletion, landing unfixed — hold on a main line only: the
+  default branch, or one a watcher marks guarded or critical (`isTrunk`). Pushing straight to a
+  personal branch is how a pull request is opened, and rebasing it is how it is kept current;
+  judging those as trunk offences charged every ordinary day's work. Everything else, the size
+  rules included (the developer's call), holds on every branch. A release line is a main line
+  only when a watcher says so — the platform does not guess which branches matter.
+- **A charge keeps its branch and whether that was a main line** (`ledger_events.branch`,
+  `main_line`), and weighs double there in the dossier (`MAIN_LINE_WEIGHT`). The role is stored,
+  not recomputed: the default branch is not kept anywhere else, and a watcher added later must not
+  reweigh what was charged before it. A row without one keeps the weight it always had.
 - **A recovered push names no pusher** (`recovered`). Git records who wrote and who committed a
   commit, never who pushed it; grouping by author invented a push per author and charged them
   with pushes someone else made.

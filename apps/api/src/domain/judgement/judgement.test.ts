@@ -183,7 +183,7 @@ test("each author answers for their own commits in a push that holds several", (
 test("a finding the evidence names nobody for is charged to nobody", () => {
   // An author address GitHub ties to no account; a recovered push, whose pusher git never recorded.
   const unlinked = judge({ push: push([commit("c1", { title: "wip", authorLogin: "" })]), rules: LAZY });
-  const recovered = judge({ push: push([commit("c1")], { recovered: true }), rules: DIRECT });
+  const recovered = judge({ push: push([commit("c1")], { recovered: true, defaultBranch: "main" }), rules: DIRECT });
 
   for (const judgement of [unlinked, recovered]) assert.deepEqual(judgement.violations, []);
   assert.deepEqual(unlinked.unattributed.map((entry) => entry.ruleId), ["lazy_message"]);
@@ -252,6 +252,17 @@ test("a push that cannot be weighed lands nothing: its own work cannot be told f
   const unweighed = push([{ ...commit("c1"), paths: undefined }], { actorLogin: OMAR, defaultBranch: "main" });
 
   assert.deepEqual(charges({ push: unweighed, checks: ledger(190, 210) }), []);
+});
+
+test("the rules about landing work hold on a main line only; what a commit holds, on every branch", () => {
+  const rules = mergeWithDefaults({ ...QUIET, direct_push: { enabled: true }, lazy_message: { enabled: true } });
+  const wip = [commit("c1", { title: "wip" })];
+  const onFeature = judge({ push: push(wip, { defaultBranch: "main", branch: "feature/x", ref: "refs/heads/feature/x" }), rules });
+  const onMain = judge({ push: push(wip, { defaultBranch: "main" }), rules });
+
+  assert.deepEqual(onFeature.violations.map((hit) => hit.ruleId), ["lazy_message"], "pushing to your own branch is how a pull request is opened");
+  assert.deepEqual(onMain.violations.map((hit) => hit.ruleId).sort(), ["direct_push", "lazy_message"]);
+  assert.deepEqual([onFeature.mainLine, onMain.mainLine], [false, true], "kept with every charge, which weighs double on a main line");
 });
 
 test("a silent front withholds a push that found nothing, and records none of it", () => {

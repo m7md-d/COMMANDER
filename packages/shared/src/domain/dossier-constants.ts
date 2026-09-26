@@ -11,6 +11,14 @@ export const HALF_LIFE_DAYS = 30;
 export const BURST_DISCOUNT = 0.4;
 
 /**
+ * A charge made on a main line weighs double (0009 §3; the developer's call,
+ * 2026-09-26): the same act lands on everyone there, and on a work branch only
+ * on the work in progress. A work branch keeps the weight every charge had
+ * before, and so does a row written before the branch was kept.
+ */
+export const MAIN_LINE_WEIGHT = 2;
+
+/**
  * Not all violations are equal. Rewriting shared history is a different class
  * of act from a terse commit message, and a flat count would rank a chronically
  * lazy writer above someone who force-pushed over a teammate's work.
@@ -60,13 +68,15 @@ export type ToleranceTier = (typeof TOLERANCE_TIERS)[number];
 export interface ViolationEventInput {
   ruleId: ViolationId;
   occurredAt: string;
+  /** Whether the charge was made on a main line; null when the row predates the question. */
+  mainLine?: boolean | null;
 }
 
 export interface ScoredEvent {
   ruleId: ViolationId;
   occurredAt: string;
   ageDays: number;
-  /** severity x decay x burst discount. */
+  /** severity x decay x burst discount x the main line's weight. */
   weight: number;
   /** True when this event belongs to a cluster that never recurred. */
   discountedAsAnomaly: boolean;

@@ -11,6 +11,8 @@ export interface RuleContext {
   push: NormalizedPush;
   /** What happened (`classifyPush`): the rules judge the event, not the list of commits. */
   kind: PushKind;
+  /** Whether the push is on a main line (`isTrunk`), where the rules about landing work apply. */
+  trunk: boolean;
   /** Fixed UTC offset from settings. Used by the time-based rules. */
   timezoneOffset: number;
   /**

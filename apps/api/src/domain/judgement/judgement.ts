@@ -105,6 +105,8 @@ export type Judgement = {
   pusher: string | null;
   /** What happened (`classifyPush`), and the pull request that landed it — for the communiqué to say. */
   event: { kind: PushKind; pull: number | null };
+  /** Whether the push was on a main line (`isTrunk`): kept with every charge, which weighs double there. */
+  mainLine: boolean;
 } & (
   // Written to the record — commits, counters, ledger — and then reported.
   | { recorded: true; withheld: null }
@@ -118,8 +120,9 @@ export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Jud
   // A squash or a rebase re-delivers a branch already judged, under new shas.
   const knownShas = judgedShas({ push, pull, knownShas: facts.knownShas });
   const weight = weighPush({ push, knownShas });
-  const checked = judgeChecks({ ...facts, knownShas }, weight);
-  const rules = { kind, rules: facts.rules, timezoneOffset: facts.timezoneOffset, landed: checked.landed };
+  const trunk = isTrunk({ branch: push.branch, defaultBranch: push.defaultBranch, watchers: facts.watchers });
+  const checked = judgeChecks({ ...facts, knownShas }, { weight, trunk });
+  const rules = { kind, trunk, rules: facts.rules, timezoneOffset: facts.timezoneOffset, landed: checked.landed };
   const found = [...judgeRules({ push, weight, knownShas, ...rules }, onRuleError), ...checked.violations];
   const judged = {
     violations: answered(found),
@@ -129,6 +132,7 @@ export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Jud
       .map(({ ruleId, detail }) => ({ ruleId, detail })),
     pusher: pusherOf(push),
     event: { kind, pull: pull.status === "landed" ? pull.number : null },
+    mainLine: trunk,
   };
 
   const withheld = withholding(facts, judged.violations.length + judged.commendations.length);
@@ -140,13 +144,12 @@ export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Jud
  * left on a main line from others' work. A push that cannot be weighed has no new
  * work to tell from carried work, and nothing is judged.
  */
-function judgeChecks(facts: PushFacts, weight: PushWeight): LandingOutcome {
+function judgeChecks(facts: PushFacts, on: { weight: PushWeight; trunk: boolean }): LandingOutcome {
   const { push, knownShas, checks } = facts;
-  const none: LandingOutcome = { violations: [], commendations: [], landed: [] };
-  if (!weight.measured) return none;
+  const { weight, trunk } = on;
+  if (!weight.measured) return { violations: [], commendations: [], landed: [] };
 
   const pusher = pusherOf(push);
-  const trunk = isTrunk({ branch: push.branch, defaultBranch: push.defaultBranch, watchers: facts.watchers });
   if (checks.landing) {
     const scope = { push, weight, knownShas, config: checks.config, readings: checks.readings, pusher, trunk };
     return judgeLanding(checks.changes, checks.landing, scope);

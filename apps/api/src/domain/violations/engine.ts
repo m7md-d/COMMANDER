@@ -11,7 +11,7 @@ import {
   type RuleDetail,
   type RuleId,
 } from "@commander/shared";
-import { RULE_ANSWERER, RULE_REGISTRY, type Answerer } from "./registry.js";
+import { RULE_ANSWERER, RULE_REGISTRY, RULE_SCOPE, type Answerer } from "./registry.js";
 import type { RuleContext } from "./types.js";
 
 /**
@@ -59,10 +59,10 @@ export function mergeWithDefaults(stored: unknown): RuleConfigMap {
 export type RuleErrorReporter = (ruleId: RuleId, error: unknown) => void;
 
 /**
- * The enabled rules one answerer is responsible for, on one context. Findings
- * name nobody: who answers is `judgePush`'s to say, and it says it by choosing
- * the context — the push for the pusher, one author's new commits for that
- * author.
+ * The enabled rules one answerer is responsible for, on one context — each where
+ * it applies (`RULE_SCOPE`). Findings name nobody: who answers is `judgePush`'s
+ * to say, and it says it by choosing the context — the push for the pusher, one
+ * author's new commits for that author.
  */
 export function evaluateRules(
   run: { context: RuleContext; rules: RuleConfigMap; answerer: Answerer },
@@ -73,6 +73,7 @@ export function evaluateRules(
   for (const ruleId of RULE_IDS) {
     const config = run.rules[ruleId];
     if (!config.enabled || RULE_ANSWERER[ruleId] !== run.answerer) continue;
+    if (RULE_SCOPE[ruleId] === "trunk" && !run.context.trunk) continue;
 
     const detail = runRule({ ruleId, context: run.context, config, onRuleError });
     if (detail !== null) findings.push({ ruleId, detail });

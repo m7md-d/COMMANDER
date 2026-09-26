@@ -338,7 +338,7 @@ export const EN: Dictionary = {
     "A critical branch ({branch}) — the front line, and what reaches production. The wording is strictly formal, and every violation here is recorded as a precedent with an explicit remedy demanded.",
 
   "repos.watchers": "Branch watchers",
-  "repos.watchersHint": "The first matching pattern governs the branch. Standing changes the severity of the wording and the weight of a violation only — code review runs at the same depth on every branch.",
+  "repos.watchersHint": "The first matching pattern governs the branch. Guarded and critical make it a main line like the default branch: direct pushes, force pushes and deletions are charged there, and its charges weigh double. Standing also sets how severe the wording is — code review runs at the same depth on every branch.",
   "repos.watcherPattern": "Branch pattern",
   "repos.watcherGravity": "Standing",
   "repos.watcherAdd": "Add watcher",

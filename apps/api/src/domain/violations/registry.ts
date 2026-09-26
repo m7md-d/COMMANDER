@@ -64,3 +64,26 @@ export const RULE_ANSWERER: { [K in RuleId]: Answerer } = {
   merge_residue: "author",
   landed_unfixed: "pusher",
 };
+
+/**
+ * Where a rule applies (0009 §3). A main line — the default branch, or one a
+ * watcher guards (`isTrunk`) — is what the rules about how work lands protect:
+ * pushing straight to a personal branch is how a pull request is opened, and
+ * rebasing one is how it is kept current. What a commit holds, and how much a
+ * push heaps up at once, is judged on every branch (the developer's call for the
+ * size rules, 2026-09-26).
+ */
+export type Scope = "trunk" | "anywhere";
+
+export const RULE_SCOPE: { [K in RuleId]: Scope } = {
+  force_push: "trunk",
+  batch_dump: "anywhere",
+  direct_push: "trunk",
+  lazy_message: "anywhere",
+  night_ops: "anywhere",
+  weekend_ops: "anywhere",
+  large_diff: "anywhere",
+  branch_deleted: "trunk",
+  merge_residue: "anywhere",
+  landed_unfixed: "trunk",
+};

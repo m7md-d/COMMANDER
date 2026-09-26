@@ -12,7 +12,7 @@ import { GITHUB_UI_COMMITTER } from "@commander/shared";
 import type { CommitListEntry } from "@/integrations/github/commits.client.js";
 import { branchesToReconcile, recoveredPush } from "@/queue/reconciler.mapper.js";
 
-const REPO = { fullName: "team/repo" };
+const REPO = { fullName: "team/repo", defaultBranch: "main" };
 
 function entry(overrides: Partial<CommitListEntry> = {}): CommitListEntry {
   return {

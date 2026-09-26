@@ -243,6 +243,13 @@ model LedgerEvent {
   detail     Json     @default("{}")
   deliveryId String?  @map("delivery_id")
 
+  /// The branch the push was on, and whether it was a main line then (0009 §3):
+  /// the role is kept, not recomputed, because what makes a branch main — the
+  /// default branch, a guarded watcher — can change after the charge. A charge
+  /// on a main line weighs double in the dossier. Null on rows written before.
+  branch   String?
+  mainLine Boolean? @map("main_line")
+
   @@index([repositoryId, kind, login, occurredAt])
   @@index([repositoryId, kind, occurredAt])
   @@map("ledger_events")

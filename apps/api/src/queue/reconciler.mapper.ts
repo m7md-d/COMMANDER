@@ -73,7 +73,7 @@ export function branchesToReconcile(input: {
  * no pusher — `recovered` — and is addressed to the author of its newest commit.
  */
 export function recoveredPush(
-  repo: { fullName: string },
+  repo: { fullName: string; defaultBranch: string },
   branch: string,
   commits: CommitListEntry[],
 ): NormalizedPush | null {
@@ -89,6 +89,9 @@ export function recoveredPush(
     created: false,
     deleted: false,
     compareUrl: "",
+    // Known to the reconciler, which reads every branch against it: a charge on a
+    // recovered push to main weighs what it would have by webhook.
+    defaultBranch: repo.defaultBranch,
     actorLogin: newest.authorLogin || "unknown",
     actorAvatarUrl: "",
     recovered: true,

@@ -37,6 +37,14 @@ test("severity ranks a force push above a lazy message", () => {
   assert.ok(forced.riskScore > lazy.riskScore);
 });
 
+test("a charge on a main line weighs double; a work branch and an older row keep today's weight", () => {
+  const at = (mainLine: boolean | null) =>
+    scoreDossier([{ ruleId: "lazy_message", occurredAt: daysAgo(1), mainLine }], { now: NOW }).events[0]?.weight ?? 0;
+
+  assert.ok(Math.abs(at(true) - 2 * at(false)) < 1e-9);
+  assert.equal(at(null), at(false), "a row written before the branch was kept is not guessed at");
+});
+
 test("an old unrepeated burst is discounted as an anomaly", () => {
   // Four force pushes inside one day, then silence for ~4 half-lives.
   const burst = scoreDossier(

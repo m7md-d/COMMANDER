@@ -38,7 +38,7 @@ function loadLedger(repositoryId: string, login: string) {
     prisma.ledgerEvent.findMany({
       where: { repositoryId, login, kind: "violation" },
       orderBy: { occurredAt: "asc" },
-      select: { ruleId: true, occurredAt: true },
+      select: { ruleId: true, occurredAt: true, mainLine: true },
     }),
     prisma.memberStat.findUnique({ where: { repositoryId_login: { repositoryId, login } } }),
     prisma.fileAttribution.findMany({
@@ -78,6 +78,7 @@ export async function computeFacts(repositoryId: string, login: string): Promise
     events.map((event) => ({
       ruleId: event.ruleId as RuleId,
       occurredAt: event.occurredAt.toISOString(),
+      mainLine: event.mainLine,
     })),
   );
 

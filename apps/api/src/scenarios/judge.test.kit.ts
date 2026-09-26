@@ -12,7 +12,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DEFAULT_CHECKS, isGitHubUiCommit, type CheckConfigMap, type NormalizedPush, type RuleConfigMap } from "@commander/shared";
+import { DEFAULT_CHECKS, isGitHubUiCommit, type CheckConfigMap, type NormalizedPush, type RuleConfigMap, type Watcher } from "@commander/shared";
 import { RECONCILE_LOOKBACK_MS } from "@/config/constants.js";
 import { wanted } from "@/domain/checks/judge.js";
 import { pushChanges, pushSpan } from "@/domain/judgement/changes.js";
@@ -32,6 +32,8 @@ import { REPOSITORY, Story, type PushEvent, type ReconcileEvent, type RemoteEven
 export interface Front {
   /** Watched branches. Empty is every branch — the shipped default. */
   watch: string[];
+  /** Branches marked guarded or critical. With none, the main line is the default branch alone. */
+  watchers: Watcher[];
   /** Whether the GitHub App is installed, which every enrichment needs. */
   app: boolean;
   rules: RuleConfigMap;
@@ -46,7 +48,7 @@ export interface Front {
  */
 export const SUITE_RULES: RuleConfigMap = mergeWithDefaults({ large_diff: { enabled: true, threshold: 40 } });
 
-const DEFAULT_FRONT: Front = { watch: [], app: true, rules: SUITE_RULES, checks: DEFAULT_CHECKS };
+const DEFAULT_FRONT: Front = { watch: [], watchers: [], app: true, rules: SUITE_RULES, checks: DEFAULT_CHECKS };
 const TIMEZONE_OFFSET = 3;
 /** reconciler.ts `computeSince` — the minute of overlap against clock skew. */
 const OVERLAP_MS = 60_000;
@@ -155,8 +157,7 @@ async function handle(run: Run, received: NormalizedPush): Promise<Verdict> {
     pull: readPull(run, push),
     rules: run.front.rules,
     timezoneOffset: TIMEZONE_OFFSET,
-    // No branch is marked guarded here: the main line is the default branch alone.
-    watchers: [],
+    watchers: run.front.watchers,
     checks: await readChanges(run, push, knownShas),
     silentWhenClean: false,
     hasChannel: true,
@@ -203,7 +204,7 @@ async function reconcile(run: Run, event: ReconcileEvent): Promise<Verdict> {
   for (const read of reads) {
     // reconcileBranch — drop what is on record.
     const fresh = (await missed(run, { read, since, remote: event.remote })).filter((entry) => !run.known.has(entry.sha));
-    const push = recoveredPush({ fullName: REPOSITORY }, read.branch, fresh);
+    const push = recoveredPush({ fullName: REPOSITORY, defaultBranch: "main" }, read.branch, fresh);
     if (push) found.push(await handle(run, push));
   }
   return credited(charged(...found.flatMap((verdict) => verdict.charges)), ...found.flatMap((verdict) => verdict.credits));

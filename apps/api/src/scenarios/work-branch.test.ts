@@ -5,7 +5,8 @@
  * deletions) describe ordinary work when they meet a personal branch. Pushing
  * your own commits to your own branch is how a pull request is opened, and
  * rebasing it is how it is kept current. A branch that is protected — a
- * release line — is still protected.
+ * release line a watcher marks guarded — is still protected; one nobody marked
+ * is not guessed at.
  */
 
 import { LINA, SARA } from "./git.test.kit.js";
@@ -13,6 +14,7 @@ import { CLEAN, charged, IGNORED, runCatalog, SKIPPED, type Scenario } from "./j
 import { seed, work } from "./story.test.kit.js";
 
 const FEATURE = "feature/export";
+const GUARDED_RELEASES = { pattern: "release/*", gravity: "guarded" as const, promptId: null, model: "" };
 
 const scenarios: Scenario[] = [
   {
@@ -25,11 +27,6 @@ const scenarios: Scenario[] = [
       await story.push(FEATURE, SARA);
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("direct_push@sara"),
-      because:
-        "direct_push applies to every watched branch, and on a personal branch every commit is local. With the shipped default — watch everything — all ordinary work is charged. (0009 §3)",
-    },
   },
   {
     id: "feature-rebased-and-force-pushed",
@@ -45,11 +42,6 @@ const scenarios: Scenario[] = [
       await story.push(FEATURE, SARA);
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("direct_push@sara", "force_push@sara"),
-      because:
-        "force_push and direct_push fire on any branch; rebasing one's own branch is how it is kept current. (0009 §3)",
-    },
   },
   {
     id: "update-branch-button",
@@ -66,8 +58,11 @@ const scenarios: Scenario[] = [
     expect: CLEAN,
   },
   {
+    // Protected because the front says so: a watcher marks release lines guarded,
+    // which is what makes a branch other than the default a main line (0009 §3).
     id: "release-branch-deleted",
     title: "a release line deleted — the one deletion that is an attack on history",
+    front: { watchers: [GUARDED_RELEASES] },
     story: async (story) => {
       await seed(story);
       await story.branch("release/2.0", "main");
@@ -76,6 +71,20 @@ const scenarios: Scenario[] = [
       story.deleteBranch("release/2.0", SARA);
     },
     expect: charged("branch_deleted@sara"),
+  },
+  {
+    // The same deletion on a front that never said its release lines are main:
+    // the platform does not guess which branches matter.
+    id: "unmarked-release-branch-deleted",
+    title: "a release line deleted on a front that marks no branch guarded",
+    story: async (story) => {
+      await seed(story);
+      await story.branch("release/2.0", "main");
+      await story.commit({ on: "release/2.0", by: LINA, title: "Pin the release version", write: { "VERSION": "2.0.0\n" } });
+      await story.push("release/2.0", LINA);
+      story.deleteBranch("release/2.0", SARA);
+    },
+    expect: CLEAN,
   },
   {
     id: "branch-created-with-nothing-new",

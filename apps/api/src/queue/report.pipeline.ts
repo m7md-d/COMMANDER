@@ -60,9 +60,10 @@ export const logRuleError: RuleErrorReporter = (ruleId, error) =>
 export function detectViolations(input: { push: NormalizedPush; repository: Repository; settings: Settings }): ViolationHit[] {
   const { push, repository, settings } = input;
   const weight = weighPush({ push, knownShas: EMPTY_HISTORY });
-  // Someone's own commits, so no button landed them; and no checks run on a sample, so it lands nothing.
+  // Someone's own commits, so no button landed them; on the main line, so every
+  // rule the sample was written to exercise runs; and no checks, so it lands nothing.
   const kind = classifyPush({ push, pull: { status: "unasked" } });
-  const facts = { push, kind, weight, knownShas: EMPTY_HISTORY, rules: repository.rules, timezoneOffset: settings.timezoneOffset, landed: [] };
+  const facts = { push, kind, trunk: true, weight, knownShas: EMPTY_HISTORY, rules: repository.rules, timezoneOffset: settings.timezoneOffset, landed: [] };
   return answered(judgeRules(facts, logRuleError));
 }
 

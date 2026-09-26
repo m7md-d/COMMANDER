@@ -115,11 +115,6 @@ const scenarios: Scenario[] = [
       story.deleteBranch(FEATURE, OMAR);
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("branch_deleted@omar"),
-      because:
-        "branch_deleted fires on any watched branch; the rules have no notion of which branches are protected. Deleting a merged PR's branch is the workflow finishing. (0009 §3)",
-    },
   },
   {
     id: "lazy-commit-already-on-record",
@@ -168,7 +163,8 @@ const scenarios: Scenario[] = [
   },
   {
     id: "edited-in-the-browser-on-a-release-branch",
-    title: "a file edited with GitHub's pencil, committed straight to release/1.0",
+    title: "a file edited with GitHub's pencil, committed straight to a guarded release/1.0",
+    front: { watchers: [{ pattern: "release/*", gravity: "guarded", promptId: null, model: "" }] },
     story: async (story) => {
       await seed(story);
       await story.branch("release/1.0", "main");

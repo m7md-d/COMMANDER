@@ -68,13 +68,13 @@ async function reconcileRepo(repo: RepoTarget): Promise<number> {
   // a project is filled in here, a batch at a time, until it is complete.
   await sweepMeasurements(repo);
 
-  const reads = await resolveBranches(repo);
-  if (reads.length === 0) return 0;
+  const { reads, defaultBranch } = await resolveBranches(repo);
+  if (reads.length === 0 || !defaultBranch) return 0;
 
   const since = await computeSince(repo.id);
   let recovered = 0;
   for (const read of reads) {
-    recovered += await reconcileBranch(repo, read, since);
+    recovered += await reconcileBranch({ ...repo, defaultBranch }, read, since);
   }
   return recovered;
 }
@@ -85,13 +85,13 @@ async function reconcileRepo(repo: RepoTarget): Promise<number> {
  * branch is read against — and the branch listing unless the front watches
  * every branch.
  */
-async function resolveBranches(repo: RepoTarget): Promise<BranchRead[]> {
+async function resolveBranches(repo: RepoTarget): Promise<{ reads: BranchRead[]; defaultBranch: string | null }> {
   const everything = watchesEverything(repo.branches);
   const [defaultBranch, existing] = await Promise.all([
     readDefaultBranch(repo),
     everything ? null : readBranches(repo),
   ]);
-  return branchesToReconcile({ watch: repo.branches, existing, defaultBranch });
+  return { reads: branchesToReconcile({ watch: repo.branches, existing, defaultBranch }), defaultBranch };
 }
 
 /**
@@ -110,7 +110,7 @@ async function computeSince(repositoryId: string): Promise<Date> {
   return new Date(Math.max(cursor - 60_000, floor));
 }
 
-async function reconcileBranch(repo: RepoTarget, read: BranchRead, since: Date): Promise<number> {
+async function reconcileBranch(repo: RepoTarget & { defaultBranch: string }, read: BranchRead, since: Date): Promise<number> {
   const listed = await readMissed(repo, read, since);
   if (listed.length === 0) return 0;
 
