@@ -29,23 +29,27 @@ export function renderUserPrompt(template: string, values: PromptValues): string
     ? rendered
     : `${renderTemplate(PROJECT_CONTEXT_BLOCK, values)}\n\n${rendered}`;
 
-  return appendCommendations(withContext, template, values);
+  return appendLate(withContext, template, values);
 }
 
+/** The values added after most prompts were written, in the order they are appended. */
+const LATE: readonly ("event" | "commendations")[] = ["event", "commendations"];
+
 /**
- * Praise reaches the model even through a template written before praise
- * existed.
+ * What happened, and praise, reach the model even through a template written
+ * before either existed.
  *
- * Every stored prompt in every installation predates `{{commendations}}`, and
- * prompts are the operator's text to edit — never ours to rewrite. Appending
- * only when the template does not place the variable itself, and only when there
- * is something to append, means this costs exactly nothing on the pushes where
- * nobody earned anything, and cannot double up on a template that was updated.
+ * Every stored prompt in every installation predates `{{event}}` and
+ * `{{commendations}}`, and prompts are the operator's text to edit — never ours
+ * to rewrite. Appending only when the template does not place the variable
+ * itself, and only when there is something to append, means nothing is doubled
+ * on a template that was updated, and an empty block costs nothing.
  */
-function appendCommendations(rendered: string, template: string, values: PromptValues): string {
-  const block = String(values.commendations);
-  if (!block || template.includes("{{commendations}}")) return rendered;
-  return `${rendered}\n\n${block}`;
+function appendLate(rendered: string, template: string, values: PromptValues): string {
+  const blocks = LATE.filter((name) => !template.includes(`{{${name}}}`))
+    .map((name) => String(values[name]))
+    .filter(Boolean);
+  return blocks.length === 0 ? rendered : [rendered, ...blocks].join("\n\n");
 }
 
 /** Unknown placeholders are left intact rather than blanked, so typos are visible. */

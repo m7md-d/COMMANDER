@@ -39,6 +39,9 @@ const TEMPLATED = [
   "tier.",
   "delivery.status.",
   "delivery.reason.",
+  // Built by `eventLine(kind)` from the PUSH_KINDS union: a member without its
+  // sentence is a compile error at the call, so the family is complete.
+  "event.",
   "var.",
   // The manual prints a row per member of an enum it imports, so these families
   // are complete or the table is. A missing member shows as a blank cell in the

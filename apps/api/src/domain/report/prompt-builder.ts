@@ -15,6 +15,7 @@ import {
   type PromptValues,
   type ViolationHit,
 } from "@commander/shared";
+import type { PushKind } from "@/domain/judgement/event.js";
 import { sanitizeQuote } from "./sanitize.js";
 import {
   buildCommendationBlock,
@@ -23,6 +24,7 @@ import {
   buildReviewBlock,
   buildStructureBlock,
   buildViolationBlock,
+  eventLine,
   type Quote,
   type ReviewedCommit,
 } from "./prompt-blocks.js";
@@ -68,8 +70,11 @@ export interface ProjectProfile {
  */
 const CONSTITUTION_LIMIT = 2_000;
 
-export function buildPromptValues(input: {
+/** Everything a communiqué is written from. */
+export interface PromptFacts {
   push: NormalizedPush;
+  /** What happened (`classifyPush`), and the pull request that landed it. */
+  event: { kind: PushKind; pull: number | null };
   member: MemberIdentity | null;
   violations: ViolationHit[];
   commendations: Commendation[];
@@ -78,7 +83,9 @@ export function buildPromptValues(input: {
   project: ProjectProfile;
   reviews: ReviewedCommit[];
   gravity: Gravity;
-}): PromptValues {
+}
+
+export function buildPromptValues(input: PromptFacts): PromptValues {
   const { push, member, violations, history, options, project, reviews, gravity } = input;
   const { locale } = options;
   const quote = { maxLength: options.quoteMaxLength, guardEnabled: options.injectionGuard };
@@ -103,6 +110,7 @@ export function buildPromptValues(input: {
     ...identityValues({ push, member, locale, quote }),
     branch: push.branch,
     commitCount: push.commits.length,
+    event: eventLine(locale, input.event),
     commits: buildCommitBlock(push, locale, quote),
     violations: buildViolationBlock(violations, locale, addressee),
     commendations: buildCommendationBlock(input.commendations, locale, addressee),

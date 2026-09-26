@@ -30,6 +30,7 @@ import { judgeFile, type Reading } from "@/domain/checks/judge.js";
 import type { TouchedFile } from "@/domain/tree/diff.js";
 import type { RuleErrorReporter } from "@/domain/violations/engine.js";
 import { answered, handsOnPaths, judgeRules, pusherOf, soleHand } from "./attribution.js";
+import { classifyPush, judgedShas, type PullFact, type PushKind } from "./event.js";
 import { judgeLanding, type LandingOutcome, type LandingSides } from "./landing.js";
 
 /**
@@ -50,8 +51,9 @@ export function admitPush(input: {
 
   if (!repository.enabled) return { read: false, reason: "repo_disabled" };
   if (!branchIsWatched(repository.branches, push.branch)) return { read: false, reason: "branch_not_watched" };
-  // A branch deletion carries no commits but is still worth reporting.
-  if (push.commits.length === 0 && !push.deleted) return { read: true, judged: false, reason: "no_commits" };
+  // A deletion and a rewind carry no commits and are still worth reporting: a
+  // forced push that only removes commits deletes history from the branch.
+  if (push.commits.length === 0 && !push.deleted && !push.forced) return { read: true, judged: false, reason: "no_commits" };
   return { read: true, judged: true };
 }
 
@@ -74,6 +76,8 @@ export interface PushFacts {
   push: NormalizedPush;
   /** Shas already in `commit_records`: the work this repository had seen before. */
   knownShas: ReadonlySet<string>;
+  /** Whether a pull request landed the push, as GitHub answered (`PullFact`). */
+  pull: PullFact;
   rules: RuleConfigMap;
   timezoneOffset: number;
   /** The repository's watchers — which, with the default branch, say what a main line is. */
@@ -99,6 +103,8 @@ export type Judgement = {
   unattributed: Finding[];
   /** Whoever pushed: whose push this counts as. Null for a recovered push. */
   pusher: string | null;
+  /** What happened (`classifyPush`), and the pull request that landed it — for the communiqué to say. */
+  event: { kind: PushKind; pull: number | null };
 } & (
   // Written to the record — commits, counters, ledger — and then reported.
   | { recorded: true; withheld: null }
@@ -107,10 +113,13 @@ export type Judgement = {
 );
 
 export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Judgement {
-  const { push, knownShas } = facts;
+  const { push, pull } = facts;
+  const kind = classifyPush({ push, pull });
+  // A squash or a rebase re-delivers a branch already judged, under new shas.
+  const knownShas = judgedShas({ push, pull, knownShas: facts.knownShas });
   const weight = weighPush({ push, knownShas });
-  const checked = judgeChecks(facts, weight);
-  const rules = { rules: facts.rules, timezoneOffset: facts.timezoneOffset, landed: checked.landed };
+  const checked = judgeChecks({ ...facts, knownShas }, weight);
+  const rules = { kind, rules: facts.rules, timezoneOffset: facts.timezoneOffset, landed: checked.landed };
   const found = [...judgeRules({ push, weight, knownShas, ...rules }, onRuleError), ...checked.violations];
   const judged = {
     violations: answered(found),
@@ -119,6 +128,7 @@ export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Jud
       .filter((entry) => entry.login === null)
       .map(({ ruleId, detail }) => ({ ruleId, detail })),
     pusher: pusherOf(push),
+    event: { kind, pull: pull.status === "landed" ? pull.number : null },
   };
 
   const withheld = withholding(facts, judged.violations.length + judged.commendations.length);

@@ -38,6 +38,7 @@ const UNREADABLE: NormalizedPush = {
 /** The commits under judgement cannot be read either. */
 const CONTEXT: RuleContext = {
   push: UNREADABLE,
+  kind: "rewrite",
   timezoneOffset: 3,
   weight: UNWEIGHED,
   landed: [],

@@ -6,9 +6,17 @@ code.
 
 ## Detection
 
-- **`direct_push` keys on `committer.username === "web-flow"`**, not a `^Merge` message prefix.
-  Squash and rebase merges produce ordinary commits; matching the message flags nearly every push
-  and the reports become noise nobody reads.
+- **The rules judge the event, not the commits** (`classifyPush`, 0009 §2). A merge is two
+  parents, never a `^Merge` title — squash and rebase merges have none, and anyone can type one;
+  `isMergeCommit` is gone so that no second definition can come back. `web-flow` as committer says
+  GitHub made the commit, not which button: the pencil carries it too, so a pull request's landing
+  is GitHub's own answer, asked of the head (`readPull`). Off the default branch that answer lists
+  only open pull requests, and a squash onto a release line read as the pencil — a direct push
+  charged to whoever merged — so the branch's closed pull requests are asked as well, and a full
+  page without the landing is `unknown`, not "no pull request".
+- **An event that cannot be told weighs nothing.** Without the App, GitHub's own commit is a
+  landing or the pencil and nobody can say which: `unknown` — no direct push, no size rule — and
+  the communiqué says it could not tell rather than letting the model guess.
 - **`lazy_message` strips Conventional Commit prefixes** before the length check, so `fix: x` is
   judged on `x`.
 - **`function_lines` and `nesting_depth` are measured with TypeScript's own parser**

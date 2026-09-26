@@ -101,6 +101,7 @@ function facts(overrides: Partial<PushFacts> = {}): PushFacts {
   return {
     push: push([commit("c1")]),
     knownShas: new Set(),
+    pull: { status: "unasked" },
     rules: QUIET,
     timezoneOffset: 3,
     watchers: [],

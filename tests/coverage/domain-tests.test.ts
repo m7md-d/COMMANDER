@@ -55,8 +55,6 @@ const UNTESTED_AT_ADOPTION = new Set([
   "findAnomalies",
   "hourInWindow",
   "isCheckMetric",
-  "isGitHubUiCommit",
-  "isMergeCommit",
   "isOver",
   "leader",
   "localHour",

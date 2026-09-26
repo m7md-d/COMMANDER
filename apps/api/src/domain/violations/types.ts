@@ -5,9 +5,12 @@
  */
 
 import type { Finding, NormalizedCommit, NormalizedPush, PushWeight, RuleDetail } from "@commander/shared";
+import type { PushKind } from "@/domain/judgement/event.js";
 
 export interface RuleContext {
   push: NormalizedPush;
+  /** What happened (`classifyPush`): the rules judge the event, not the list of commits. */
+  kind: PushKind;
   /** Fixed UTC offset from settings. Used by the time-based rules. */
   timezoneOffset: number;
   /**

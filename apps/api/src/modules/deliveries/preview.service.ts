@@ -3,6 +3,7 @@ import { NotFoundError } from "@/core/errors/app-error.js";
 import { findByFullName } from "@/modules/repositories/repositories.service.js";
 import { getDefaultPrompt, getPrompt } from "@/modules/prompts/prompts.service.js";
 import { getSettings } from "@/modules/settings/settings.service.js";
+import { classifyPush } from "@/domain/judgement/event.js";
 import { composeReport, detectViolations, samplePush } from "@/queue/report.pipeline.js";
 import { listMemberStats } from "@/modules/stats/stats.service.js";
 
@@ -32,6 +33,8 @@ export async function runPreview(request: PreviewRequest): Promise<PreviewResult
 
   const composed = await composeReport({
     push,
+    // The worker's own classification: someone's commits, which no button landed.
+    event: { kind: classifyPush({ push, pull: { status: "unasked" } }), pull: null },
     repository,
     settings,
     violations,

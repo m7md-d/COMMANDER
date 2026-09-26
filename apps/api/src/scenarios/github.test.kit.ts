@@ -18,12 +18,14 @@
  * | list API `since`        | compared with the committer date                  | assumption |
  * | compare API `commits`   | the base..head set, oldest first, never cut        | GitHub docs, "Compare two commits": `git log BASE..HEAD`, chronological; 250 without paging |
  * | compare `merge_base_commit` | `git merge-base base head`                     | GitHub docs, "Compare two commits" |
+ * | `commits/{sha}/pulls`   | the pull request merged into `main` whose merge made the sha; none for any other base, open ones not modelled | GitHub docs, "List pull requests associated with a commit": the merged one on the default branch, open ones elsewhere |
+ * | `pulls?state=closed&base=` | every pull request merged into that base, the latest first | GitHub docs, "List pull requests" |
  * | `username` / `login`    | `<login>@users.noreply.github.com`; GitHub's own address is `web-flow` | fixture convention |
  * | `repository.default_branch` | `main`                                        | GitHub docs, push event: the full repository object |
  */
 
 import type { Git } from "./git.test.kit.js";
-import { REPOSITORY, ZERO, type PushEvent } from "./story.test.kit.js";
+import { REPOSITORY, ZERO, type MergedPull, type PushEvent } from "./story.test.kit.js";
 
 const FIELD = "\x1f";
 const RECORD = "\x1e";
@@ -79,7 +81,20 @@ export class GitHubView {
   private readonly metas = new Map<string, Meta>();
   private readonly diffs = new Map<string, Entry[]>();
 
-  constructor(private readonly git: Git) {}
+  constructor(
+    private readonly git: Git,
+    private readonly merged: readonly MergedPull[] = [],
+  ) {}
+
+  /** `GET /repos/{owner}/{repo}/commits/{sha}/pulls`: on the default branch, the merged one that made it. */
+  pulls(sha: string) {
+    return this.merged.filter((pull) => pull.base === "main" && pull.mergeCommit === sha).map(pullJson);
+  }
+
+  /** `GET /repos/{owner}/{repo}/pulls?state=closed&base=…&sort=updated&direction=desc`. */
+  closedPulls(base: string) {
+    return this.merged.filter((pull) => pull.base === base).reverse().map(pullJson);
+  }
 
   /** The `push` webhook body for one event. */
   async webhook(event: PushEvent): Promise<WebhookPush> {
@@ -228,6 +243,10 @@ export class GitHubView {
       ...webhookLists(files),
     };
   }
+}
+
+function pullJson(pull: MergedPull) {
+  return { number: pull.number, merged_at: "2026-08-10T12:00:00Z", merge_commit_sha: pull.mergeCommit, head: { sha: pull.head } };
 }
 
 function parseMetas(out: string): Meta[] {

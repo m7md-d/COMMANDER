@@ -14,6 +14,7 @@ export const PROMPT_VARIABLES = [
   "note",
   "branch",
   "commitCount",
+  "event",
   "commits",
   "violations",
   "commendations",
@@ -112,6 +113,7 @@ export const DEFAULT_USER_TEMPLATE = `تاريخ اليوم: {{today}}
 الفرد: {{displayName}}{{rankSuffix}} (@{{login}})
 الفرع: {{branch}}
 عدد الكوميتات بهذه الدفعة: {{commitCount}}
+{{event}}
 
 <${UNTRUSTED_TAG}>
 {{commits}}

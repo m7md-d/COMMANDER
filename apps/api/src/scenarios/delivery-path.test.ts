@@ -61,8 +61,9 @@ const scenarios: Scenario[] = [
   },
   {
     // A pattern is not a branch the commits API can read; the reconciler matches
-    // it against the branches there are. An edit made on GitHub keeps direct_push
-    // out of the verdict, so the road is the only thing under test.
+    // it against the branches there are. The pencil's edit is a direct push, and a
+    // recovered push names no pusher to charge it to, so the road is the only
+    // thing under test.
     id: "lost-push-on-a-wildcard-front",
     title: "an edit to release/1.0 on GitHub whose webhook is lost, on a front that watches release/* only",
     front: { watch: ["release/*"] },
@@ -131,11 +132,6 @@ const scenarios: Scenario[] = [
     front: { app: false },
     story: (story) => prMerged(story, false),
     expect: CLEAN,
-    defect: {
-      observed: charged("large_diff@omar"),
-      because:
-        "Without the App there are no parents, so the merge cannot be recognised and its 45 files count as Omar's. Without the evidence to tell, the platform should say it could not tell. (0009 §2)",
-    },
   },
 ];
 

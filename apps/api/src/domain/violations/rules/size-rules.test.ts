@@ -40,6 +40,7 @@ function context(weight: Partial<PushWeight>, commits: NormalizedCommit[] = []):
       commits: [],
       truncated: false,
     },
+    kind: "direct_push",
     timezoneOffset: 3,
     weight: { newCommits: 0, filesTouched: 0, work: [], measured: true, ...weight },
     commits,

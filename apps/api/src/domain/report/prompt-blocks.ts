@@ -18,6 +18,7 @@ import {
   type StructureDigest,
   type ViolationHit,
 } from "@commander/shared";
+import type { PushKind } from "@/domain/judgement/event.js";
 import { sanitizeQuote } from "./sanitize.js";
 
 export interface Quote {
@@ -50,6 +51,15 @@ export function violationLabel(locale: LocaleId, hit: ViolationHit): string {
  *  "back under", so there is no `rule.<RuleId>.praise` to reach. */
 export function praiseLabel(locale: LocaleId, entry: Commendation): string {
   return t(locale, `rule.${entry.ruleId}.praise`, entry.detail);
+}
+
+/**
+ * What happened, as a sentence for the model (0009 §2): a landing is named as
+ * one, so it is not described as a heap of commits — and an event that could
+ * not be told is said to be unknown rather than left to be guessed.
+ */
+export function eventLine(locale: LocaleId, event: { kind: PushKind; pull: number | null }): string {
+  return t(locale, `event.${event.kind}`, { number: event.pull ?? "" });
 }
 
 /**

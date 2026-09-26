@@ -20,6 +20,7 @@ import type {
   ViolationHit,
 } from "@commander/shared";
 import { evaluateRules, type RuleErrorReporter } from "@/domain/violations/engine.js";
+import type { PushKind } from "./event.js";
 
 /** A finding, and who the evidence names to answer for it — null when it names nobody. */
 export interface Named extends Finding {
@@ -36,6 +37,7 @@ const authorOf = (commit: NormalizedCommit): string | null => commit.authorLogin
 
 export interface RuleFacts {
   push: NormalizedPush;
+  kind: PushKind;
   weight: PushWeight;
   knownShas: ReadonlySet<string>;
   rules: RuleConfigMap;
@@ -51,16 +53,16 @@ export interface RuleFacts {
  * and a merge that carries it later charges nobody for it again.
  */
 export function judgeRules(facts: RuleFacts, onRuleError: RuleErrorReporter): Named[] {
-  const { push, weight, rules, timezoneOffset } = facts;
+  const { push, kind, weight, rules, timezoneOffset } = facts;
   const pusher = pusherOf(push);
-  const pushed = { push, timezoneOffset, weight, commits: push.commits, landed: facts.landed };
+  const pushed = { push, kind, timezoneOffset, weight, commits: push.commits, landed: facts.landed };
   const named: Named[] = evaluateRules({ context: pushed, rules, answerer: "pusher" }, onRuleError).map(
     (finding) => ({ ...finding, login: pusher }),
   );
 
   const unjudged = push.commits.filter((commit) => !facts.knownShas.has(commit.sha));
   for (const [author, commits] of byAuthor(unjudged)) {
-    const written = { push, timezoneOffset, weight, commits, landed: [] };
+    const written = { push, kind, timezoneOffset, weight, commits, landed: [] };
     const found = evaluateRules({ context: written, rules, answerer: "author" }, onRuleError);
     named.push(...found.map((finding) => ({ ...finding, login: author })));
   }

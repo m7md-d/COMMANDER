@@ -48,6 +48,16 @@ export type RemoteEvent = PushEvent | ReconcileEvent;
 
 export type MergeStyle = "merge" | "squash" | "rebase";
 
+/** A pull request GitHub merged, as its API lists it against a commit. */
+export interface MergedPull {
+  number: number;
+  base: string;
+  /** The pull request's branch head when it was merged. */
+  head: string;
+  /** What the merge made: the merge commit, the squash, or the rebase's last commit. */
+  mergeCommit: string;
+}
+
 export interface PullRequest {
   number: number;
   head: string;
@@ -66,6 +76,8 @@ export interface PullRequest {
 export class Story {
   readonly remote = new Map<string, string>();
   readonly events: RemoteEvent[] = [];
+  /** Every pull request the story merged through GitHub's button. */
+  readonly pulls: MergedPull[] = [];
 
   private constructor(readonly git: Git) {}
 
@@ -124,6 +136,7 @@ export class Story {
   /** The green button, in each of its three styles, then the push GitHub sends. */
   async mergePullRequest(pr: PullRequest): Promise<void> {
     const title = pr.title ?? `Deliver ${pr.head}`;
+    const head = await this.git.resolve(pr.head);
 
     if (pr.style === "merge") {
       const message = `Merge pull request #${pr.number} from ${REPOSITORY.split("/")[0]}/${pr.head}\n\n${title}`;
@@ -137,6 +150,7 @@ export class Story {
       await this.git.cherryPick({ onto: pr.base, shas, committer: WEB_FLOW });
     }
 
+    this.pulls.push({ number: pr.number, base: pr.base, head, mergeCommit: await this.git.resolve(pr.base) });
     await this.push(pr.base, pr.by, { lost: pr.lost ?? false });
   }
 

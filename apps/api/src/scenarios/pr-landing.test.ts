@@ -60,11 +60,6 @@ const scenarios: Scenario[] = [
       await land(story, "merge");
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("large_diff@omar"),
-      because:
-        "The 'Update branch' merge's second parent is on main, outside the push, so isWeighable gives up on the whole push and the landing merge counts at its full first-parent diff: 45 files. (0009 §2)",
-    },
   },
   {
     id: "squash-merge",
@@ -74,11 +69,6 @@ const scenarios: Scenario[] = [
       await land(story, "squash");
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("large_diff@omar"),
-      because:
-        "A squash commit has one parent and a new sha: nothing in the push marks it as a landing, so its 45 files are new work by Omar. Only the pull-request link (commits/{sha}/pulls) knows. (0009 §2)",
-    },
   },
   {
     id: "rebase-merge",
@@ -88,11 +78,6 @@ const scenarios: Scenario[] = [
       await land(story, "rebase");
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("batch_dump@omar", "large_diff@omar"),
-      because:
-        "GitHub rewrites every commit, so none of the new shas is on record: six new commits and 60 touches, charged to Omar. web-flow as committer exempts direct_push and nothing else. (0009 §2)",
-    },
   },
   {
     id: "eighteen-commit-pr",
@@ -111,11 +96,6 @@ const scenarios: Scenario[] = [
       await land(story, "merge");
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("large_diff@omar"),
-      because:
-        "normalizePush marks any push of 20+ commits truncated — the Events timeline's cap, not the webhook's (2,048) — so weighPush refuses to weigh it and the merge counts at its full diff. One commit fewer and the same PR is clean (eighteen-commit-pr). (0009 §6)",
-    },
   },
   {
     id: "pr-from-a-fork",
@@ -125,11 +105,6 @@ const scenarios: Scenario[] = [
       await land(story, "merge");
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("batch_dump@omar", "large_diff@omar"),
-      because:
-        "A fork's commits were never pushed here, so neither the record nor `distinct` can recognise them as reviewed work — only the pull request can. (0009 §2)",
-    },
   },
   {
     id: "head-branch-deleted-after-merge",
@@ -173,6 +148,34 @@ const scenarios: Scenario[] = [
       await land(story, "merge");
     },
     expect: charged("lazy_message@sara"),
+  },
+  {
+    // GitHub lists a merged pull request against its commit only on the default
+    // branch; anywhere else it lists the open ones. A squash onto a release line
+    // is still a landing, not the pencil.
+    id: "squash-merged-into-a-release-branch",
+    title: "PR squash-merged into release/1.0, a branch other than the default",
+    story: async (story) => {
+      await seed(story);
+      await story.branch("release/1.0", "main");
+      await story.push("release/1.0", OMAR);
+      await story.branch(FEATURE, "release/1.0");
+      await work(story, { on: FEATURE, by: SARA, commits: 2, width: 3 });
+      await story.push(FEATURE, SARA);
+      await story.mergePullRequest({ number: 14, head: FEATURE, base: "release/1.0", author: SARA, by: OMAR, style: "squash" });
+    },
+    expect: CLEAN,
+  },
+  {
+    id: "edited-in-the-browser-on-a-release-branch",
+    title: "a file edited with GitHub's pencil, committed straight to release/1.0",
+    story: async (story) => {
+      await seed(story);
+      await story.branch("release/1.0", "main");
+      await story.push("release/1.0", OMAR);
+      await story.editOnGitHub({ on: "release/1.0", by: OMAR, title: "Pin the release version", write: { "VERSION": "1.0.1\n" } });
+    },
+    expect: charged("direct_push@omar"),
   },
 ];
 

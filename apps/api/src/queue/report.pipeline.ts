@@ -16,6 +16,7 @@ import {
 } from "@commander/shared";
 import { createLogger } from "@/core/logger/logger.js";
 import { answered, judgeRules } from "@/domain/judgement/attribution.js";
+import { classifyPush, type PushKind } from "@/domain/judgement/event.js";
 import type { RuleErrorReporter } from "@/domain/violations/engine.js";
 import {
   buildPromptValues,
@@ -59,8 +60,9 @@ export const logRuleError: RuleErrorReporter = (ruleId, error) =>
 export function detectViolations(input: { push: NormalizedPush; repository: Repository; settings: Settings }): ViolationHit[] {
   const { push, repository, settings } = input;
   const weight = weighPush({ push, knownShas: EMPTY_HISTORY });
-  // No checks run on a sample push, so it lands nothing.
-  const facts = { push, weight, knownShas: EMPTY_HISTORY, rules: repository.rules, timezoneOffset: settings.timezoneOffset, landed: [] };
+  // Someone's own commits, so no button landed them; and no checks run on a sample, so it lands nothing.
+  const kind = classifyPush({ push, pull: { status: "unasked" } });
+  const facts = { push, kind, weight, knownShas: EMPTY_HISTORY, rules: repository.rules, timezoneOffset: settings.timezoneOffset, landed: [] };
   return answered(judgeRules(facts, logRuleError));
 }
 
@@ -79,6 +81,8 @@ export function findMember(repository: Repository, login: string): MemberIdentit
 
 interface ComposeInput {
   push: NormalizedPush;
+  /** What happened (`judgePush`), so a landing is not described as a heap of commits. */
+  event: { kind: PushKind; pull: number | null };
   repository: Repository;
   settings: Settings;
   violations: ViolationHit[];
@@ -105,6 +109,7 @@ function renderPrompts(
 
   const values = buildPromptValues({
     push,
+    event: input.event,
     member,
     violations,
     commendations: input.commendations,

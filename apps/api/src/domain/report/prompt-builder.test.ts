@@ -15,6 +15,7 @@ import {
   praiseLabel,
   violationLabel,
 } from "@/domain/report/prompt-builder.js";
+import { eventLine } from "@/domain/report/prompt-blocks.js";
 import { renderUserPrompt } from "@/domain/report/prompt-render.js";
 
 function commit(overrides: Partial<NormalizedCommit> = {}): NormalizedCommit {
@@ -50,6 +51,7 @@ function push(commits: NormalizedCommit[]): NormalizedPush {
 }
 
 const BASE = {
+  event: { kind: "direct_push" as const, pull: null },
   member: null,
   violations: [],
   commendations: [],
@@ -354,4 +356,16 @@ test("a push with nothing earned adds nothing to the prompt", () => {
 
   assert.equal(String(values.commendations), "", "silence, not 'nobody improved anything'");
   assert.doesNotMatch(rendered, /استُحقّ عليه المدح/, "no empty heading in the prompt");
+});
+
+test("eventLine: a landing is named with its pull request, and an event nobody could tell is said to be unknown", () => {
+  assert.match(eventLine("ar", { kind: "pr_landing", pull: 12 }), /#12/);
+  assert.match(eventLine("en", { kind: "unknown", pull: null }), /unknown.*do not guess/);
+});
+
+test("what happened reaches a template written before it existed, once", () => {
+  const values = buildPromptValues({ ...BASE, event: { kind: "pr_landing", pull: 12 }, push: push([commit()]) });
+
+  assert.match(renderUserPrompt("الريبو: {{repo}}", values), /#12/);
+  assert.equal(renderUserPrompt("{{event}}", values).match(/#12/g)?.length, 1);
 });

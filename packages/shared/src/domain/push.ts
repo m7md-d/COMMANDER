@@ -97,19 +97,16 @@ export interface NormalizedPush {
 }
 
 /**
- * Commits authored through the GitHub web UI — every PR merge, squash and
- * rebase — carry `web-flow` as committer. It is the only in-payload signal that
- * a push arrived via a pull request; matching a "Merge ..." message prefix
- * misses squash and rebase entirely.
+ * Commits GitHub's web UI writes — every pull request merge, squash and rebase,
+ * "Update branch", and the pencil — carry `web-flow` as committer. It says
+ * GitHub made the commit, not which button did: a pull request's landing is
+ * GitHub's own answer, asked of the commit (`classifyPush`). A merge is two
+ * parents (`isMerge`), never a "Merge…" title.
  */
 export const GITHUB_UI_COMMITTER = "web-flow";
 
 export function isGitHubUiCommit(commit: NormalizedCommit): boolean {
   return commit.committerLogin === GITHUB_UI_COMMITTER;
-}
-
-export function isMergeCommit(commit: NormalizedCommit): boolean {
-  return /^merge\b/i.test(commit.title);
 }
 
 export function totalFilesTouched(commits: NormalizedCommit[]): number {

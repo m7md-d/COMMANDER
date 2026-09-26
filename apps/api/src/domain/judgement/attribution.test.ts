@@ -57,7 +57,7 @@ test("judgeRules: the pusher's rules name the pusher, each author's rules that a
   const forced = push([commit("c1", "sara"), commit("c2", "lina")], { forced: true });
 
   const weight = weighPush({ push: forced, knownShas: NONE });
-  const named = judgeRules({ push: forced, weight, knownShas: NONE, rules, timezoneOffset: 3, landed: [] }, () => {
+  const named = judgeRules({ push: forced, kind: "rewrite", weight, knownShas: NONE, rules, timezoneOffset: 3, landed: [] }, () => {
     throw new Error("no rule should throw");
   });
 

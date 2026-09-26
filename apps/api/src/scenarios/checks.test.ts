@@ -219,11 +219,6 @@ const scenarios: Scenario[] = [
       await story.mergePullRequest({ number: 12, head: FEATURE, base: "main", author: SARA, by: OMAR, style: "squash" });
     },
     expect: charged("landed_unfixed@omar"),
-    defect: {
-      observed: charged("file_lines@sara", "landed_unfixed@omar"),
-      because:
-        "A squash commit is new to the record, so Sara's crossing — charged when her branch was pushed — reads as new work of hers and is charged to her a second time. Only the pull-request link knows the squash is her reviewed branch (0009 §2).",
-    },
   },
   {
     id: "crossing-fixed-by-the-reviewer",

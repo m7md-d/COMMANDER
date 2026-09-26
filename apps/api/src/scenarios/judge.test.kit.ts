@@ -12,14 +12,15 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DEFAULT_CHECKS, type CheckConfigMap, type NormalizedPush, type RuleConfigMap } from "@commander/shared";
+import { DEFAULT_CHECKS, isGitHubUiCommit, type CheckConfigMap, type NormalizedPush, type RuleConfigMap } from "@commander/shared";
 import { RECONCILE_LOOKBACK_MS } from "@/config/constants.js";
 import { wanted } from "@/domain/checks/judge.js";
 import { pushChanges, pushSpan } from "@/domain/judgement/changes.js";
 import { admitPush, judgePush, type ChecksFacts } from "@/domain/judgement/judgement.js";
 import { landingMerge, type LandingSides } from "@/domain/judgement/landing.js";
+import { headOf, pullFact, type PullFact } from "@/domain/judgement/event.js";
 import { mergeWithDefaults } from "@/domain/violations/engine.js";
-import { toCommitDetail, toCommitListEntry } from "@/integrations/github/commit.mapper.js";
+import { toCommitDetail, toCommitListEntry, toCommitPull } from "@/integrations/github/commit.mapper.js";
 import { isBranchRef, normalizePush } from "@/modules/webhook/push.mapper.js";
 import { enrichWith } from "@/queue/push.detail.js";
 import type { CommitListEntry } from "@/integrations/github/commits.client.js";
@@ -107,7 +108,7 @@ export async function play(scenario: Scenario): Promise<{ verdict: Verdict; trai
     if (story.events.length === 0) throw new Error(`${scenario.id}: the story emits no event`);
 
     const front = { ...DEFAULT_FRONT, ...scenario.front };
-    const run: Run = { story, view: new GitHubView(story.git), front, known: new Map(), contents: new Contents(story.git) };
+    const run: Run = { story, view: new GitHubView(story.git, story.pulls), front, known: new Map(), contents: new Contents(story.git) };
     const trail: string[] = [];
     let verdict = CLEAN;
     for (const event of story.events) {
@@ -151,6 +152,7 @@ async function handle(run: Run, received: NormalizedPush): Promise<Verdict> {
   const facts = {
     push,
     knownShas,
+    pull: readPull(run, push),
     rules: run.front.rules,
     timezoneOffset: TIMEZONE_OFFSET,
     // No branch is marked guarded here: the main line is the default branch alone.
@@ -166,6 +168,17 @@ async function handle(run: Run, received: NormalizedPush): Promise<Verdict> {
   if (judgement.recorded) remember(run.known, push);
   const named = (entries: { ruleId: string; login: string }[]) => entries.map((entry) => `${entry.ruleId}@${entry.login}`);
   return credited(charged(...named(judgement.violations)), ...named(judgement.commendations));
+}
+
+/** push.enrich.ts `readPull`: asked only of a head GitHub committed, only with the App — and off the default branch, of its closed pull requests too. */
+function readPull(run: Run, push: NormalizedPush): PullFact {
+  const head = headOf(push);
+  if (!head || !isGitHubUiCommit(head)) return { status: "unasked" };
+  if (!run.front.app) return { status: "unknown" };
+
+  const found = pullFact(run.view.pulls(head.sha).map(toCommitPull), head.sha);
+  if (found.status !== "none" || push.branch === push.defaultBranch) return found;
+  return pullFact(run.view.closedPulls(push.branch).map(toCommitPull), head.sha);
 }
 
 /** dossier.ledger.ts `recordCommits`: first write wins, unparseable dates are skipped. */

@@ -51,7 +51,7 @@ test("it names no pusher, and is addressed to the author of its newest commit", 
   assert.equal(recoveredPush(REPO, "main", [entry({ authorLogin: "" })])?.actorLogin, "unknown");
 });
 
-test("a web-flow merge keeps its committer login, which the direct-push rule reads", () => {
+test("a web-flow merge keeps its committer login, which the event is read from", () => {
   const push = recoveredPush(REPO, "main", [entry({ sha: "m", authorLogin: "ahmad", committerLogin: GITHUB_UI_COMMITTER })]);
 
   assert.equal(push?.commits[0]?.committerLogin, GITHUB_UI_COMMITTER);

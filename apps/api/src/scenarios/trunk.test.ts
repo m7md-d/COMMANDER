@@ -9,7 +9,7 @@
  */
 
 import { LINA, OMAR, SARA } from "./git.test.kit.js";
-import { CLEAN, charged, runCatalog, SKIPPED, type Scenario } from "./judge.test.kit.js";
+import { charged, runCatalog, type Scenario } from "./judge.test.kit.js";
 import { modules, REPOSITORY, seed, work } from "./story.test.kit.js";
 
 const FEATURE = "feature/export";
@@ -62,11 +62,6 @@ const scenarios: Scenario[] = [
       await story.push("main", SARA);
     },
     expect: charged("direct_push@sara"),
-    defect: {
-      observed: CLEAN,
-      because:
-        "direct_push exempts any push holding a commit whose title starts with 'Merge' (isMergeCommit is a title regex), so typing the word is enough. (0009 §2)",
-    },
   },
   {
     id: "local-merge-default-message",
@@ -77,11 +72,6 @@ const scenarios: Scenario[] = [
       await story.push("main", SARA);
     },
     expect: charged("direct_push@sara"),
-    defect: {
-      observed: CLEAN,
-      because:
-        "git's own merge message starts with 'Merge', which exempts the push; the same merge under another message is charged (local-merge-own-message). The verdict hangs on the text. (0009 §2)",
-    },
   },
   {
     id: "local-merge-own-message",
@@ -107,11 +97,6 @@ const scenarios: Scenario[] = [
       await story.push("main", SARA);
     },
     expect: charged("direct_push@sara"),
-    defect: {
-      observed: CLEAN,
-      because:
-        "Exempted by its title, like every local merge git names itself. (0009 §2)",
-    },
   },
   {
     id: "git-pull-merge-then-push",
@@ -127,9 +112,9 @@ const scenarios: Scenario[] = [
     },
     expect: charged("direct_push@sara"),
     defect: {
-      observed: charged("large_diff@sara"),
+      observed: charged("direct_push@sara", "large_diff@sara"),
       because:
-        "Two errors. The pull merge's title exempts the push from direct_push (0009 §2). And its second parent is main's old head, outside the push, so weighPush refuses to weigh it and counts the merge at its whole first-parent diff: Lina's 48 files, brought in by the pull. Sara answers for the push, rightly; the count is not hers (weighPush's fallback for an unweighable push).",
+        "The direct push is seen — a merge made on a laptop is one, whatever its title (0009 §2). The size is not: the pull merge's second parent is main's old head, outside the push, so weighPush refuses to weigh it and counts the merge at its whole first-parent diff — Lina's 48 files, brought in by the pull (weighPush's fallback for an unweighable push).",
     },
   },
   {
@@ -144,9 +129,9 @@ const scenarios: Scenario[] = [
     },
     expect: charged("direct_push@sara"),
     defect: {
-      observed: charged("large_diff@sara"),
+      observed: charged("direct_push@sara", "large_diff@sara"),
       because:
-        "The pull merge's shape again: exempted by its title (0009 §2), then counted at its whole first-parent diff — Lina's 48 files, main's work — because its second parent is outside the push. The right person, the wrong count (weighPush's fallback for an unweighable push).",
+        "The pull merge's shape again: the direct push is seen, and the merge is counted at its whole first-parent diff — Lina's 48 files, main's work — because its second parent is outside the push (weighPush's fallback for an unweighable push).",
     },
   },
   {
@@ -158,11 +143,6 @@ const scenarios: Scenario[] = [
       await story.editOnGitHub({ on: "main", by: SARA, title: "Correct the ledger header", write });
     },
     expect: charged("direct_push@sara"),
-    defect: {
-      observed: CLEAN,
-      because:
-        "A web-flow committer is read as 'arrived through a pull request', but the pencil commits straight to main with no pull request at all. (0009 §2)",
-    },
   },
   {
     id: "cherry-pick-to-main",
@@ -196,11 +176,6 @@ const scenarios: Scenario[] = [
       await story.push("main", SARA);
     },
     expect: charged("force_push@sara"),
-    defect: {
-      observed: SKIPPED,
-      because:
-        "A force push that only removes commits carries none, and the processor skips a push without commits before any rule runs — so deleting history from main is never reported. (0009 §2)",
-    },
   },
   {
     id: "main-rewritten-by-force",

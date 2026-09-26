@@ -9,6 +9,7 @@
  * which is the only way a field being *dropped* is ever noticed.
  */
 
+import type { CommitPull } from "@/domain/judgement/event.js";
 import type { CommitDetail } from "./github.client.js";
 import type { CommitListEntry } from "./commits.client.js";
 
@@ -62,5 +63,22 @@ export function toCommitListEntry(raw: RawListCommit): CommitListEntry {
     timestamp: raw.commit?.committer?.date ?? raw.commit?.author?.date ?? "",
     authorLogin: raw.author?.login ?? "",
     committerLogin: raw.committer?.login ?? "",
+  };
+}
+
+/** One entry of `GET /repos/{owner}/{repo}/commits/{sha}/pulls`, the fields read from it. */
+export interface RawCommitPull {
+  number?: number;
+  merged_at?: string | null;
+  merge_commit_sha?: string | null;
+  head?: { sha?: string };
+}
+
+export function toCommitPull(raw: RawCommitPull): CommitPull {
+  return {
+    number: raw.number ?? 0,
+    merged: Boolean(raw.merged_at),
+    mergeCommit: raw.merge_commit_sha || null,
+    head: raw.head?.sha ?? "",
   };
 }

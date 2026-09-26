@@ -24,7 +24,7 @@ import { readChanges, refreshMeasurements, refreshTodos, refreshTree } from "./d
 import { writeLedger } from "./delivery.ledger.js";
 import { deliver } from "./delivery.dispatch.js";
 import { processDigest } from "./digest.processor.js";
-import { enrichPush } from "./push.enrich.js";
+import { enrichPush, readPull } from "./push.enrich.js";
 import { markFailed, markSkipped } from "./outbox.service.js";
 
 const log = createLogger("processor");
@@ -85,7 +85,7 @@ async function run(job: PrismaDelivery, received: NormalizedPush): Promise<void>
 
   // Real file and line counts before either the rules or the report read them.
   const push = await enrichPush(repository, received);
-  const knownShas = await recordedShas(repository.id, push);
+  const [knownShas, pull] = await Promise.all([recordedShas(repository.id, push), readPull(repository, push)]);
   // The checks' evidence is what this push changed on its own branch. The
   // snapshot is the project's state — measured and noted, charged to nobody.
   const checks = await readChanges(repository, push, knownShas);
@@ -98,6 +98,7 @@ async function run(job: PrismaDelivery, received: NormalizedPush): Promise<void>
     {
       push,
       knownShas,
+      pull,
       rules: repository.rules,
       timezoneOffset: settings.timezoneOffset,
       watchers: repository.watchers,
@@ -130,7 +131,7 @@ async function record(
   },
 ): Promise<void> {
   const { push, repository, settings, judgement, webhookUrl } = ctx;
-  const { violations, commendations } = judgement;
+  const { violations, commendations, event } = judgement;
 
   const history = await recordPush({
     repositoryId: repository.id,
@@ -143,7 +144,7 @@ async function record(
   await writeLedger({ repositoryId: repository.id, push, judgement, deliveryId: job.id });
 
   const watcher = resolveWatcher(repository.watchers, push.branch);
-  await report(job, { push, repository, settings, violations, commendations, history, webhookUrl, watcher });
+  await report(job, { push, event, repository, settings, violations, commendations, history, webhookUrl, watcher });
 }
 
 /**
@@ -156,6 +157,7 @@ async function report(
   job: PrismaDelivery,
   ctx: {
     push: NormalizedPush;
+    event: Judgement["event"];
     repository: Repository;
     settings: Settings;
     violations: ViolationHit[];
