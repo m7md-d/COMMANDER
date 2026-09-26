@@ -14,6 +14,7 @@
 
 import {
   branchIsWatched,
+  isTrunk,
   weighPush,
   type CheckConfigMap,
   type Commendation,
@@ -22,11 +23,12 @@ import {
   type Repository,
   type RuleConfigMap,
   type ViolationHit,
+  type Watcher,
 } from "@commander/shared";
 import { judgeFile, type Reading } from "@/domain/checks/judge.js";
 import type { TouchedFile } from "@/domain/tree/diff.js";
 import type { RuleErrorReporter } from "@/domain/violations/engine.js";
-import { answered, handsOnPaths, judgeRules, pusherOf, type Named } from "./attribution.js";
+import { answered, handsOnPaths, judgeRules, pusherOf, soleHand, type Named } from "./attribution.js";
 
 /**
  * Whether a push is read, and whether it is judged. Read without being judged
@@ -67,6 +69,8 @@ export interface PushFacts {
   knownShas: ReadonlySet<string>;
   rules: RuleConfigMap;
   timezoneOffset: number;
+  /** The repository's watchers — which, with the default branch, say what a main line is. */
+  watchers: Watcher[];
   checks: ChecksFacts;
   silentWhenClean: boolean;
   /** Whether there is a channel to send to at all. */
@@ -98,9 +102,13 @@ export type Judgement = {
 export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Judgement {
   const { push, knownShas } = facts;
   const weight = weighPush({ push, knownShas });
-  const ruled = judgeRules({ push, weight, knownShas, rules: facts.rules, timezoneOffset: facts.timezoneOffset }, onRuleError);
-  const checked = judgeChanges(facts.checks, handsOnPaths(push, weight));
-  const found = [...ruled, ...checked.violations];
+  const checked = judgeChanges(facts.checks, {
+    hands: weight.measured ? handsOnPaths(push, weight) : null,
+    pusher: pusherOf(push),
+    trunk: isTrunk({ branch: push.branch, defaultBranch: push.defaultBranch, watchers: facts.watchers }),
+  });
+  const rules = { rules: facts.rules, timezoneOffset: facts.timezoneOffset, landed: checked.landed };
+  const found = [...judgeRules({ push, weight, knownShas, ...rules }, onRuleError), ...checked.violations];
   const judged = {
     violations: answered(found),
     commendations: answered(checked.commendations),
@@ -115,21 +123,31 @@ export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Jud
 }
 
 /**
- * The checks, on the paths new work touched, each naming whose work it was. A
- * file only carried by commits already on record was judged when they arrived,
- * and judging it again charges the same crossing twice — the second time to
- * whoever merged. A push that cannot be weighed has no new work to tell from
- * carried work, so nothing is judged.
+ * The checks, each finding naming whose work it was, and the crossings the push
+ * landed on a main line from others' work.
+ *
+ * A file only carried by commits already on record was judged when they
+ * arrived: its author is not charged again. On a main line it is still landed —
+ * by whoever merged it unfixed. Without the weight (`hands` null), new work
+ * cannot be told from carried work, and nothing is judged at all.
  */
-function judgeChanges(checks: ChecksFacts, hands: ReadonlyMap<string, string | null>) {
-  const outcome: { violations: Named[]; commendations: Named[] } = { violations: [], commendations: [] };
+function judgeChanges(checks: ChecksFacts, scope: { hands: Map<string, Set<string | null>> | null; pusher: string | null; trunk: boolean }) {
+  const outcome = { violations: [] as Named[], commendations: [] as Named[], landed: [] as Finding[] };
+  if (scope.hands === null) return outcome;
 
   for (const file of checks.changes) {
-    if (!hands.has(file.path)) continue;
-    const login = hands.get(file.path) ?? null;
+    const hands = scope.hands.get(file.path);
+    if (hands === undefined && !scope.trunk) continue;
+
     const judged = judgeFile(checks.config, file, checks.readings);
-    outcome.violations.push(...judged.violations.map((finding) => ({ ...finding, login })));
-    outcome.commendations.push(...judged.commendations.map((finding) => ({ ...finding, login })));
+    const login = hands === undefined ? null : soleHand(hands);
+    if (hands !== undefined) {
+      outcome.violations.push(...judged.violations.map((finding) => ({ ...finding, login })));
+      outcome.commendations.push(...judged.commendations.map((finding) => ({ ...finding, login })));
+    }
+    // The pusher's own new work is charged once, as its author.
+    const own = scope.pusher !== null && login === scope.pusher;
+    if (scope.trunk && !own) outcome.landed.push(...judged.violations);
   }
   return outcome;
 }

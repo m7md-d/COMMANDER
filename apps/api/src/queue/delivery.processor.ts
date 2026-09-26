@@ -100,6 +100,7 @@ async function run(job: PrismaDelivery, received: NormalizedPush): Promise<void>
       knownShas,
       rules: repository.rules,
       timezoneOffset: settings.timezoneOffset,
+      watchers: repository.watchers,
       checks,
       silentWhenClean: repository.silentWhenClean,
       hasChannel: webhookUrl !== "",

@@ -7,7 +7,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { branchIsWatched, resolveWatcher, watchesEverything, type Watcher } from "./watcher.js";
+import { branchIsWatched, isTrunk, resolveWatcher, watchesEverything, type Watcher } from "./watcher.js";
 
 function watcher(pattern: string, gravity: Watcher["gravity"]): Watcher {
   return { pattern, gravity, promptId: null, model: "" };
@@ -61,4 +61,15 @@ test("a watch list admits everything when it is empty or holds a lone *", () => 
   assert.equal(watchesEverything(["main", " * "]), true, "patterns are trimmed");
   assert.equal(watchesEverything(["release/*"]), false, "a prefix is not everything");
   assert.equal(watchesEverything([""]), false, "a blank pattern watches nothing");
+});
+
+test("a main line is the default branch, or one a watcher marks guarded or critical", () => {
+  const trunk = (branch: string, watchers: Watcher[] = []) => isTrunk({ branch, defaultBranch: "main", watchers });
+
+  assert.equal(trunk("main"), true);
+  assert.equal(trunk("feature/export"), false, "pulling main into a feature lands nothing there to review");
+  assert.equal(trunk("release/2.0", LIST), true);
+  assert.equal(trunk("feature/export", LIST), false, "the catch-all is routine");
+  // Without the default branch, only the watchers can say.
+  assert.equal(isTrunk({ branch: "main", defaultBranch: undefined, watchers: [] }), false);
 });

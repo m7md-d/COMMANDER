@@ -1,9 +1,9 @@
 /**
  * What GitHub would send about a story, computed from its real repository.
  *
- * Fields the production code does not read yet are sent anyway — `distinct`,
- * `previous_filename`, `before`, `after`. The payload is GitHub's, not ours, so
- * the day the code starts reading one of them the scenarios change with it.
+ * Fields are sent as GitHub sends them, whether or not the production code
+ * reads them yet. The payload is GitHub's, not ours, so the day the code starts
+ * reading one of them the scenarios change with it.
  *
  * Every modelling choice is here, once, so a wrong one is a one-line fix:
  *
@@ -18,6 +18,7 @@
  * | list API `since`        | compared with the committer date                  | assumption |
  * | compare API `commits`   | the base..head set, oldest first, never cut        | GitHub docs, "Compare two commits": `git log BASE..HEAD`, chronological; 250 without paging |
  * | `username` / `login`    | `<login>@users.noreply.github.com`; GitHub's own address is `web-flow` | fixture convention |
+ * | `repository.default_branch` | `main`                                        | GitHub docs, push event: the full repository object |
  */
 
 import type { Git } from "./git.test.kit.js";
@@ -103,7 +104,7 @@ export class GitHubView {
       compare: `${WEB}/compare/${event.before.slice(0, 12)}...${event.after.slice(0, 12)}`,
       commits,
       head_commit: commits.at(-1) ?? null,
-      repository: { full_name: REPOSITORY, html_url: WEB },
+      repository: { full_name: REPOSITORY, html_url: WEB, default_branch: "main" },
       pusher: { name: event.sender.login, email: event.sender.email },
       sender: { login: event.sender.login, avatar_url: "" },
     };

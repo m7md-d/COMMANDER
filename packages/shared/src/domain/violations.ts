@@ -18,6 +18,7 @@ export const RULE_IDS = [
   "large_diff",
   "branch_deleted",
   "merge_residue",
+  "landed_unfixed",
 ] as const;
 
 export type RuleId = (typeof RULE_IDS)[number];
@@ -92,6 +93,7 @@ export interface RuleConfigMap {
   large_diff: ThresholdRuleConfig;
   branch_deleted: RuleConfigBase;
   merge_residue: RuleConfigBase;
+  landed_unfixed: RuleConfigBase;
 }
 
 export type RuleConfig = RuleConfigMap[RuleId];
@@ -126,5 +128,9 @@ export function defaultRuleConfig(): RuleConfigMap {
     // because a clean merge and a conflict resolution both leave nothing behind
     // — a conflicted file is in the branch too, so it is carried, not residue.
     merge_residue: { enabled: true },
+    // No threshold either: one file landed over its limit is the finding. It
+    // only ever fires beside a check's crossing, so a front with every check
+    // off never sees it.
+    landed_unfixed: { enabled: true },
   };
 }

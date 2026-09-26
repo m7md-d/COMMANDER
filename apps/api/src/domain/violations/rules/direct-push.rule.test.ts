@@ -59,7 +59,7 @@ function push(commits: NormalizedCommit[]): NormalizedPush {
 const UNWEIGHED: PushWeight = { newCommits: 0, filesTouched: 0, work: [], measured: false };
 
 const evaluate = (commits: NormalizedCommit[]) =>
-  directPushRule({ push: push(commits), timezoneOffset: 3, weight: UNWEIGHED, commits }, ENABLED);
+  directPushRule({ push: push(commits), timezoneOffset: 3, weight: UNWEIGHED, commits, landed: [] }, ENABLED);
 
 test("local commits pushed straight to the branch are flagged", () => {
   const hit = evaluate([commit(), commit({ sha: "b".repeat(40) })]);
@@ -117,7 +117,7 @@ test("normalizePush preserves the committer login the rule depends on", () => {
   assert.equal(normalized.commits[0]?.committerLogin, GITHUB_UI_COMMITTER);
   assert.equal(normalized.commits[0]?.title, "Add invoice export (#42)");
   assert.equal(
-    directPushRule({ push: normalized, timezoneOffset: 3, weight: UNWEIGHED, commits: normalized.commits }, ENABLED),
+    directPushRule({ push: normalized, timezoneOffset: 3, weight: UNWEIGHED, commits: normalized.commits, landed: [] }, ENABLED),
     null,
   );
 });

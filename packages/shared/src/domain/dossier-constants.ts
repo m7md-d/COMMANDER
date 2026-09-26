@@ -23,6 +23,10 @@ export const RULE_SEVERITY: Record<ViolationId, number> = {
   // file nobody approved is least likely to be noticed.
   merge_residue: 2.8,
   branch_deleted: 2.5,
+  // The merger's share of a crossing weighs what the crossing does: the same
+  // defect, landed on a main line rather than written. Beside file_lines, the
+  // heaviest check, because a crossing of any metric is landed the same way.
+  landed_unfixed: 1.4,
   direct_push: 1.5,
   large_diff: 1.2,
   batch_dump: 1.0,

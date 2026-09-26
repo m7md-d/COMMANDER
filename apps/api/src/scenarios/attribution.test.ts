@@ -5,8 +5,10 @@
  * a wrong verdict. The policy these hold the code to: whoever pushed answers for
  * what the push did — landing on the trunk unreviewed, rewriting it, deleting
  * it, pushing a heap at once. Whoever wrote a commit answers for what the commit
- * holds: its message, its hour, what it did to a file. When the evidence names
- * nobody, nobody is charged.
+ * holds: its message, its hour, what it did to a file. Whoever lands someone
+ * else's crossing on the trunk shares it with its author — the catalog in
+ * `checks.test.ts` holds those. When the evidence names nobody, nobody is
+ * charged.
  */
 
 import { LINA, SARA, type Person } from "./git.test.kit.js";

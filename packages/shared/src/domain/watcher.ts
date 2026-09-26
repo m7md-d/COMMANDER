@@ -76,3 +76,14 @@ export function resolveWatcher(watchers: Watcher[], branch: string): Watcher {
   const match = watchers.find((watcher) => patternMatches(watcher.pattern, branch));
   return match ?? { pattern: branch, gravity: DEFAULT_GRAVITY, promptId: null, model: "" };
 }
+
+/**
+ * Whether `branch` is a main line: the repository's default branch, or one a
+ * watcher marks `guarded` or `critical` — 0009 §3's definition. Work landing on
+ * a main line is what review exists for; pulling main into a feature branch
+ * lands nothing there that was not already reviewed.
+ */
+export function isTrunk(input: { branch: string; defaultBranch: string | undefined; watchers: Watcher[] }): boolean {
+  if (input.defaultBranch !== undefined && input.branch === input.defaultBranch) return true;
+  return resolveWatcher(input.watchers, input.branch).gravity !== DEFAULT_GRAVITY;
+}

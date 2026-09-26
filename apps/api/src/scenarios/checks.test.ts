@@ -3,8 +3,11 @@
  *
  * A check violates on the crossing — a file taken past its limit — and the
  * crossing belongs to the work that made it: on the branch where it was made,
- * to the person who made it, once. These fronts switch every rule off, so a
- * verdict here is the checks alone.
+ * to the person who made it, once. Whoever lands it on a main line unfixed —
+ * a branch whose crossing was reported, or someone else's commits — shares it:
+ * the author for writing it, the lander for landing it (`landed_unfixed`).
+ * These fronts switch every engagement rule off, so a verdict here is the
+ * checks and that one share alone.
  */
 
 import { LINA, OMAR, SARA } from "./git.test.kit.js";
@@ -66,14 +69,16 @@ const scenarios: Scenario[] = [
     expect: charged("file_lines@sara"),
   },
   {
+    // Sara answered when her branch was pushed; the crossing is still there when
+    // Omar merges it, and landing it unfixed is his.
     id: "crossing-charged-to-whoever-merged",
-    title: "the same branch merged by Omar through the PR",
+    title: "the same branch merged by Omar through the PR, the crossing still standing",
     front: { rules: QUIET },
     story: async (story) => {
       await sarasCrossing(story);
       await story.mergePullRequest({ number: 12, head: FEATURE, base: "main", author: SARA, by: OMAR, style: "merge" });
     },
-    expect: CLEAN,
+    expect: charged("landed_unfixed@omar"),
   },
   {
     id: "main-crossing-charged-to-a-release-push",
@@ -136,7 +141,7 @@ const scenarios: Scenario[] = [
       await sarasCrossing(story);
       await story.push(FEATURE, LINA, { to: "main" });
     },
-    expect: charged("file_lines@sara"),
+    expect: charged("file_lines@sara", "landed_unfixed@lina"),
   },
   {
     id: "crossing-by-two-hands",
@@ -164,7 +169,51 @@ const scenarios: Scenario[] = [
       await sarasCrossing(story);
       await story.mergePullRequest({ number: 12, head: FEATURE, base: "main", author: SARA, by: OMAR, style: "merge" });
     },
-    expect: charged("file_lines@sara"),
+    expect: charged("file_lines@sara", "landed_unfixed@omar"),
+  },
+  {
+    id: "crossing-fixed-before-merge",
+    title: "Sara's crossing, reported on her branch, brought back under before Omar merges",
+    front: { rules: QUIET },
+    story: async (story) => {
+      await sarasCrossing(story);
+      await story.commit({ on: FEATURE, by: SARA, title: "Split the refunds out of the ledger", write: { [LEDGER]: sized(195, "split") } });
+      await story.push(FEATURE, SARA);
+      await story.mergePullRequest({ number: 12, head: FEATURE, base: "main", author: SARA, by: OMAR, style: "merge" });
+    },
+    expect: CLEAN,
+  },
+  {
+    // Merging main into a feature brings it nothing a review has not seen:
+    // Lina answered on main, and Sara lands nothing by syncing.
+    id: "main-pulled-into-a-feature",
+    title: "Lina's crossing on main reaches Sara's branch through 'Update branch'",
+    front: { rules: QUIET },
+    story: async (story) => {
+      await ledgerOnMain(story);
+      await story.branch(FEATURE, "main");
+      await story.commit({ on: FEATURE, by: SARA, title: "Export the ledger as CSV", write: { "src/export/csv.ts": "export const csv = true;\n" } });
+      await story.push(FEATURE, SARA);
+      await story.commit({ on: "main", by: LINA, title: "Track refunds in the ledger", write: { [LEDGER]: sized(210, "refunds") } });
+      await story.push("main", LINA);
+      await story.updateBranch({ head: FEATURE, base: "main", by: SARA });
+    },
+    expect: CLEAN,
+  },
+  {
+    id: "crossing-squash-merged",
+    title: "Sara's reported crossing squash-merged by Omar, still standing",
+    front: { rules: QUIET },
+    story: async (story) => {
+      await sarasCrossing(story);
+      await story.mergePullRequest({ number: 12, head: FEATURE, base: "main", author: SARA, by: OMAR, style: "squash" });
+    },
+    expect: charged("landed_unfixed@omar"),
+    defect: {
+      observed: charged("file_lines@sara", "landed_unfixed@omar"),
+      because:
+        "A squash commit is new to the record, so Sara's crossing — charged when her branch was pushed — reads as new work of hers and is charged to her a second time. Only the pull-request link knows the squash is her reviewed branch (0009 §2).",
+    },
   },
 ];
 

@@ -18,6 +18,7 @@ import { weekendOpsRule } from "./rules/weekend-ops.rule.js";
 import { largeDiffRule } from "./rules/large-diff.rule.js";
 import { branchDeletedRule } from "./rules/branch-deleted.rule.js";
 import { mergeResidueRule } from "./rules/merge-residue.rule.js";
+import { landedUnfixedRule } from "./rules/landed-unfixed.rule.js";
 
 type Registry = { [K in RuleId]: RuleEvaluator<RuleConfigMap[K]> };
 
@@ -31,6 +32,7 @@ export const RULE_REGISTRY: Registry = {
   large_diff: largeDiffRule,
   branch_deleted: branchDeletedRule,
   merge_residue: mergeResidueRule,
+  landed_unfixed: landedUnfixedRule,
 };
 
 /**
@@ -43,6 +45,10 @@ export const RULE_REGISTRY: Registry = {
  * `merge_residue` is the author's, where 0009 listed it with the pusher's acts:
  * a merge commit's author is the one who made the merge, and the pusher of
  * someone else's merge would otherwise answer for what they never wrote.
+ *
+ * The two are partners, not alternatives: a crossing someone else wrote is
+ * charged to its author, and landing it on a main line unfixed is charged to
+ * whoever landed it — `landed_unfixed`, the pusher's share.
  */
 export type Answerer = "pusher" | "author";
 
@@ -56,4 +62,5 @@ export const RULE_ANSWERER: { [K in RuleId]: Answerer } = {
   large_diff: "pusher",
   branch_deleted: "pusher",
   merge_residue: "author",
+  landed_unfixed: "pusher",
 };

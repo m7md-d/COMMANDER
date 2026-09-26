@@ -2,11 +2,12 @@
  * Who answers for what a push holds (0009 §4).
  *
  * Whoever pushed answers for what the push did; whoever wrote a commit answers
- * for what the commit holds. Every finding leaves here naming one person or
- * naming nobody, and a finding that names nobody is charged to nobody. The
- * alternative — charging whoever is at hand — is how a merge came to answer for
- * the branch it closed, and a maintainer for the commits of whoever they pushed
- * for (scenarios in `attribution.test.ts`).
+ * for what the commit holds; and whoever lands someone else's crossing on a
+ * main line answers for landing it unfixed — beside its author, not instead of
+ * them. Every finding leaves here naming one person or naming nobody, and a
+ * finding that names nobody is charged to nobody. Charging whoever is at hand
+ * instead is how a merge came to answer for the branch it closed in place of
+ * the branch's author (scenarios in `attribution.test.ts`).
  */
 
 import type {
@@ -39,6 +40,8 @@ export interface RuleFacts {
   knownShas: ReadonlySet<string>;
   rules: RuleConfigMap;
   timezoneOffset: number;
+  /** Crossings the push landed on a main line from others' work (`RuleContext.landed`). */
+  landed: Finding[];
 }
 
 /**
@@ -50,14 +53,14 @@ export interface RuleFacts {
 export function judgeRules(facts: RuleFacts, onRuleError: RuleErrorReporter): Named[] {
   const { push, weight, rules, timezoneOffset } = facts;
   const pusher = pusherOf(push);
-  const pushed = { push, timezoneOffset, weight, commits: push.commits };
+  const pushed = { push, timezoneOffset, weight, commits: push.commits, landed: facts.landed };
   const named: Named[] = evaluateRules({ context: pushed, rules, answerer: "pusher" }, onRuleError).map(
     (finding) => ({ ...finding, login: pusher }),
   );
 
   const unjudged = push.commits.filter((commit) => !facts.knownShas.has(commit.sha));
   for (const [author, commits] of byAuthor(unjudged)) {
-    const written = { push, timezoneOffset, weight, commits };
+    const written = { push, timezoneOffset, weight, commits, landed: [] };
     const found = evaluateRules({ context: written, rules, answerer: "author" }, onRuleError);
     named.push(...found.map((finding) => ({ ...finding, login: author })));
   }
@@ -75,12 +78,11 @@ function byAuthor(commits: NormalizedCommit[]): Map<string | null, NormalizedCom
 }
 
 /**
- * Whose work changed each path the checks may judge: the author of the one
- * unjudged commit — or merge residue — that touched it. A path two people
- * changed in one push names nobody: the crossing is measured between the push's
- * two ends, and which of them made it would take a measurement per commit.
+ * Whose work changed each path the checks may judge: the authors of the
+ * unjudged commits — or merge residue — that touched it. A path absent here was
+ * only carried, by work already on record.
  */
-export function handsOnPaths(push: NormalizedPush, weight: PushWeight): Map<string, string | null> {
+export function handsOnPaths(push: NormalizedPush, weight: PushWeight): Map<string, Set<string | null>> {
   const author = new Map(push.commits.map((commit) => [commit.sha, authorOf(commit)]));
   const hands = new Map<string, Set<string | null>>();
   for (const entry of weight.work) {
@@ -88,7 +90,16 @@ export function handsOnPaths(push: NormalizedPush, weight: PushWeight): Map<stri
       hands.set(path, (hands.get(path) ?? new Set<string | null>()).add(author.get(entry.sha) ?? null));
     }
   }
-  return new Map([...hands].map(([path, set]) => [path, set.size === 1 ? ([...set][0] ?? null) : null]));
+  return hands;
+}
+
+/**
+ * The one author a crossing can be charged to. A path two people changed in one
+ * push names nobody: the crossing is measured between the push's two ends, and
+ * which of them made it would take a measurement per commit.
+ */
+export function soleHand(hands: ReadonlySet<string | null>): string | null {
+  return hands.size === 1 ? ([...hands][0] ?? null) : null;
 }
 
 /** The findings someone answers for, as the record holds them. */

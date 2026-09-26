@@ -47,6 +47,7 @@ export function mergeWithDefaults(stored: unknown): RuleConfigMap {
     large_diff: overlay("large_diff"),
     branch_deleted: overlay("branch_deleted"),
     merge_residue: overlay("merge_residue"),
+    landed_unfixed: overlay("landed_unfixed"),
   };
 }
 

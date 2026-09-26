@@ -4,7 +4,7 @@
  * engine testable without a database or a server.
  */
 
-import type { NormalizedCommit, NormalizedPush, PushWeight, RuleDetail } from "@commander/shared";
+import type { Finding, NormalizedCommit, NormalizedPush, PushWeight, RuleDetail } from "@commander/shared";
 
 export interface RuleContext {
   push: NormalizedPush;
@@ -24,6 +24,13 @@ export interface RuleContext {
    * answers for, every commit the push carries.
    */
   commits: NormalizedCommit[];
+  /**
+   * Crossings the push left standing on a main line from work that was not the
+   * pusher's own new work — a branch reported before, or someone else's commits.
+   * What `landed_unfixed` charges the pusher with. Empty off a main line, and in
+   * the authors' pass.
+   */
+  landed: Finding[];
 }
 
 /**

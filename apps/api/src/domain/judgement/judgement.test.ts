@@ -51,7 +51,10 @@ function push(commits: NormalizedCommit[], overrides: Partial<NormalizedPush> = 
 }
 
 const OFF = { enabled: false };
-/** Every rule off — `weekend_ops` and `large_diff` ship off already. */
+/**
+ * Every engagement rule off — `weekend_ops` and `large_diff` ship off already.
+ * `landed_unfixed` stays on: only a check's crossing on a main line raises it.
+ */
 const QUIET = mergeWithDefaults({
   force_push: OFF,
   batch_dump: OFF,
@@ -100,6 +103,7 @@ function facts(overrides: Partial<PushFacts> = {}): PushFacts {
     knownShas: new Set(),
     rules: QUIET,
     timezoneOffset: 3,
+    watchers: [],
     checks: NO_CHANGES,
     silentWhenClean: false,
     hasChannel: true,
@@ -212,6 +216,41 @@ test("a push that cannot be weighed has nothing judged by the checks", () => {
   const unweighed = push([{ ...commit("c1"), paths: undefined }]);
 
   assert.deepEqual(judge({ push: unweighed, checks: ledger(190, 210) }).violations, []);
+});
+
+const charges = (overrides: Partial<PushFacts>) =>
+  judge(overrides).violations.map((hit) => `${hit.ruleId}@${hit.login}`).sort();
+/** Omar lands Sara's commit c1 on main. */
+const LANDED = push([commit("c1")], { actorLogin: OMAR, defaultBranch: "main" });
+
+test("someone else's crossing landed on a main line: its author wrote it, the pusher landed it", () => {
+  assert.deepEqual(charges({ push: LANDED, checks: ledger(190, 210) }), ["file_lines@sara", "landed_unfixed@omar"]);
+});
+
+test("a crossing reported on its branch and merged unfixed is the merger's alone", () => {
+  // Sara was charged when c1 arrived; landing it again charges whoever landed it.
+  assert.deepEqual(charges({ push: LANDED, knownShas: new Set(["c1"]), checks: ledger(190, 210) }), ["landed_unfixed@omar"]);
+});
+
+test("off a main line nothing is landed: pulling main into a feature charges nobody for main", () => {
+  const synced = push([commit("c1")], { actorLogin: OMAR, defaultBranch: "main", branch: "feature/x", ref: "refs/heads/feature/x" });
+
+  assert.deepEqual(charges({ push: synced, knownShas: new Set(["c1"]), checks: ledger(190, 210) }), []);
+  // A branch a watcher guards is a main line too.
+  const guarded = [{ pattern: "feature/*", gravity: "guarded" as const, promptId: null, model: "" }];
+  assert.deepEqual(charges({ push: synced, knownShas: new Set(["c1"]), checks: ledger(190, 210), watchers: guarded }), [
+    "landed_unfixed@omar",
+  ]);
+});
+
+test("a pusher's own crossing is charged once, as its author", () => {
+  assert.deepEqual(charges({ push: push([commit("c1")], { defaultBranch: "main" }), checks: ledger(190, 210) }), ["file_lines@sara"]);
+});
+
+test("a push that cannot be weighed lands nothing: its own work cannot be told from others'", () => {
+  const unweighed = push([{ ...commit("c1"), paths: undefined }], { actorLogin: OMAR, defaultBranch: "main" });
+
+  assert.deepEqual(charges({ push: unweighed, checks: ledger(190, 210) }), []);
 });
 
 test("a silent front withholds a push that found nothing, and records none of it", () => {

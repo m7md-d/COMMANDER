@@ -236,6 +236,10 @@ export const EN: Dictionary = {
   "rule.merge_residue.hint":
     "Detects files the merge commit itself introduced that belong to no commit it brings in. A clean merge and a conflict resolution both leave none.",
   "rule.merge_residue.report": "landed a merge introducing {files} file(s) belonging to no commit in it",
+  "rule.landed_unfixed.label": "Landed unfixed",
+  "rule.landed_unfixed.hint":
+    "Charged to whoever lands on a main branch a file over its limit from someone else's work — a branch already reported, or commits never seen — and leaves it over. The author answers for writing it; whoever landed it, for landing it.",
+  "rule.landed_unfixed.report": "landed {files} file(s) over their limit on {branch} without fixing them",
 
   "day.0": "Sunday",
   "day.1": "Monday",

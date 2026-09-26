@@ -70,6 +70,12 @@ export interface NormalizedPush {
   before?: string;
   after?: string;
   /**
+   * The repository's default branch, as the push event names it — one of the
+   * main lines work lands on (`isTrunk`). Absent from a recovered push and from
+   * rows queued before it was read.
+   */
+  defaultBranch?: string;
+  /**
    * Whoever pushed, and whom the communiqué addresses. On a recovered push
    * nobody is known to have pushed, and this only names the author of its
    * newest commit, for the communiqué to address.

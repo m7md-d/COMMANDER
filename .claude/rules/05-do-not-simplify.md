@@ -28,14 +28,21 @@ code.
   snapshot is already in the database, which looks like waste. It is not: the snapshot follows
   one branch and moves with whatever landed there, and judging its movements charged pushes with
   other branches' work (measured in `apps/api/src/scenarios/checks.test.ts`). The snapshot is the
-  project's state and never evidence. And the checks judge **new work only** (`weight.work`): a
-  file carried by commits already on record was judged when they arrived, and judging the merge
-  that carries it charges the same crossing twice, the second time to whoever merged.
+  project's state and never evidence. And a crossing's **author** is charged for new work only
+  (`weight.work`): a file carried by commits already on record was judged when they arrived.
 - **Every finding carries who answers for it** (`ViolationHit.login`, `RULE_ANSWERER`), and
   nothing after `judgePush` picks a person. Whoever pushed answers for what the push did; the
   author answers for what a commit holds — its message, its hour, a crossing, a merge's residue.
   One `login` for the whole push looks simpler and is how a maintainer was charged with the
   commits of whoever they pushed for (`apps/api/src/scenarios/attribution.test.ts`).
+- **Landing is a share, not a transfer** (`landed_unfixed`). Whoever lands a crossing someone
+  else wrote on a main line — the default branch, or one a watcher guards — and leaves it
+  standing answers for landing it, beside its author, never instead of them: the author for
+  writing it (once, when first seen), the lander for merging it unfixed. It is its own charge
+  because "made this file too long" would be false of the merger. Two limits hold it: it reads
+  the measurements only — a message or an hour is how the author worked, not what the merge left
+  in the code — and it fires on a main line only, so pulling main into a feature charges nobody
+  for what main already held.
 - **"New" has two answers, and each rule reads its own.** The size rules count what the push
   *brought* — GitHub's `distinct` and not on record — so landing a branch pushed elsewhere first
   is not a heap dumped at once. Everything else reads what the record has *not judged yet*, so a

@@ -30,7 +30,7 @@ interface RawPushPayload {
   deleted?: boolean;
   compare?: string;
   commits?: RawCommit[];
-  repository?: { full_name?: string; html_url?: string };
+  repository?: { full_name?: string; html_url?: string; default_branch?: string };
   sender?: { login?: string; avatar_url?: string };
   pusher?: { name?: string };
 }
@@ -68,6 +68,7 @@ export function normalizePush(payload: unknown): NormalizedPush {
     compareUrl: raw.compare ?? "",
     ...(raw.before && { before: raw.before }),
     ...(raw.after && { after: raw.after }),
+    ...(raw.repository?.default_branch && { defaultBranch: raw.repository.default_branch }),
     actorLogin: raw.sender?.login ?? raw.pusher?.name ?? "unknown",
     actorAvatarUrl: raw.sender?.avatar_url ?? "",
     commits: commits.map(mapCommit),

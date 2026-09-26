@@ -1,7 +1,7 @@
 /**
  * The fields of GitHub's push payload the judgement reads. The scenario
- * reference feeds `normalizePush` whole payloads; this pins the one field whose
- * absence must stay distinguishable from its value.
+ * reference feeds `normalizePush` whole payloads; this pins the two whose
+ * absence must stay distinguishable from their value.
  */
 
 import assert from "node:assert/strict";
@@ -20,4 +20,12 @@ test("distinct is read as GitHub sent it, and left out when it did not send it",
   assert.equal(normalizePush(payload({ distinct: false })).commits[0]?.distinct, false);
   assert.equal(normalizePush(payload({ distinct: true })).commits[0]?.distinct, true);
   assert.equal("distinct" in (normalizePush(payload({})).commits[0] ?? {}), false, "absent: the record decides");
+});
+
+test("the default branch is read from the repository object, and left out when absent", () => {
+  // What makes main a main line: work landing there is answered for by whoever lands it.
+  const named = normalizePush({ ...payload({}), repository: { full_name: "team/repo", default_branch: "trunk" } });
+
+  assert.equal(named.defaultBranch, "trunk");
+  assert.equal("defaultBranch" in normalizePush(payload({})), false);
 });

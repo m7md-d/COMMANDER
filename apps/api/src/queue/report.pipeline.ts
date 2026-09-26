@@ -59,7 +59,8 @@ export const logRuleError: RuleErrorReporter = (ruleId, error) =>
 export function detectViolations(input: { push: NormalizedPush; repository: Repository; settings: Settings }): ViolationHit[] {
   const { push, repository, settings } = input;
   const weight = weighPush({ push, knownShas: EMPTY_HISTORY });
-  const facts = { push, weight, knownShas: EMPTY_HISTORY, rules: repository.rules, timezoneOffset: settings.timezoneOffset };
+  // No checks run on a sample push, so it lands nothing.
+  const facts = { push, weight, knownShas: EMPTY_HISTORY, rules: repository.rules, timezoneOffset: settings.timezoneOffset, landed: [] };
   return answered(judgeRules(facts, logRuleError));
 }
 

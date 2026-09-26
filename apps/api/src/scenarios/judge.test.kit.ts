@@ -143,6 +143,8 @@ async function handle(run: Run, received: NormalizedPush): Promise<Verdict> {
     knownShas: new Set(run.known.keys()),
     rules: run.front.rules,
     timezoneOffset: TIMEZONE_OFFSET,
+    // No branch is marked guarded here: the main line is the default branch alone.
+    watchers: [],
     checks: await readChanges(run, push),
     silentWhenClean: false,
     hasChannel: true,

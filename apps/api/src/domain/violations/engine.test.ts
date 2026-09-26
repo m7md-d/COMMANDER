@@ -40,6 +40,7 @@ const CONTEXT: RuleContext = {
   push: UNREADABLE,
   timezoneOffset: 3,
   weight: UNWEIGHED,
+  landed: [],
   get commits(): NormalizedCommit[] {
     throw new Error("unreadable");
   },
