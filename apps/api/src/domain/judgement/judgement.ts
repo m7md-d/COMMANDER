@@ -20,6 +20,7 @@ import {
   type Commendation,
   type Finding,
   type NormalizedPush,
+  type PushWeight,
   type Repository,
   type RuleConfigMap,
   type ViolationHit,
@@ -28,7 +29,8 @@ import {
 import { judgeFile, type Reading } from "@/domain/checks/judge.js";
 import type { TouchedFile } from "@/domain/tree/diff.js";
 import type { RuleErrorReporter } from "@/domain/violations/engine.js";
-import { answered, handsOnPaths, judgeRules, pusherOf, soleHand, type Named } from "./attribution.js";
+import { answered, handsOnPaths, judgeRules, pusherOf, soleHand } from "./attribution.js";
+import { judgeLanding, type LandingOutcome, type LandingSides } from "./landing.js";
 
 /**
  * Whether a push is read, and whether it is judged. Read without being judged
@@ -60,6 +62,11 @@ export interface ChecksFacts {
   changes: TouchedFile[];
   /** Measurements by blob hash — both sides of every change, where they could be taken. */
   readings: ReadonlyMap<string, Reading>;
+  /**
+   * When the push lands a merge (`landingMerge`), its branch and its fork, so the
+   * landing is judged against its own parents rather than the push's base alone.
+   */
+  landing?: LandingSides;
 }
 
 export interface PushFacts {
@@ -102,11 +109,7 @@ export type Judgement = {
 export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Judgement {
   const { push, knownShas } = facts;
   const weight = weighPush({ push, knownShas });
-  const checked = judgeChanges(facts.checks, {
-    hands: weight.measured ? handsOnPaths(push, weight) : null,
-    pusher: pusherOf(push),
-    trunk: isTrunk({ branch: push.branch, defaultBranch: push.defaultBranch, watchers: facts.watchers }),
-  });
+  const checked = judgeChecks(facts, weight);
   const rules = { rules: facts.rules, timezoneOffset: facts.timezoneOffset, landed: checked.landed };
   const found = [...judgeRules({ push, weight, knownShas, ...rules }, onRuleError), ...checked.violations];
   const judged = {
@@ -124,16 +127,32 @@ export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Jud
 
 /**
  * The checks, each finding naming whose work it was, and the crossings the push
- * landed on a main line from others' work.
+ * left on a main line from others' work. A push that cannot be weighed has no new
+ * work to tell from carried work, and nothing is judged.
+ */
+function judgeChecks(facts: PushFacts, weight: PushWeight): LandingOutcome {
+  const { push, knownShas, checks } = facts;
+  const none: LandingOutcome = { violations: [], commendations: [], landed: [] };
+  if (!weight.measured) return none;
+
+  const pusher = pusherOf(push);
+  const trunk = isTrunk({ branch: push.branch, defaultBranch: push.defaultBranch, watchers: facts.watchers });
+  if (checks.landing) {
+    const scope = { push, weight, knownShas, config: checks.config, readings: checks.readings, pusher, trunk };
+    return judgeLanding(checks.changes, checks.landing, scope);
+  }
+  return judgeChanges(checks, { hands: handsOnPaths(push, weight), pusher, trunk });
+}
+
+/**
+ * Any other push, between its two ends.
  *
  * A file only carried by commits already on record was judged when they
  * arrived: its author is not charged again. On a main line it is still landed —
- * by whoever merged it unfixed. Without the weight (`hands` null), new work
- * cannot be told from carried work, and nothing is judged at all.
+ * by whoever merged it unfixed.
  */
-function judgeChanges(checks: ChecksFacts, scope: { hands: Map<string, Set<string | null>> | null; pusher: string | null; trunk: boolean }) {
-  const outcome = { violations: [] as Named[], commendations: [] as Named[], landed: [] as Finding[] };
-  if (scope.hands === null) return outcome;
+function judgeChanges(checks: ChecksFacts, scope: { hands: Map<string, Set<string | null>>; pusher: string | null; trunk: boolean }) {
+  const outcome: LandingOutcome = { violations: [], commendations: [], landed: [] };
 
   for (const file of checks.changes) {
     const hands = scope.hands.get(file.path);

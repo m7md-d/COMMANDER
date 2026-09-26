@@ -20,7 +20,9 @@ import { createLogger } from "@/core/logger/logger.js";
 import { wanted } from "@/domain/checks/judge.js";
 import { pushChanges, pushSpan } from "@/domain/judgement/changes.js";
 import type { ChecksFacts } from "@/domain/judgement/judgement.js";
+import { landingMerge, type LandingSides } from "@/domain/judgement/landing.js";
 import type { TouchedFile } from "@/domain/tree/diff.js";
+import { compareCommits } from "@/integrations/github/branches.client.js";
 import { fetchCommitTree, fetchRepoTree, type RepoTreeEntry } from "@/integrations/github/commits.client.js";
 import { syncTree } from "@/modules/tree/tree.service.js";
 import { measureChanges, measureSnapshot } from "@/modules/checks/checks.service.js";
@@ -70,7 +72,7 @@ export async function refreshMeasurements(repository: Repository, touched: Touch
  * short — a file missing from one would read as new, and a new file over the
  * limit is a crossing.
  */
-export async function readChanges(repository: Repository, push: NormalizedPush): Promise<ChecksFacts> {
+export async function readChanges(repository: Repository, push: NormalizedPush, knownShas: ReadonlySet<string>): Promise<ChecksFacts> {
   const config = await resolveFrontChecks(repository.id);
   const none: ChecksFacts = { config, changes: [], readings: new Map() };
   const span = pushSpan(push);
@@ -79,15 +81,56 @@ export async function readChanges(repository: Repository, push: NormalizedPush):
   const target = measureTarget(repository, config);
   const [before, after] = await Promise.all([listCommit(target, span.base), listCommit(target, span.head)]);
   if (!before || !after) return none;
+  const landing = await readLanding(target, { push, knownShas, before, after });
+  if (landing.status === "unreadable") return none;
 
   const changes = pushChanges({ before, after, push }).filter((file) => wanted(config, file.path));
-  const bytes = new Map([...before, ...after].map((entry) => [entry.sha, entry.bytes]));
+  const sides = landing.status === "read" ? { ...landing.sides, branch: landing.sides.branch.filter((file) => wanted(config, file.path)) } : undefined;
+  const listed = [...before, ...after, ...(landing.status === "read" ? landing.listed : [])];
+  const bytes = new Map(listed.map((entry) => [entry.sha, entry.bytes]));
 
-  const readings = await measureChanges(target, { changes, bytes }).catch((error: unknown) => {
+  const readings = await measureChanges(target, { changes: [...changes, ...(sides?.branch ?? [])], bytes }).catch((error: unknown) => {
     log.error("push measurement crashed", { repositoryId: repository.id, error: String(error) });
     return null;
   });
-  return readings ? { config, changes, readings } : none;
+  return readings ? { config, changes, readings, ...(sides && { landing: sides }) } : none;
+}
+
+type LandingRead =
+  | { status: "none" }
+  | { status: "unreadable" }
+  | { status: "read"; sides: LandingSides; listed: RepoTreeEntry[] };
+
+/**
+ * A landing merge's other side (`landingMerge`): where the branch forked, from
+ * the compare API, and the listings of its fork and its head. Unreadable is not
+ * "no landing": judged between the push's two ends alone, a landing charged the
+ * branch's author with what main added meanwhile, so an unread one judges
+ * nothing at all.
+ */
+async function readLanding(
+  target: MeasureTarget,
+  input: { push: NormalizedPush; knownShas: ReadonlySet<string>; before: RepoTreeEntry[]; after: RepoTreeEntry[] },
+): Promise<LandingRead> {
+  const landing = landingMerge({ push: input.push, knownShas: input.knownShas });
+  if (!landing) return { status: "none" };
+
+  const repo = { installationId: target.installationId, repoFullName: target.fullName };
+  const compared = await compareCommits({ ...repo, base: landing.first, head: landing.second });
+  const fork = compared.ok ? compared.data.mergeBase : null;
+  const [second, forked] = await Promise.all([
+    listCommit(target, landing.second),
+    fork === landing.first ? input.before : fork ? listCommit(target, fork) : null,
+  ]);
+  if (!second || !forked) {
+    log.warn("landing unreadable", { repositoryId: target.repositoryId, merge: landing.merge });
+    return { status: "unreadable" };
+  }
+
+  const blobs = (listing: RepoTreeEntry[]) => new Map(listing.map((entry) => [entry.path, entry.sha]));
+  const branch = pushChanges({ before: forked, after: second, push: input.push });
+  const sides = { merge: landing.merge, branch, first: blobs(input.before), fork: blobs(forked), second: blobs(second), merged: blobs(input.after) };
+  return { status: "read", sides, listed: [...second, ...forked] };
 }
 
 /** A commit's whole file listing, or null when it cannot be had complete. */

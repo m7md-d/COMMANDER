@@ -34,7 +34,9 @@ deliver`. Nothing in the first waits on the second.
    is drawn from, which is why a moved file is `update`d and never replaced. The snapshot is the
    project's *state* — the panel, the digest and the notes read it — and never the evidence a
    check charges on: that is the push's own two trees
-   ([domain/judgement/changes.ts](../../apps/api/src/domain/judgement/changes.ts)).
+   ([domain/judgement/changes.ts](../../apps/api/src/domain/judgement/changes.ts)), and for a
+   push that lands a merge, the merge's parents and their fork as well
+   ([domain/judgement/landing.ts](../../apps/api/src/domain/judgement/landing.ts)).
 7. **[reconciler.ts](../../apps/api/src/queue/reconciler.ts) pulls what push missed.** Nothing
    guarantees the host was awake, and GitHub gives up after a few retries. It asks the GitHub App
    for commits newer than the last on record and replays each branch's gap through the same

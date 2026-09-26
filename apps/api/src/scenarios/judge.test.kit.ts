@@ -17,13 +17,14 @@ import { RECONCILE_LOOKBACK_MS } from "@/config/constants.js";
 import { wanted } from "@/domain/checks/judge.js";
 import { pushChanges, pushSpan } from "@/domain/judgement/changes.js";
 import { admitPush, judgePush, type ChecksFacts } from "@/domain/judgement/judgement.js";
+import { landingMerge, type LandingSides } from "@/domain/judgement/landing.js";
 import { mergeWithDefaults } from "@/domain/violations/engine.js";
 import { toCommitDetail, toCommitListEntry } from "@/integrations/github/commit.mapper.js";
 import { isBranchRef, normalizePush } from "@/modules/webhook/push.mapper.js";
 import { enrichWith } from "@/queue/push.detail.js";
 import type { CommitListEntry } from "@/integrations/github/commits.client.js";
 import { branchesToReconcile, recoveredPush, type BranchRead } from "@/queue/reconciler.mapper.js";
-import { Contents } from "./contents.test.kit.js";
+import { Contents, type Listed } from "./contents.test.kit.js";
 import { GitHubView } from "./github.test.kit.js";
 import { REPOSITORY, Story, type PushEvent, type ReconcileEvent, type RemoteEvent } from "./story.test.kit.js";
 
@@ -51,19 +52,27 @@ const OVERLAP_MS = 60_000;
 
 export type Outcome = "judged" | "ignored" | "unwatched" | "skipped" | "lost";
 
-/** What happened to the last event of a story, and who was charged with what. */
+/** What happened to the last event of a story, who was charged with what, and who was credited. */
 export interface Verdict {
   outcome: Outcome;
   /** `rule@login`, sorted. The login is the one the ledger would write. */
   charges: string[];
+  /**
+   * `metric@login`, sorted: what someone was credited with for bringing a file
+   * back under its limit. Half the record — a reference that only reads the
+   * charges cannot say whether whoever fixed something was rewarded for it.
+   */
+  credits: string[];
 }
 
-export const charged = (...charges: string[]): Verdict => ({ outcome: "judged", charges: [...charges].sort() });
+export const charged = (...charges: string[]): Verdict => ({ outcome: "judged", charges: [...charges].sort(), credits: [] });
+/** A verdict that also credits someone: `credited(CLEAN, "file_lines@sara")`. */
+export const credited = (verdict: Verdict, ...credits: string[]): Verdict => ({ ...verdict, credits: [...credits].sort() });
 export const CLEAN: Verdict = charged();
-export const IGNORED: Verdict = { outcome: "ignored", charges: [] };
-export const UNWATCHED: Verdict = { outcome: "unwatched", charges: [] };
-export const SKIPPED: Verdict = { outcome: "skipped", charges: [] };
-const LOST: Verdict = { outcome: "lost", charges: [] };
+export const IGNORED: Verdict = { outcome: "ignored", charges: [], credits: [] };
+export const UNWATCHED: Verdict = { outcome: "unwatched", charges: [], credits: [] };
+export const SKIPPED: Verdict = { outcome: "skipped", charges: [], credits: [] };
+const LOST: Verdict = { outcome: "lost", charges: [], credits: [] };
 
 export interface Scenario {
   /** Stable, kebab-case: the name a failure and a defect record are filed under. */
@@ -138,14 +147,15 @@ async function handle(run: Run, received: NormalizedPush): Promise<Verdict> {
     ? (await enrichWith(received, async (sha) => ({ ok: true, data: toCommitDetail(await run.view.commit(sha)) }))).push
     : received;
 
+  const knownShas = new Set(run.known.keys());
   const facts = {
     push,
-    knownShas: new Set(run.known.keys()),
+    knownShas,
     rules: run.front.rules,
     timezoneOffset: TIMEZONE_OFFSET,
     // No branch is marked guarded here: the main line is the default branch alone.
     watchers: [],
-    checks: await readChanges(run, push),
+    checks: await readChanges(run, push, knownShas),
     silentWhenClean: false,
     hasChannel: true,
   };
@@ -154,7 +164,8 @@ async function handle(run: Run, received: NormalizedPush): Promise<Verdict> {
   });
 
   if (judgement.recorded) remember(run.known, push);
-  return charged(...judgement.violations.map((hit) => `${hit.ruleId}@${hit.login}`));
+  const named = (entries: { ruleId: string; login: string }[]) => entries.map((entry) => `${entry.ruleId}@${entry.login}`);
+  return credited(charged(...named(judgement.violations)), ...named(judgement.commendations));
 }
 
 /** dossier.ledger.ts `recordCommits`: first write wins, unparseable dates are skipped. */
@@ -174,15 +185,15 @@ async function reconcile(run: Run, event: ReconcileEvent): Promise<Verdict> {
   const existing = [...event.remote.keys()];
   const reads = branchesToReconcile({ watch: run.front.watch, existing, defaultBranch: "main" });
   const since = cursor(run, event.clock);
-  const charges: string[] = [];
+  const found: Verdict[] = [];
 
   for (const read of reads) {
     // reconcileBranch — drop what is on record.
     const fresh = (await missed(run, { read, since, remote: event.remote })).filter((entry) => !run.known.has(entry.sha));
     const push = recoveredPush({ fullName: REPOSITORY }, read.branch, fresh);
-    if (push) charges.push(...(await handle(run, push)).charges);
+    if (push) found.push(await handle(run, push));
   }
-  return { outcome: "judged", charges: charges.sort() };
+  return credited(charged(...found.flatMap((verdict) => verdict.charges)), ...found.flatMap((verdict) => verdict.credits));
 }
 
 /** reconciler.read.ts `readMissed`, oldest first: the default branch by its history, any other beyond it. */
@@ -200,18 +211,34 @@ async function missed(run: Run, at: { read: BranchRead; since: number; remote: H
 
 /**
  * delivery.checks.ts `readChanges`: the push's own tree before against after,
- * both sides measured. The worker resolves each commit to its tree first; git
- * reads a commit's tree directly, which is the same listing.
+ * both sides measured — and a landing's other side besides. The worker resolves
+ * each commit to its tree first; git reads a commit's tree directly, which is
+ * the same listing.
  */
-async function readChanges(run: Run, push: NormalizedPush): Promise<ChecksFacts> {
+async function readChanges(run: Run, push: NormalizedPush, knownShas: ReadonlySet<string>): Promise<ChecksFacts> {
   const config = run.front.checks;
   const span = run.front.app ? pushSpan(push) : null;
   if (!span) return { config, changes: [], readings: new Map() };
 
   const [before, after] = await Promise.all([run.contents.tree(span.base), run.contents.tree(span.head)]);
+  const landing = await readLanding(run, { push, knownShas, before, after });
   const changes = pushChanges({ before, after, push }).filter((file) => wanted(config, file.path));
-  const blobs = changes.flatMap((file) => [file, ...(file.previousSha ? [{ path: file.path, sha: file.previousSha }] : [])]);
-  return { config, changes, readings: await run.contents.measure(blobs) };
+  const branch = (landing?.branch ?? []).filter((file) => wanted(config, file.path));
+  const blobs = [...changes, ...branch].flatMap((file) => [file, ...(file.previousSha ? [{ path: file.path, sha: file.previousSha }] : [])]);
+  const readings = await run.contents.measure(blobs);
+  return { config, changes, readings, ...(landing && { landing: { ...landing, branch } }) };
+}
+
+/** delivery.checks.ts `readLanding`: the fork from the compare API, then its listing and the branch head's. */
+async function readLanding(run: Run, input: { push: NormalizedPush; knownShas: ReadonlySet<string>; before: Listed[]; after: Listed[] }): Promise<LandingSides | null> {
+  const landing = landingMerge({ push: input.push, knownShas: input.knownShas });
+  if (!landing) return null;
+
+  const { merge_base_commit: fork } = await run.view.compare(landing.first, landing.second);
+  const [second, forked] = await Promise.all([run.contents.tree(landing.second), run.contents.tree(fork.sha)]);
+  const blobs = (listing: Listed[]) => new Map(listing.map((entry) => [entry.path, entry.sha]));
+  const branch = pushChanges({ before: forked, after: second, push: input.push });
+  return { merge: landing.merge, branch, first: blobs(input.before), fork: blobs(forked), second: blobs(second), merged: blobs(input.after) };
 }
 
 /** reconciler.ts `computeSince`. */
@@ -228,7 +255,8 @@ function describeEvent(event: RemoteEvent): string {
 }
 
 export function format(verdict: Verdict): string {
-  return `${verdict.outcome} [${verdict.charges.join(", ")}]`;
+  const credits = verdict.credits.length > 0 ? ` credits [${verdict.credits.join(", ")}]` : "";
+  return `${verdict.outcome} [${verdict.charges.join(", ")}]${credits}`;
 }
 
 /**
@@ -269,6 +297,7 @@ function assertWellFormed(scenarios: Scenario[]): void {
   for (const scenario of scenarios) {
     assert.match(scenario.id, /^[a-z0-9]+(-[a-z0-9]+)*$/, `${scenario.id}: ids are kebab-case`);
     assert.deepEqual(scenario.expect.charges, [...scenario.expect.charges].sort(), `${scenario.id}: build verdicts with charged()`);
+    assert.deepEqual(scenario.expect.credits, [...scenario.expect.credits].sort(), `${scenario.id}: add credits with credited()`);
     if (scenario.defect) {
       assert.notDeepEqual(scenario.defect.observed, scenario.expect, `${scenario.id}: a defect that equals its expectation is not a defect`);
     }

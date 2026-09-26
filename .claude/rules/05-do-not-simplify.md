@@ -54,6 +54,14 @@ code.
 - **A recovered push names no pusher** (`recovered`). Git records who wrote and who committed a
   commit, never who pushed it; grouping by author invented a push per author and charged them
   with pushes someone else made.
+- **A landing merge is judged against its own parents** (`landing.ts`), which costs a compare
+  call and two more listings and looks redundant beside the push's own two trees. Between the
+  push's ends alone, a branch adding 20 lines while main added 40 — each under the limit, joined
+  over it — charged the branch's author with a crossing nobody made. So the branch is judged from
+  its fork, the merge against what git makes of its parents unaided (where one side left the file
+  alone, the other side's version; anything else is the merger's own work), and the crossing that
+  remains is landed. A landing that cannot be read judges nothing: falling back to the two ends is
+  the false charge again.
 - **A moved file keeps the blob it had at its old path** (`pushChanges`). Read as created at the
   new path, a file moved while already over its limit is a crossing charged to whoever moved it.
 - **The record is `ledger_events`, not `violation_events`, and every query names its `kind`.** A

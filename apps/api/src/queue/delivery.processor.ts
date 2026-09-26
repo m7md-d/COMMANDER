@@ -88,7 +88,7 @@ async function run(job: PrismaDelivery, received: NormalizedPush): Promise<void>
   const knownShas = await recordedShas(repository.id, push);
   // The checks' evidence is what this push changed on its own branch. The
   // snapshot is the project's state — measured and noted, charged to nobody.
-  const checks = await readChanges(repository, push);
+  const checks = await readChanges(repository, push, knownShas);
   await refreshMeasurements(repository, touched);
   // After the measurement, which is what fills in the notes it reads.
   await refreshTodos(repository.id, touched);

@@ -61,6 +61,7 @@ export async function fetchDefaultBranch(
 interface RawCompare {
   total_commits?: number;
   commits?: RawListCommit[];
+  merge_base_commit?: { sha?: string };
 }
 
 /** A branch name as a path: each segment escaped, the slashes between them kept. */
@@ -70,14 +71,15 @@ const asPath = (branch: string): string => branch.split("/").map(encodeURICompon
  * What `head` has beyond `base`, oldest first — the work pushed to a branch past
  * the one it was cut from. GitHub's docs: the `git log BASE..HEAD` set, in
  * chronological order, at most 250 without paging. `complete` is false when
- * `total_commits` says there were more.
+ * `total_commits` says there were more. `mergeBase` is where the two last
+ * shared history — a landing's branch is judged from there.
  */
 export async function compareCommits(input: {
   installationId: string;
   repoFullName: string;
   base: string;
   head: string;
-}): Promise<Result<{ commits: CommitListEntry[]; complete: boolean }>> {
+}): Promise<Result<{ commits: CommitListEntry[]; complete: boolean; mergeBase: string | null }>> {
   const { installationId, repoFullName, base, head } = input;
   const result = await request<RawCompare>(
     installationId,
@@ -86,5 +88,6 @@ export async function compareCommits(input: {
   if (!result.ok) return result;
 
   const commits = (result.data.commits ?? []).map(toCommitListEntry);
-  return { ok: true, data: { commits, complete: commits.length >= (result.data.total_commits ?? 0) } };
+  const complete = commits.length >= (result.data.total_commits ?? 0);
+  return { ok: true, data: { commits, complete, mergeBase: result.data.merge_base_commit?.sha || null } };
 }

@@ -11,7 +11,7 @@
  */
 
 import { LINA, OMAR, SARA } from "./git.test.kit.js";
-import { CLEAN, charged, runCatalog, type Scenario } from "./judge.test.kit.js";
+import { CLEAN, charged, credited, runCatalog, type Scenario } from "./judge.test.kit.js";
 import { mergeWithDefaults } from "@/domain/violations/engine.js";
 import { seed, type Story } from "./story.test.kit.js";
 
@@ -50,6 +50,16 @@ async function reportOnMain(story: Story) {
   await seed(story);
   await story.commit({ on: "main", by: LINA, title: "Add the monthly report", write: { [REPORT]: sized(300, "report") } });
   await story.push("main", LINA);
+}
+
+/** `count` lines, each named after `stamp` — so two people's additions to one file stay apart for git. */
+const block = (count: number, stamp: string) => Array.from({ length: count }, (_, line) => `export const ${stamp}${line} = "${stamp}";`);
+const file = (...blocks: string[][]) => blocks.flat().join("\n") + "\n";
+
+/** Omar merges Sara's branch into main on his laptop, writing the ledger as `lines` lines in the merge itself. */
+async function mergedWithLedgerAt(story: Story, lines: number) {
+  await story.merge({ into: "main", from: FEATURE, by: OMAR, message: "Integrate the refunds", amend: { write: { [LEDGER]: sized(lines, "merged") } } });
+  await story.push("main", OMAR);
 }
 
 /** …then Sara takes it to 210 on her own branch and pushes the branch. */
@@ -213,6 +223,94 @@ const scenarios: Scenario[] = [
       observed: charged("file_lines@sara", "landed_unfixed@omar"),
       because:
         "A squash commit is new to the record, so Sara's crossing — charged when her branch was pushed — reads as new work of hers and is charged to her a second time. Only the pull-request link knows the squash is her reviewed branch (0009 §2).",
+    },
+  },
+  {
+    id: "crossing-fixed-by-the-reviewer",
+    title: "Omar brings Sara's reported crossing back under with a commit on her branch",
+    front: { rules: QUIET },
+    story: async (story) => {
+      await sarasCrossing(story);
+      await story.commit({ on: FEATURE, by: OMAR, title: "Split the refunds out of the ledger", write: { [LEDGER]: sized(195, "split") } });
+      await story.push(FEATURE, OMAR);
+    },
+    expect: credited(CLEAN, "file_lines@omar"),
+  },
+  {
+    id: "inherited-file-fixed-and-landed",
+    title: "Sara splits Lina's 300-line report on a branch main-only does not watch, and Omar merges it",
+    front: { watch: ["main"], rules: QUIET },
+    story: async (story) => {
+      await reportOnMain(story);
+      await story.branch(FEATURE, "main");
+      await story.commit({ on: FEATURE, by: SARA, title: "Split the monthly report", write: { [REPORT]: sized(150, "split") } });
+      await story.push(FEATURE, SARA);
+      await story.mergePullRequest({ number: 12, head: FEATURE, base: "main", author: SARA, by: OMAR, style: "merge" });
+    },
+    expect: credited(CLEAN, "file_lines@sara"),
+  },
+  {
+    // The merge's own work is whoever made the merge's: here, bringing the
+    // branch's crossing back under while merging it.
+    id: "crossing-fixed-in-the-merge",
+    title: "Omar merges Sara's reported crossing on his laptop and trims the ledger to 195 in the merge",
+    front: { rules: QUIET },
+    story: async (story) => {
+      await sarasCrossing(story);
+      await mergedWithLedgerAt(story, 195);
+    },
+    expect: credited(CLEAN, "file_lines@omar"),
+  },
+  {
+    id: "crossing-made-in-the-merge",
+    title: "Sara's branch leaves the ledger at 195; Omar's merge writes it at 212",
+    front: { rules: QUIET },
+    story: async (story) => {
+      await ledgerOnMain(story);
+      await story.branch(FEATURE, "main");
+      await story.commit({ on: FEATURE, by: SARA, title: "Track refunds in the ledger", write: { [LEDGER]: sized(195, "refunds") } });
+      await story.push(FEATURE, SARA);
+      await mergedWithLedgerAt(story, 212);
+    },
+    expect: charged("file_lines@omar"),
+  },
+  {
+    // Neither side crossed: 150 + 20 on Sara's branch, 150 + 40 on main. Git
+    // joins them into 210, and whoever merged answers for the result.
+    id: "crossing-made-by-combining-two-edits",
+    title: "Sara's 20 lines and Lina's 40, each under the limit alone, merged into 210 by Omar",
+    front: { watch: ["main"], rules: QUIET },
+    story: async (story) => {
+      await seed(story);
+      await story.commit({ on: "main", by: LINA, title: "Add the ledger", write: { [LEDGER]: file(block(150, "entry")) } });
+      await story.push("main", LINA);
+      await story.branch(FEATURE, "main");
+      await story.commit({ on: FEATURE, by: SARA, title: "Track refunds", write: { [LEDGER]: file(block(150, "entry"), block(20, "refund")) } });
+      await story.push(FEATURE, SARA);
+      await story.commit({ on: "main", by: LINA, title: "Track credits", write: { [LEDGER]: file(block(40, "credit"), block(150, "entry")) } });
+      await story.push("main", LINA);
+      await story.mergePullRequest({ number: 12, head: FEATURE, base: "main", author: SARA, by: OMAR, style: "merge" });
+    },
+    expect: charged("landed_unfixed@omar"),
+  },
+  {
+    // New to the record when it lands: Sara did the work, Lina fixed it.
+    id: "new-crossing-fixed-before-landing",
+    title: "on a branch main-only does not watch, Sara takes the ledger to 210 and Lina back to 195; Omar merges",
+    front: { watch: ["main"], rules: QUIET },
+    story: async (story) => {
+      await ledgerOnMain(story);
+      await story.branch(FEATURE, "main");
+      await story.commit({ on: FEATURE, by: SARA, title: "Track refunds in the ledger", write: { [LEDGER]: sized(210, "refunds") } });
+      await story.commit({ on: FEATURE, by: LINA, title: "Split the refunds out of the ledger", write: { [LEDGER]: sized(195, "split") } });
+      await story.push(FEATURE, SARA);
+      await story.mergePullRequest({ number: 12, head: FEATURE, base: "main", author: SARA, by: OMAR, style: "merge" });
+    },
+    expect: credited(charged("file_lines@sara"), "file_lines@lina"),
+    defect: {
+      observed: CLEAN,
+      because:
+        "The branch is judged from where it forked to its head: 190 to 195 crosses nothing. Sara's 210 lived only between her commit and Lina's, and seeing it takes a measurement per commit (landing.ts branchWork).",
     },
   },
 ];

@@ -17,6 +17,7 @@
  * | `timestamp`             | the author date                                   | assumption |
  * | list API `since`        | compared with the committer date                  | assumption |
  * | compare API `commits`   | the base..head set, oldest first, never cut        | GitHub docs, "Compare two commits": `git log BASE..HEAD`, chronological; 250 without paging |
+ * | compare `merge_base_commit` | `git merge-base base head`                     | GitHub docs, "Compare two commits" |
  * | `username` / `login`    | `<login>@users.noreply.github.com`; GitHub's own address is `web-flow` | fixture convention |
  * | `repository.default_branch` | `main`                                        | GitHub docs, push event: the full repository object |
  */
@@ -139,11 +140,15 @@ export class GitHubView {
     return metas.filter((meta) => Date.parse(meta.committer.date) >= since).map(listed);
   }
 
-  /** `GET /repos/{owner}/{repo}/compare/{base}...{head}`: the base..head set, oldest first. */
+  /** `GET /repos/{owner}/{repo}/compare/{base}...{head}`: the base..head set, oldest first, and where they forked. */
   async compare(base: string, head: string) {
-    const metas = parseMetas(await this.git.run(["log", "--reverse", `--format=${FORMAT}`, `${base}..${head}`]));
+    const [log, fork] = await Promise.all([
+      this.git.run(["log", "--reverse", `--format=${FORMAT}`, `${base}..${head}`]),
+      this.git.run(["merge-base", base, head]),
+    ]);
+    const metas = parseMetas(log);
     metas.forEach((meta) => this.metas.set(meta.sha, meta));
-    return { total_commits: metas.length, commits: metas.map(listed) };
+    return { total_commits: metas.length, commits: metas.map(listed), merge_base_commit: { sha: fork.trim() } };
   }
 
   /** before..after, or — for a new branch — everything no other head reaches. */
