@@ -32,3 +32,28 @@ export const RULE_REGISTRY: Registry = {
   branch_deleted: branchDeletedRule,
   merge_residue: mergeResidueRule,
 };
+
+/**
+ * Who answers for what a rule finds (0009 §4): whoever pushed, for what the
+ * push did — landed on a branch unreviewed, rewrote it, deleted it, dumped a
+ * heap at once; the author, for what a commit holds — its message, its hour,
+ * what a merge slipped in beside the work it carries. Written out per rule like
+ * the registry, so a new rule cannot compile without an answer.
+ *
+ * `merge_residue` is the author's, where 0009 listed it with the pusher's acts:
+ * a merge commit's author is the one who made the merge, and the pusher of
+ * someone else's merge would otherwise answer for what they never wrote.
+ */
+export type Answerer = "pusher" | "author";
+
+export const RULE_ANSWERER: { [K in RuleId]: Answerer } = {
+  force_push: "pusher",
+  batch_dump: "pusher",
+  direct_push: "pusher",
+  lazy_message: "author",
+  night_ops: "author",
+  weekend_ops: "author",
+  large_diff: "pusher",
+  branch_deleted: "pusher",
+  merge_residue: "author",
+};

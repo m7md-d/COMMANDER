@@ -27,7 +27,7 @@ import {
   type ReviewedCommit,
 } from "./prompt-blocks.js";
 
-export { praiseLabel, violationLabel, type ReviewedCommit } from "./prompt-blocks.js";
+export { chargeLabel, creditLabel, praiseLabel, violationLabel, type ReviewedCommit } from "./prompt-blocks.js";
 
 export interface MemberIdentity {
   displayName: string;
@@ -83,8 +83,12 @@ export function buildPromptValues(input: {
   const { locale } = options;
   const quote = { maxLength: options.quoteMaxLength, guardEnabled: options.injectionGuard };
 
+  // The register is set by what the addressee answers for. A charge on the
+  // author of a commit they only carried is named in the block, and must not
+  // make the communiqué harder on them.
+  const addressee = push.actorLogin;
   const tone = computeTone({
-    violations: violations.map((hit) => hit.ruleId),
+    violations: violations.filter((hit) => hit.login === addressee).map((hit) => hit.ruleId),
     lifetimeCounts: history.violationCounts,
     stage: project.stage,
     gravity,
@@ -100,8 +104,8 @@ export function buildPromptValues(input: {
     branch: push.branch,
     commitCount: push.commits.length,
     commits: buildCommitBlock(push, locale, quote),
-    violations: buildViolationBlock(violations, locale),
-    commendations: buildCommendationBlock(input.commendations, locale),
+    violations: buildViolationBlock(violations, locale, addressee),
+    commendations: buildCommendationBlock(input.commendations, locale, addressee),
     history: buildHistoryBlock(history.violationCounts, locale),
     totalCommits: history.totalCommits,
     totalPushes: history.totalPushes,

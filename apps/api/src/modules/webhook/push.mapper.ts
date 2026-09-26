@@ -10,6 +10,7 @@ const COMMIT_ARRAY_CAP = 20;
 
 interface RawCommit {
   id?: string;
+  distinct?: boolean;
   message?: string;
   url?: string;
   timestamp?: string;
@@ -46,6 +47,8 @@ function mapCommit(raw: RawCommit): NormalizedCommit {
     filesModified: raw.modified?.length ?? 0,
     authorLogin: raw.author?.username ?? "",
     committerLogin: raw.committer?.username ?? "",
+    // Kept only when GitHub sent it: absent, the record decides what is new.
+    ...(typeof raw.distinct === "boolean" && { distinct: raw.distinct }),
   };
 }
 

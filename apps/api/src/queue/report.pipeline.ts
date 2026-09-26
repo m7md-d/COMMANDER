@@ -15,7 +15,8 @@ import {
   type Watcher,
 } from "@commander/shared";
 import { createLogger } from "@/core/logger/logger.js";
-import { evaluateRules, type RuleErrorReporter } from "@/domain/violations/engine.js";
+import { answered, judgeRules } from "@/domain/judgement/attribution.js";
+import type { RuleErrorReporter } from "@/domain/violations/engine.js";
 import {
   buildPromptValues,
   type HistoryRecord,
@@ -51,16 +52,15 @@ export const logRuleError: RuleErrorReporter = (ruleId, error) =>
   log.error("rule threw", { ruleId, error: String(error) });
 
 /**
- * The rules alone, for the preview. The worker's charges come from `judgePush`,
- * which evaluates the same rules on a push weighed against the real history.
+ * The rules alone, for the preview, each charge naming who answers for it. The
+ * worker's charges come from `judgePush`, which evaluates the same rules on a
+ * push weighed against the real history.
  */
-export function detectViolations(input: { push: NormalizedPush; repository: Repository; settings: Settings }) {
+export function detectViolations(input: { push: NormalizedPush; repository: Repository; settings: Settings }): ViolationHit[] {
   const { push, repository, settings } = input;
-  return evaluateRules(
-    { push, timezoneOffset: settings.timezoneOffset, weight: weighPush({ push, knownShas: EMPTY_HISTORY }) },
-    repository.rules,
-    logRuleError,
-  );
+  const weight = weighPush({ push, knownShas: EMPTY_HISTORY });
+  const facts = { push, weight, knownShas: EMPTY_HISTORY, rules: repository.rules, timezoneOffset: settings.timezoneOffset };
+  return answered(judgeRules(facts, logRuleError));
 }
 
 /** A push weighed against no history: every commit is new, which is what a

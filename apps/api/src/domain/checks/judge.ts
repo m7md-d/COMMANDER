@@ -15,23 +15,23 @@ import {
   measureContent,
   type CheckConfigMap,
   type CheckMetric,
-  type Commendation,
+  type Finding,
   type RuleDetail,
-  type ViolationHit,
 } from "@commander/shared";
 import type { TouchedFile } from "@/domain/tree/diff.js";
 import { readSyntax } from "./syntax.js";
 
 /**
- * What one push did to the files it touched, in both directions.
+ * What one push did to the files it touched, in both directions — naming
+ * nobody yet: whose work changed the file is `judgePush`'s to say.
  *
  * Two lists rather than one tagged list: the caller does entirely different
  * things with them — one joins the violation stream that feeds the tone, the
  * embed colour and the repeat bands; the other must touch none of those.
  */
 export interface CheckOutcome {
-  violations: ViolationHit[];
-  commendations: Commendation[];
+  violations: Finding[];
+  commendations: Finding[];
 }
 
 /** The stored columns a metric can be read from. */

@@ -39,6 +39,10 @@ function push(commits: NormalizedCommit[], overrides: Partial<NormalizedPush> = 
 
 const NONE: ReadonlySet<string> = new Set();
 
+/** The paths each commit did on its own, by sha. */
+const workOf = (weight: ReturnType<typeof weighPush>) =>
+  Object.fromEntries(weight.work.map((entry) => [entry.sha, [...entry.paths].sort()]));
+
 test("a merge is two parents, not a title", () => {
   assert.equal(isMerge(commit("a", [], ["p0", "p1"])), true);
   assert.equal(isMerge(commit("b", [], ["p0"])), false);
@@ -55,7 +59,7 @@ test("a clean merge weighs nothing: it transports work, it does not add it", () 
   const weight = weighPush({ push: push([one, two, merge]), knownShas: NONE });
 
   assert.equal(weight.measured, true);
-  assert.deepEqual(weight.residue, [], "nothing in the merge that its commits do not have");
+  assert.deepEqual(workOf(weight)["m"], [], "nothing in the merge that its commits do not have");
   assert.equal(weight.filesTouched, 2, "the two files, once — not four");
 });
 
@@ -80,19 +84,39 @@ test("a merge carrying a path no commit of its own touched is the smuggled line"
 
   const weight = weighPush({ push: push([one, two, merge]), knownShas: new Set(["c1", "c2"]) });
 
-  assert.deepEqual(weight.residue, ["src/auth.ts"]);
+  assert.deepEqual(workOf(weight), { m: ["src/auth.ts"] });
   assert.equal(weight.filesTouched, 1, "charged for what it added, not for what it carried");
 });
 
-test("the paths new work touched: a new commit's every path, a new merge's residue alone", () => {
+test("each unjudged commit's own work: a commit's every path, a merge's residue alone", () => {
   const known = commit("c1", ["src/a.ts"]);
   const fresh = commit("c2", ["src/b.ts", "src/c.ts"]);
   const merge = commit("m", ["src/a.ts", "src/b.ts", "src/c.ts", "src/auth.ts"], ["p0", "c2"]);
 
   const weight = weighPush({ push: push([known, fresh, merge]), knownShas: new Set(["c1"]) });
 
-  assert.deepEqual([...weight.paths].sort(), ["src/auth.ts", "src/b.ts", "src/c.ts"]);
-  assert.ok(!weight.paths.includes("src/a.ts"), "a path only a recorded commit touched was judged when it arrived");
+  assert.deepEqual(workOf(weight), { c2: ["src/b.ts", "src/c.ts"], m: ["src/auth.ts"] });
+  assert.ok(!("c1" in workOf(weight)), "a recorded commit was judged when it arrived");
+});
+
+test("work pushed elsewhere first is not this push's size, and is still judged once", () => {
+  // Sara's branch was pushed where this front does not look; Omar's merge lands it.
+  const one = { ...commit("c1", ["src/a.ts"]), distinct: false };
+  const two = { ...commit("c2", ["src/b.ts"]), distinct: false };
+  const merge = { ...commit("m", ["src/a.ts", "src/b.ts"], ["p0", "c2"]), distinct: true };
+
+  const weight = weighPush({ push: push([one, two, merge]), knownShas: NONE });
+
+  assert.equal(weight.newCommits, 1, "only the merge was new to the repository");
+  assert.equal(weight.filesTouched, 0, "and it carried the branch rather than adding to it");
+  assert.deepEqual(workOf(weight), { c1: ["src/a.ts"], c2: ["src/b.ts"], m: [] }, "never on record, so judged now");
+});
+
+test("without GitHub's word on it — a recovered push — the record alone decides what is new", () => {
+  const weight = weighPush({ push: push([commit("c1", ["src/a.ts"]), commit("c2", ["src/b.ts"])]), knownShas: new Set(["c1"]) });
+
+  assert.equal(weight.newCommits, 1);
+  assert.deepEqual(Object.keys(workOf(weight)), ["c2"]);
 });
 
 test("a truncated push is not weighed: the constituents it dropped are invisible", () => {
@@ -101,7 +125,7 @@ test("a truncated push is not weighed: the constituents it dropped are invisible
   const weight = weighPush({ push: push([merge], { truncated: true }), knownShas: NONE });
 
   assert.equal(weight.measured, false);
-  assert.deepEqual(weight.residue, [], "silence, not an accusation built on a partial payload");
+  assert.deepEqual(weight.work, [], "silence, not an accusation built on a partial payload");
 });
 
 test("a merge whose branch head is absent is not weighed", () => {
@@ -111,7 +135,7 @@ test("a merge whose branch head is absent is not weighed", () => {
   const weight = weighPush({ push: push([merge]), knownShas: NONE });
 
   assert.equal(weight.measured, false);
-  assert.deepEqual(weight.residue, []);
+  assert.deepEqual(weight.work, []);
 });
 
 test("an unenriched push falls back to the old count rather than guessing", () => {
@@ -133,5 +157,5 @@ test("an ordinary push is unaffected by any of this", () => {
   assert.equal(weight.measured, true);
   assert.equal(weight.newCommits, 2);
   assert.equal(weight.filesTouched, 3);
-  assert.deepEqual(weight.residue, []);
+  assert.deepEqual(workOf(weight), { c1: ["src/a.ts", "src/b.ts"], c2: ["src/c.ts"] });
 });

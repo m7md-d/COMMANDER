@@ -16,7 +16,7 @@ import { toJson } from "@/core/json.js";
 
 interface LedgerWrite {
   repositoryId: string;
-  login: string;
+  /** Each written against the login it carries: who answers is decided before the record. */
   entries: (ViolationHit | Commendation)[];
   occurredAt: Date;
   deliveryId: string;
@@ -42,7 +42,7 @@ async function record(kind: LedgerKind, input: LedgerWrite): Promise<void> {
   await prisma.ledgerEvent.createMany({
     data: input.entries.map((entry) => ({
       repositoryId: input.repositoryId,
-      login: input.login,
+      login: entry.login,
       kind,
       ruleId: entry.ruleId,
       occurredAt: input.occurredAt,
@@ -74,8 +74,8 @@ export async function recordedShas(repositoryId: string, push: NormalizedPush): 
 
 export async function recordCommits(input: {
   repositoryId: string;
-  login: string;
-  commits: { sha: string; title: string; timestamp: string; filesTouched: number }[];
+  /** Each under the member it is filed under — its author, not whoever pushed it (`filedUnder`). */
+  commits: { sha: string; login: string; title: string; timestamp: string; filesTouched: number }[];
 }): Promise<void> {
   for (const commit of input.commits) {
     if (!commit.sha) continue;
@@ -89,7 +89,7 @@ export async function recordCommits(input: {
       create: {
         repositoryId: input.repositoryId,
         sha: commit.sha,
-        login: input.login,
+        login: commit.login,
         title: commit.title.slice(0, 300),
         committedAt,
         filesChanged: commit.filesTouched,

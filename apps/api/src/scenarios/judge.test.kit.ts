@@ -22,7 +22,7 @@ import { toCommitDetail, toCommitListEntry } from "@/integrations/github/commit.
 import { isBranchRef, normalizePush } from "@/modules/webhook/push.mapper.js";
 import { enrichWith } from "@/queue/push.detail.js";
 import type { CommitListEntry } from "@/integrations/github/commits.client.js";
-import { branchesToReconcile, buildSyntheticPushes, type BranchRead } from "@/queue/reconciler.mapper.js";
+import { branchesToReconcile, recoveredPush, type BranchRead } from "@/queue/reconciler.mapper.js";
 import { Contents } from "./contents.test.kit.js";
 import { GitHubView } from "./github.test.kit.js";
 import { REPOSITORY, Story, type PushEvent, type ReconcileEvent, type RemoteEvent } from "./story.test.kit.js";
@@ -152,7 +152,7 @@ async function handle(run: Run, received: NormalizedPush): Promise<Verdict> {
   });
 
   if (judgement.recorded) remember(run.known, push);
-  return charged(...judgement.violations.map((hit) => `${hit.ruleId}@${judgement.login}`));
+  return charged(...judgement.violations.map((hit) => `${hit.ruleId}@${hit.login}`));
 }
 
 /** dossier.ledger.ts `recordCommits`: first write wins, unparseable dates are skipped. */
@@ -165,8 +165,8 @@ function remember(known: Map<string, number>, push: NormalizedPush): void {
 }
 
 /**
- * reconciler.ts `reconcileRepo`, from the branch list to the synthetic pushes —
- * which it queues, so each is handled exactly as a live push is.
+ * reconciler.ts `reconcileRepo`, from the branch list to one recovered push per
+ * branch — which it queues, so each is handled exactly as a live push is.
  */
 async function reconcile(run: Run, event: ReconcileEvent): Promise<Verdict> {
   const existing = [...event.remote.keys()];
@@ -177,9 +177,8 @@ async function reconcile(run: Run, event: ReconcileEvent): Promise<Verdict> {
   for (const read of reads) {
     // reconcileBranch — drop what is on record.
     const fresh = (await missed(run, { read, since, remote: event.remote })).filter((entry) => !run.known.has(entry.sha));
-    for (const push of buildSyntheticPushes({ fullName: REPOSITORY }, read.branch, fresh)) {
-      charges.push(...(await handle(run, push)).charges);
-    }
+    const push = recoveredPush({ fullName: REPOSITORY }, read.branch, fresh);
+    if (push) charges.push(...(await handle(run, push)).charges);
   }
   return { outcome: "judged", charges: charges.sort() };
 }

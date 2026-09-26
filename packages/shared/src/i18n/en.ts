@@ -718,6 +718,8 @@ export const EN: Dictionary = {
   "report.fieldCommendations": "To their credit",
   "report.commendationsHeading":
     "What this push earned credit for (measured facts — praise them by name):",
+  "report.chargedTo": "{label} — {login} answers for this",
+  "report.creditedTo": "{label} — to {login}'s credit",
   "report.footer": "Bureau of Programming Discipline",
   "report.noConstitution": "No rules file was found in this repository.",
   "report.noStructure": "The project layout has not been scanned yet.",

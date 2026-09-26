@@ -38,9 +38,20 @@ export type ViolationId = RuleId | CheckMetric;
 /** Numbers interpolated into the localized label. Never prose. */
 export type RuleDetail = Record<string, string | number>;
 
-export interface ViolationHit {
+/** What a rule or a check found, before anyone is named for it. */
+export interface Finding {
   ruleId: ViolationId;
   detail: RuleDetail;
+}
+
+/**
+ * A finding with the member who answers for it — the pusher for what a push
+ * did, the author for what a commit holds (`judgePush`). Carried on the charge
+ * itself, so nothing downstream of the judgement picks a person: that is how a
+ * merge came to be charged to whoever pressed the button.
+ */
+export interface ViolationHit extends Finding {
+  login: string;
 }
 
 /*

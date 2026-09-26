@@ -37,7 +37,9 @@ deliver`. Nothing in the first waits on the second.
    ([domain/judgement/changes.ts](../../apps/api/src/domain/judgement/changes.ts)).
 7. **[reconciler.ts](../../apps/api/src/queue/reconciler.ts) pulls what push missed.** Nothing
    guarantees the host was awake, and GitHub gives up after a few retries. It asks the GitHub App
-   for commits newer than the last on record and replays the gap through the same pipeline. The
+   for commits newer than the last on record and replays each branch's gap through the same
+   pipeline as one recovered push, which names no pusher: git records who wrote a commit, never
+   who pushed it, so only what a commit holds is charged, to its author. The
    default branch is read by its history; any other watched branch only for what it has beyond
    the default, because its history also holds everything it inherited when it was cut — read by
    date, that came back as pushes nobody made. Which branches and how is `branchesToReconcile`,

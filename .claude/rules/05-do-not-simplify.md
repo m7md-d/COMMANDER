@@ -28,9 +28,25 @@ code.
   snapshot is already in the database, which looks like waste. It is not: the snapshot follows
   one branch and moves with whatever landed there, and judging its movements charged pushes with
   other branches' work (measured in `apps/api/src/scenarios/checks.test.ts`). The snapshot is the
-  project's state and never evidence. And the checks judge **new work only** (`weight.paths`): a
+  project's state and never evidence. And the checks judge **new work only** (`weight.work`): a
   file carried by commits already on record was judged when they arrived, and judging the merge
   that carries it charges the same crossing twice, the second time to whoever merged.
+- **Every finding carries who answers for it** (`ViolationHit.login`, `RULE_ANSWERER`), and
+  nothing after `judgePush` picks a person. Whoever pushed answers for what the push did; the
+  author answers for what a commit holds — its message, its hour, a crossing, a merge's residue.
+  One `login` for the whole push looks simpler and is how a maintainer was charged with the
+  commits of whoever they pushed for (`apps/api/src/scenarios/attribution.test.ts`).
+- **"New" has two answers, and each rule reads its own.** The size rules count what the push
+  *brought* — GitHub's `distinct` and not on record — so landing a branch pushed elsewhere first
+  is not a heap dumped at once. Everything else reads what the record has *not judged yet*, so a
+  commit is judged once, when it first arrives, on whatever branch. Collapsing them either
+  charges whoever merged for the branch, or never judges work first seen at its landing.
+- **A finding the evidence names nobody for is charged to nobody** (`unattributed`): an author
+  address tied to no account, a file two people changed in one push, the pusher of a recovered
+  push. Falling back to whoever pushed is a guess, and it lands on the person nearest the button.
+- **A recovered push names no pusher** (`recovered`). Git records who wrote and who committed a
+  commit, never who pushed it; grouping by author invented a push per author and charged them
+  with pushes someone else made.
 - **A moved file keeps the blob it had at its old path** (`pushChanges`). Read as created at the
   new path, a file moved while already over its limit is a crossing charged to whoever moved it.
 - **The record is `ledger_events`, not `violation_events`, and every query names its `kind`.** A

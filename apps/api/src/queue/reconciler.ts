@@ -3,7 +3,7 @@
  * when they happened — nothing guarantees the host is awake, and GitHub gives up
  * on a delivery after a few retries (see docs/DEPLOY.md). For each watched
  * repository it asks GitHub for commits newer than the last one on record and
- * enqueues the gap as synthetic pushes, so a recovered push flows through the
+ * enqueues each branch's gap as one recovered push, so it flows through the
  * same pipeline as a live one.
  *
  * Gated on the GitHub App: with no installation token there is no way to read a
@@ -21,7 +21,7 @@ import { RECONCILE_LOOKBACK_MS } from "@/config/constants.js";
 import { isGitHubAppConfigured } from "@/integrations/github/app-auth.js";
 import { syncTree } from "@/modules/tree/tree.service.js";
 import { enqueue } from "./outbox.service.js";
-import { branchesToReconcile, buildSyntheticPushes, type BranchRead } from "./reconciler.mapper.js";
+import { branchesToReconcile, recoveredPush, type BranchRead } from "./reconciler.mapper.js";
 import { readBranches, readDefaultBranch, readMissed } from "./reconciler.read.js";
 import { sweepMeasurements } from "./reconciler.sweep.js";
 
@@ -118,17 +118,11 @@ async function reconcileBranch(repo: RepoTarget, read: BranchRead, since: Date):
   const fresh = listed.filter((commit) => !known.has(commit.sha));
   if (fresh.length === 0) return 0;
 
-  const pushes = buildSyntheticPushes(repo, read.branch, fresh);
-  for (const push of pushes) {
-    await enqueue({ occasion: { kind: "push", push }, repositoryId: repo.id });
-  }
+  const push = recoveredPush(repo, read.branch, fresh);
+  if (!push) return 0;
+  await enqueue({ occasion: { kind: "push", push }, repositoryId: repo.id });
 
-  log.info("recovered missed commits", {
-    repo: repo.fullName,
-    branch: read.branch,
-    commits: fresh.length,
-    pushes: pushes.length,
-  });
+  log.info("recovered missed commits", { repo: repo.fullName, branch: read.branch, commits: fresh.length });
   return fresh.length;
 }
 

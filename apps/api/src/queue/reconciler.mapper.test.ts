@@ -1,16 +1,16 @@
 /**
- * The reconciler rebuilds pushes from REST commit data to recover what the
- * webhook missed during downtime. Two things must not regress: commits are
- * grouped by their real author (a shared push must never misattribute one
- * member's commits to another in the dossier), and the web-flow committer login
- * survives so the direct-push rule still fires on a recovered PR merge.
+ * The reconciler rebuilds what the webhook missed during downtime from REST
+ * commit data. Two things must not regress: a branch's gap becomes one
+ * recovered push naming no pusher — never a push per author, which invented
+ * pushes and charged authors for what others pushed — and each commit keeps its
+ * author and its committer, which the rules read.
  */
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { GITHUB_UI_COMMITTER } from "@commander/shared";
 import type { CommitListEntry } from "@/integrations/github/commits.client.js";
-import { branchesToReconcile, buildSyntheticPushes } from "@/queue/reconciler.mapper.js";
+import { branchesToReconcile, recoveredPush } from "@/queue/reconciler.mapper.js";
 
 const REPO = { fullName: "team/repo" };
 
@@ -26,52 +26,44 @@ function entry(overrides: Partial<CommitListEntry> = {}): CommitListEntry {
   };
 }
 
-test("commits are grouped into one push per author", () => {
-  const pushes = buildSyntheticPushes(REPO, "main", [
+test("a branch's gap is one recovered push, whoever wrote its commits", () => {
+  const push = recoveredPush(REPO, "main", [
     entry({ sha: "1", authorLogin: "ahmad" }),
     entry({ sha: "2", authorLogin: "sara" }),
     entry({ sha: "3", authorLogin: "ahmad" }),
   ]);
 
-  assert.equal(pushes.length, 2);
-  const ahmad = pushes.find((push) => push.actorLogin === "ahmad");
-  assert.ok(ahmad);
-  assert.deepEqual(ahmad.commits.map((commit) => commit.sha), ["1", "3"]);
-  assert.equal(ahmad.branch, "main");
-  assert.equal(ahmad.ref, "refs/heads/main");
-});
-
-test("a web-flow merge keeps its committer login and is attributed to the author", () => {
-  const [push] = buildSyntheticPushes(REPO, "main", [
-    entry({ sha: "m", authorLogin: "ahmad", committerLogin: GITHUB_UI_COMMITTER }),
-  ]);
-
   assert.ok(push);
-  // Grouped under the human author, not under web-flow...
-  assert.equal(push.actorLogin, "ahmad");
-  // ...but the committer login the direct-push rule reads is preserved.
-  assert.equal(push.commits[0]?.committerLogin, GITHUB_UI_COMMITTER);
+  assert.deepEqual(push.commits.map((commit) => [commit.sha, commit.authorLogin]), [
+    ["1", "ahmad"],
+    ["2", "sara"],
+    ["3", "ahmad"],
+  ]);
+  assert.equal(push.branch, "main");
+  assert.equal(push.ref, "refs/heads/main");
 });
 
-test("a commit with no author login falls back to committer, then unknown", () => {
-  const pushes = buildSyntheticPushes(REPO, "dev", [
-    entry({ sha: "1", authorLogin: "", committerLogin: "bot" }),
-    entry({ sha: "2", authorLogin: "", committerLogin: "" }),
-  ]);
+test("it names no pusher, and is addressed to the author of its newest commit", () => {
+  const push = recoveredPush(REPO, "main", [entry({ sha: "1", authorLogin: "sara" }), entry({ sha: "2", authorLogin: "ahmad" })]);
 
-  assert.deepEqual(pushes.map((push) => push.actorLogin).sort(), ["bot", "unknown"]);
+  assert.equal(push?.recovered, true, "git records who wrote and who committed, never who pushed");
+  assert.equal(push?.actorLogin, "ahmad");
+  assert.equal(recoveredPush(REPO, "main", [entry({ authorLogin: "" })])?.actorLogin, "unknown");
 });
 
-test("commit order within a push is preserved, and file counts are unknown", () => {
-  const [push] = buildSyntheticPushes(REPO, "main", [
-    entry({ sha: "old" }),
-    entry({ sha: "new" }),
-  ]);
+test("a web-flow merge keeps its committer login, which the direct-push rule reads", () => {
+  const push = recoveredPush(REPO, "main", [entry({ sha: "m", authorLogin: "ahmad", committerLogin: GITHUB_UI_COMMITTER })]);
 
-  assert.ok(push);
-  assert.deepEqual(push.commits.map((commit) => commit.sha), ["old", "new"]);
+  assert.equal(push?.commits[0]?.committerLogin, GITHUB_UI_COMMITTER);
+});
+
+test("commit order is preserved, file counts are unknown, and nothing recovered is no push", () => {
+  const push = recoveredPush(REPO, "main", [entry({ sha: "old" }), entry({ sha: "new" })]);
+
+  assert.deepEqual(push?.commits.map((commit) => commit.sha), ["old", "new"]);
   // The list endpoint carries no file data; enrichment backfills it later.
-  assert.equal(push.commits[0]?.filesAdded, 0);
+  assert.equal(push?.commits[0]?.filesAdded, 0);
+  assert.equal(recoveredPush(REPO, "main", []), null);
 });
 
 const BRANCHES = ["main", "release/1.0", "release/2.0", "feature/export"];

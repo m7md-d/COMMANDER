@@ -129,6 +129,34 @@ const scenarios: Scenario[] = [
     expect: CLEAN,
   },
   {
+    id: "crossing-pushed-to-main-by-a-maintainer",
+    title: "Sara's crossing, on a branch main-only does not watch, pushed straight to main by Lina",
+    front: { watch: ["main"], rules: QUIET },
+    story: async (story) => {
+      await sarasCrossing(story);
+      await story.push(FEATURE, LINA, { to: "main" });
+    },
+    expect: charged("file_lines@sara"),
+  },
+  {
+    id: "crossing-by-two-hands",
+    title: "Lina takes the ledger to 210 on Sara's branch, Sara adds two lines, and Sara pushes both",
+    front: { rules: QUIET },
+    story: async (story) => {
+      await ledgerOnMain(story);
+      await story.branch(FEATURE, "main");
+      await story.commit({ on: FEATURE, by: LINA, title: "Track refunds in the ledger", write: { [LEDGER]: sized(210, "refunds") } });
+      await story.commit({ on: FEATURE, by: SARA, title: "Track credits in the ledger", write: { [LEDGER]: sized(212, "credits") } });
+      await story.push(FEATURE, SARA);
+    },
+    expect: charged("file_lines@lina"),
+    defect: {
+      observed: CLEAN,
+      because:
+        "A file two people changed in one push names nobody: the crossing is measured between the push's two ends, and telling whose commit crossed it would take a measurement per commit. Silent where it used to charge Sara, who pushed, with Lina's crossing (attribution.ts handsOnPaths, 0009 §4).",
+    },
+  },
+  {
     id: "unwatched-branch-merged",
     title: "Sara's crossing merged by Omar, on a front that watches main only",
     front: { watch: ["main"], rules: QUIET },
@@ -137,11 +165,6 @@ const scenarios: Scenario[] = [
       await story.mergePullRequest({ number: 12, head: FEATURE, base: "main", author: SARA, by: OMAR, style: "merge" });
     },
     expect: charged("file_lines@sara"),
-    defect: {
-      observed: charged("file_lines@omar"),
-      because:
-        "Sara's branch is not watched, so her crossing is new work when it lands — and it is hers, but every charge goes to whoever pushed the merge. (0009 §4)",
-    },
   },
 ];
 

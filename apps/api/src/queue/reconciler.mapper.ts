@@ -1,15 +1,12 @@
 /**
  * The reconciler's decisions, apart from its I/O — which branches it reads, and
- * how the commits it finds there become pushes — so the scenario reference can
- * call them rather than copy them.
+ * what the commits it finds there become — so the scenario reference can call
+ * them rather than copy them.
  *
- * The pushes are rebuilt from REST commit data so a recovered push runs through
- * the exact pipeline a live webhook would. Grouped by author login rather than
- * lumped under one pusher: the original push
- * event is gone, so there is no pusher to name, and grouping keeps each commit
- * attributed to its real author in the dossier. File counts are 0 — the list
- * endpoint carries no file data; the enrichment pass fills line counts once the
- * commit is on record.
+ * What a branch gained while nobody was listening becomes one recovered push,
+ * rebuilt from REST commit data so it runs through the exact pipeline a live
+ * webhook would. File counts are 0 — the list endpoint carries no file data;
+ * the enrichment pass fills them before anything is judged.
  */
 
 import { branchIsWatched, watchesEverything } from "@commander/shared";
@@ -64,34 +61,40 @@ export function branchesToReconcile(input: {
   return watched.map((branch) => ({ branch, beyond: branch === defaultBranch ? null : defaultBranch }));
 }
 
-export function buildSyntheticPushes(
+/**
+ * One recovered push for everything the branch gained, each commit keeping its
+ * author — never one push per author.
+ *
+ * The push event is gone, and git records who wrote each commit and who
+ * committed it, never who pushed it. Grouping by author invented a push for
+ * each of them: an author was charged with a push someone else made, and with a
+ * batch of commits they had pushed across a day (0009 §4, scenario
+ * `contributors-branch-pushed-by-a-maintainer-webhook-lost`). So the push names
+ * no pusher — `recovered` — and is addressed to the author of its newest commit.
+ */
+export function recoveredPush(
   repo: { fullName: string },
   branch: string,
   commits: CommitListEntry[],
-): NormalizedPush[] {
-  const byAuthor = new Map<string, CommitListEntry[]>();
-  for (const commit of commits) {
-    const login = commit.authorLogin || commit.committerLogin || "unknown";
-    const bucket = byAuthor.get(login);
-    if (bucket) bucket.push(commit);
-    else byAuthor.set(login, [commit]);
-  }
+): NormalizedPush | null {
+  const newest = commits.at(-1);
+  if (!newest) return null;
 
-  const ref = `refs/heads/${branch}`;
-  return [...byAuthor].map(([login, entries]) => ({
+  return {
     repoFullName: repo.fullName,
     repoUrl: `https://github.com/${repo.fullName}`,
     branch,
-    ref,
+    ref: `refs/heads/${branch}`,
     forced: false,
     created: false,
     deleted: false,
     compareUrl: "",
-    actorLogin: login,
+    actorLogin: newest.authorLogin || "unknown",
     actorAvatarUrl: "",
-    commits: entries.map(toCommit),
+    recovered: true,
+    commits: commits.map(toCommit),
     truncated: false,
-  }));
+  };
 }
 
 function toCommit(entry: CommitListEntry): NormalizedCommit {

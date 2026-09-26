@@ -11,6 +11,7 @@ import { readOccasion, resolveWatcher } from "@commander/shared";
 import { fromJson } from "@/core/json.js";
 import { env } from "@/config/env.js";
 import { createLogger, describeError } from "@/core/logger/logger.js";
+import { newCommitsBy } from "@/domain/judgement/attribution.js";
 import { admitPush, judgePush, type Judgement } from "@/domain/judgement/judgement.js";
 import { findByFullName } from "@/modules/repositories/repositories.service.js";
 import { getDefaultPrompt, getPrompt } from "@/modules/prompts/prompts.service.js";
@@ -107,7 +108,7 @@ async function run(job: PrismaDelivery, received: NormalizedPush): Promise<void>
   );
   if (judgement.withheld !== null) return markSkipped(job.id, judgement.withheld);
 
-  await record(job, { push, repository, settings, judgement, webhookUrl });
+  await record(job, { push, knownShas, repository, settings, judgement, webhookUrl });
 }
 
 /**
@@ -120,23 +121,25 @@ async function record(
   job: PrismaDelivery,
   ctx: {
     push: NormalizedPush;
+    knownShas: ReadonlySet<string>;
     repository: Repository;
     settings: Settings;
     judgement: Judgement;
     webhookUrl: string;
   },
 ): Promise<void> {
-  const { push, repository, settings, webhookUrl } = ctx;
-  const { violations, commendations, login } = ctx.judgement;
+  const { push, repository, settings, judgement, webhookUrl } = ctx;
+  const { violations, commendations } = judgement;
 
   const history = await recordPush({
     repositoryId: repository.id,
-    login,
-    commitCount: push.commits.length,
+    pusher: judgement.pusher,
+    commits: newCommitsBy(push, ctx.knownShas),
     violations,
+    addressee: push.actorLogin,
   });
 
-  await writeLedger({ repositoryId: repository.id, login, push, violations, commendations, deliveryId: job.id });
+  await writeLedger({ repositoryId: repository.id, push, judgement, deliveryId: job.id });
 
   const watcher = resolveWatcher(repository.watchers, push.branch);
   await report(job, { push, repository, settings, violations, commendations, history, webhookUrl, watcher });

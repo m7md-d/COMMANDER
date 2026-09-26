@@ -2,17 +2,25 @@
  * What a push actually brought, as opposed to what it carries.
  *
  * A merge to a trunk arrives holding every commit of the branch it closes —
- * commits this repository already saw, already reported on, and already charged
+ * commits this repository may already have seen, reported on, and charged
  * for. Counted as they arrive, the same work is judged twice: the branch push
  * charges it once, and the merge charges it again with the merge commit's own
  * aggregate stacked on top. `totalFilesTouched` sums every commit in the push,
  * so the double count is ours before it is GitHub's.
  *
- * Two things follow, and both matter:
+ * Three things follow, and all of them matter:
  *
- * 1. **Re-delivered work weighs nothing.** A commit whose sha this repository
- *    already holds brought no new work, whatever ref it now appears under.
- * 2. **A merge weighs its residue** — what it contains that none of the commits
+ * 1. **Two questions, two answers.** What this push *brought* is what nobody
+ *    had pushed before — GitHub's `distinct` — and what the size rules count:
+ *    landing a branch that was pushed elsewhere first is not a heap of work
+ *    dumped at once. What the record has *not judged yet* is wider: work pushed
+ *    first to a branch this front does not watch is judged when it first
+ *    arrives, whichever push carries it — and charged to whoever wrote it, not
+ *    to whoever carried it (0009 §4).
+ * 2. **Work already on record weighs nothing.** A commit whose sha this
+ *    repository already holds was judged when it arrived, whatever ref it now
+ *    appears under.
+ * 3. **A merge weighs its residue** — what it contains that none of the commits
  *    it brings in contain. A clean merge's residue is empty, which is exactly
  *    git's own answer (`diff --cc` shows only what differs from every parent).
  *    A merge that quietly carries lines belonging to no commit has a residue,
@@ -28,20 +36,25 @@
 import type { NormalizedCommit, NormalizedPush } from "./push.js";
 
 export interface PushWeight {
-  /** Commits carrying work this repository had not already recorded. */
+  /** Commits this push brought: pushed nowhere in the repository before, and not on record. */
   newCommits: number;
-  /** Files that new work touched; a merge contributes only its residue. */
+  /** Files those commits touched; a merge contributes only its residue. */
   filesTouched: number;
-  /** Paths a merge introduced that no commit it brings in introduced. */
-  residue: string[];
   /**
-   * Paths new work touched: every path of a new commit, and a new merge's
-   * residue. What the checks may judge — a file only carried by commits already
-   * on record was judged when they arrived. Empty when unmeasured.
+   * What each commit the record has not judged yet did on its own — every path
+   * of a commit; of a merge, its residue: the paths it introduced that no
+   * commit it brings in introduced — whichever branch it was pushed to first.
+   * What the checks and `merge_residue` judge, and whose author answers for
+   * it. Empty when unmeasured.
    */
-  paths: string[];
+  work: CommitWork[];
   /** True only when every commit carried the parents and paths to weigh it. */
   measured: boolean;
+}
+
+export interface CommitWork {
+  sha: string;
+  paths: string[];
 }
 
 /** Two parents or more. The only signal that does not rely on a title. */
@@ -88,14 +101,15 @@ export function weighPush(input: {
   knownShas: ReadonlySet<string>;
 }): PushWeight {
   const { push, knownShas } = input;
-  const fresh = push.commits.filter((commit) => !knownShas.has(commit.sha));
+  const unjudged = push.commits.filter((commit) => !knownShas.has(commit.sha));
+  // Undefined on a recovered push: the record is then the only answer there is.
+  const brought = unjudged.filter((commit) => commit.distinct !== false);
 
   if (!isWeighable(push)) {
     return {
-      newCommits: fresh.length,
-      filesTouched: fresh.reduce((sum, commit) => sum + filesIn(commit), 0),
-      residue: [],
-      paths: [],
+      newCommits: brought.length,
+      filesTouched: brought.reduce((sum, commit) => sum + filesIn(commit), 0),
+      work: [],
       measured: false,
     };
   }
@@ -105,25 +119,14 @@ export function weighPush(input: {
     if (isMerge(commit)) continue;
     for (const path of commit.paths ?? []) carried.add(path);
   }
+  // The merge's own contribution, and nothing it merely transports.
+  const own = (commit: NormalizedCommit): string[] =>
+    isMerge(commit) ? (commit.paths ?? []).filter((path) => !carried.has(path)) : commit.paths ?? [];
 
-  const residue = new Set<string>();
-  const paths = new Set<string>();
-  let filesTouched = 0;
-
-  for (const commit of fresh) {
-    if (!isMerge(commit)) {
-      filesTouched += filesIn(commit);
-      (commit.paths ?? []).forEach((path) => paths.add(path));
-      continue;
-    }
-    // The merge's own contribution, and nothing it merely transports.
-    const own = (commit.paths ?? []).filter((path) => !carried.has(path));
-    own.forEach((path) => {
-      residue.add(path);
-      paths.add(path);
-    });
-    filesTouched += own.length;
-  }
-
-  return { newCommits: fresh.length, filesTouched, residue: [...residue], paths: [...paths], measured: true };
+  return {
+    newCommits: brought.length,
+    filesTouched: brought.reduce((sum, commit) => sum + (isMerge(commit) ? own(commit).length : filesIn(commit)), 0),
+    work: unjudged.map((commit) => ({ sha: commit.sha, paths: own(commit) })),
+    measured: true,
+  };
 }

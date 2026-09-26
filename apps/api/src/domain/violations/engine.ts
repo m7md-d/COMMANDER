@@ -6,11 +6,12 @@
 import {
   RULE_IDS,
   defaultRuleConfig,
+  type Finding,
   type RuleConfigMap,
+  type RuleDetail,
   type RuleId,
-  type ViolationHit,
 } from "@commander/shared";
-import { RULE_REGISTRY } from "./registry.js";
+import { RULE_ANSWERER, RULE_REGISTRY, type Answerer } from "./registry.js";
 import type { RuleContext } from "./types.js";
 
 /**
@@ -56,22 +57,27 @@ export function mergeWithDefaults(stored: unknown): RuleConfigMap {
  */
 export type RuleErrorReporter = (ruleId: RuleId, error: unknown) => void;
 
+/**
+ * The enabled rules one answerer is responsible for, on one context. Findings
+ * name nobody: who answers is `judgePush`'s to say, and it says it by choosing
+ * the context — the push for the pusher, one author's new commits for that
+ * author.
+ */
 export function evaluateRules(
-  context: RuleContext,
-  rules: RuleConfigMap,
+  run: { context: RuleContext; rules: RuleConfigMap; answerer: Answerer },
   onRuleError: RuleErrorReporter,
-): ViolationHit[] {
-  const hits: ViolationHit[] = [];
+): Finding[] {
+  const findings: Finding[] = [];
 
   for (const ruleId of RULE_IDS) {
-    const config = rules[ruleId];
-    if (!config.enabled) continue;
+    const config = run.rules[ruleId];
+    if (!config.enabled || RULE_ANSWERER[ruleId] !== run.answerer) continue;
 
-    const detail = runRule({ ruleId, context, config, onRuleError });
-    if (detail !== null) hits.push({ ruleId, detail });
+    const detail = runRule({ ruleId, context: run.context, config, onRuleError });
+    if (detail !== null) findings.push({ ruleId, detail });
   }
 
-  return hits;
+  return findings;
 }
 
 /**
@@ -83,12 +89,12 @@ function runRule<K extends RuleId>(input: {
   context: RuleContext;
   config: RuleConfigMap[K];
   onRuleError: RuleErrorReporter;
-}): ViolationHit["detail"] | null {
+}): RuleDetail | null {
   const { ruleId, context, config, onRuleError } = input;
   const evaluator = RULE_REGISTRY[ruleId] as (
     context: RuleContext,
     config: RuleConfigMap[K],
-  ) => ViolationHit["detail"] | null;
+  ) => RuleDetail | null;
 
   try {
     return evaluator(context, config);

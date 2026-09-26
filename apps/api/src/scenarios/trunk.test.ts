@@ -129,7 +129,7 @@ const scenarios: Scenario[] = [
     defect: {
       observed: charged("large_diff@sara"),
       because:
-        "Two errors. The pull merge's title exempts the push from direct_push; and its second parent is outside the push, so the push goes unweighed and Lina's 48 files, brought in by the pull, are charged to Sara. (0009 §2, §4)",
+        "Two errors. The pull merge's title exempts the push from direct_push (0009 §2). And its second parent is main's old head, outside the push, so weighPush refuses to weigh it and counts the merge at its whole first-parent diff: Lina's 48 files, brought in by the pull. Sara answers for the push, rightly; the count is not hers (weighPush's fallback for an unweighable push).",
     },
   },
   {
@@ -146,7 +146,7 @@ const scenarios: Scenario[] = [
     defect: {
       observed: charged("large_diff@sara"),
       because:
-        "The pull merge's shape again: exempted by its title, then charged with Lina's 48 files, because the merge's first-parent diff is main's work. (0009 §2, §4)",
+        "The pull merge's shape again: exempted by its title (0009 §2), then counted at its whole first-parent diff — Lina's 48 files, main's work — because its second parent is outside the push. The right person, the wrong count (weighPush's fallback for an unweighable push).",
     },
   },
   {

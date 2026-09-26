@@ -8,7 +8,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { NormalizedCommit, NormalizedPush } from "@commander/shared";
-import { buildPromptValues, praiseLabel, violationLabel } from "@/domain/report/prompt-builder.js";
+import {
+  buildPromptValues,
+  chargeLabel,
+  creditLabel,
+  praiseLabel,
+  violationLabel,
+} from "@/domain/report/prompt-builder.js";
 import { renderUserPrompt } from "@/domain/report/prompt-render.js";
 
 function commit(overrides: Partial<NormalizedCommit> = {}): NormalizedCommit {
@@ -182,13 +188,13 @@ test("a clean push is handed praise instructions, not a licence to invent faults
 test("the register hardens with repetition of the same rule", () => {
   const once = buildPromptValues({
     ...BASE,
-    violations: [{ ruleId: "weekend_ops", detail: {} }],
+    violations: [{ ruleId: "weekend_ops", detail: {}, login: "m7md-d" }],
     history: { ...BASE.history, violationCounts: { weekend_ops: 1 } },
     push: push([commit()]),
   });
   const chronic = buildPromptValues({
     ...BASE,
-    violations: [{ ruleId: "weekend_ops", detail: {} }],
+    violations: [{ ruleId: "weekend_ops", detail: {}, login: "m7md-d" }],
     history: { ...BASE.history, violationCounts: { weekend_ops: 12 } },
     push: push([commit()]),
   });
@@ -198,10 +204,53 @@ test("the register hardens with repetition of the same rule", () => {
   assert.notEqual(once.tone, chronic.tone);
 });
 
+test("a charge on someone else is named, and does not harden the register on the addressee", () => {
+  // m7md-d pushed; the late commit in the push was sara's.
+  const values = buildPromptValues({
+    ...BASE,
+    violations: [{ ruleId: "weekend_ops", detail: {}, login: "sara" }],
+    history: { ...BASE.history, violationCounts: { weekend_ops: 12 } },
+    push: push([commit()]),
+  });
+
+  assert.match(String(values.violations), /يُسأل عنها sara/);
+  assert.match(String(values.tone), /ابدأ بالثناء/, "nothing here is the addressee's to answer for");
+});
+
+test("a charge on the addressee is not tagged with their own name", () => {
+  const values = buildPromptValues({
+    ...BASE,
+    violations: [{ ruleId: "weekend_ops", detail: {}, login: "m7md-d" }],
+    push: push([commit()]),
+  });
+
+  assert.doesNotMatch(String(values.violations), /يُسأل عنها/);
+});
+
+test("a credit earned by someone else is theirs in the prompt", () => {
+  const values = buildPromptValues({
+    ...BASE,
+    commendations: [
+      { ruleId: "file_lines", detail: { path: "src/a.ts", before: 400, after: 350, threshold: 200 }, login: "sara" },
+    ],
+    push: push([commit()]),
+  });
+
+  assert.match(String(values.commendations), /يُحسب لـsara/);
+});
+
+test("chargeLabel and creditLabel name the member only when it is not the addressee", () => {
+  const hit = { ruleId: "file_lines" as const, detail: { path: "src/a.ts", before: 190, after: 210, threshold: 200 }, login: "sara" };
+
+  assert.equal(chargeLabel("en", hit, "sara"), violationLabel("en", hit));
+  assert.match(chargeLabel("en", hit, "omar"), /sara answers for this$/);
+  assert.match(creditLabel("en", { ...hit, detail: { ...hit.detail, before: 210, after: 190 } }, "omar"), /to sara's credit$/);
+});
+
 test("a critical branch is named to the model and hardens the register", () => {
   const slip = {
     ...BASE,
-    violations: [{ ruleId: "weekend_ops" as const, detail: {} }],
+    violations: [{ ruleId: "weekend_ops" as const, detail: {}, login: "m7md-d" }],
     history: { ...BASE.history, violationCounts: { weekend_ops: 1 } },
     push: push([commit()]),
   };
@@ -252,6 +301,7 @@ test("a check on a new file takes the sentence that claims no before", () => {
   const label = violationLabel("ar", {
     ruleId: "file_lines",
     detail: { path: "src/a.ts", after: 210, threshold: 200 },
+    login: "m7md-d",
   });
 
   assert.match(label, /أنشأ/);
@@ -262,6 +312,7 @@ test("an engagement rule keeps its own sentence, having never had a before", () 
   const label = violationLabel("ar", {
     ruleId: "large_diff",
     detail: { count: 40, threshold: 20 },
+    login: "m7md-d",
   });
 
   assert.match(label, /40/);
@@ -272,6 +323,7 @@ test("a credit reads as an improvement, with the numbers that prove it", () => {
   const label = praiseLabel("ar", {
     ruleId: "file_lines",
     detail: { path: "src/a.ts", before: 400, after: 350, threshold: 200 },
+    login: "m7md-d",
   });
 
   assert.match(label, /400/);
@@ -282,7 +334,7 @@ test("praise reaches a template written before praise existed", () => {
   const values = buildPromptValues({
     ...BASE,
     commendations: [
-      { ruleId: "file_lines", detail: { path: "src/a.ts", before: 400, after: 350, threshold: 200 } },
+      { ruleId: "file_lines", detail: { path: "src/a.ts", before: 400, after: 350, threshold: 200 }, login: "m7md-d" },
     ],
     push: push([commit()]),
   });

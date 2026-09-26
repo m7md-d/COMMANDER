@@ -18,7 +18,7 @@ import {
   EMBED_COLOR_CLEAN,
   EMBED_COLOR_FLAGGED,
 } from "@/config/constants.js";
-import { praiseLabel, violationLabel } from "@/domain/report/prompt-builder.js";
+import { chargeLabel, creditLabel } from "@/domain/report/prompt-builder.js";
 
 export interface DiscordEmbed {
   title: string;
@@ -79,17 +79,18 @@ function buildFields(input: EmbedInput) {
     { name: t(locale, "report.fieldCommits"), value: String(push.commits.length), inline: true },
     // Two fields, never one. A reader scans the violations list as the charge
     // sheet, and a credit sitting inside it reads as one more thing done wrong.
+    // Each names its member when it is not the one the report is addressed to.
     ...listField({
       locale,
       key: "report.fieldViolations",
       entries: violations,
-      label: (hit) => violationLabel(locale, hit),
+      label: (hit) => chargeLabel(locale, hit, push.actorLogin),
     }),
     ...listField({
       locale,
       key: "report.fieldCommendations",
       entries: commendations,
-      label: (entry) => praiseLabel(locale, entry),
+      label: (entry) => creditLabel(locale, entry, push.actorLogin),
     }),
   ];
 }

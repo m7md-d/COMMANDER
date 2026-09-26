@@ -15,21 +15,55 @@ function readCounts(value: unknown): Record<string, number> {
   );
 }
 
+interface Standing {
+  totalCommits: number;
+  totalPushes: number;
+  violationCounts: Record<string, number>;
+}
+
+/**
+ * Advances every counter one push touches, each on the member it belongs to:
+ * the push on whoever pushed, each commit on the member it is filed under, each
+ * charge on whoever answers for it. Returns the standing of `addressee` — whom
+ * the communiqué speaks to — with this push included.
+ */
 export async function recordPush(input: {
   repositoryId: string;
-  login: string;
-  commitCount: number;
+  /** Null for a recovered push, which nobody is known to have made. */
+  pusher: string | null;
+  /** Commits new to the record, by the member each is filed under. */
+  commits: ReadonlyMap<string, number>;
   violations: ViolationHit[];
-}): Promise<{ totalCommits: number; totalPushes: number; violationCounts: Record<string, number> }> {
-  const { repositoryId, login, commitCount, violations } = input;
-  const now = new Date();
+  addressee: string;
+}): Promise<Standing> {
+  const logins = new Set([input.addressee, ...input.commits.keys(), ...input.violations.map((hit) => hit.login)]);
+  if (input.pusher) logins.add(input.pusher);
 
+  let cited: Standing = { totalCommits: 0, totalPushes: 0, violationCounts: {} };
+  for (const login of logins) {
+    const standing = await tally(input.repositoryId, login, {
+      commits: input.commits.get(login) ?? 0,
+      pushes: login === input.pusher ? 1 : 0,
+      charges: input.violations.filter((hit) => hit.login === login),
+    });
+    if (login === input.addressee) cited = standing;
+  }
+  return cited;
+}
+
+/** One member's counters, advanced atomically by what this push added to them. */
+async function tally(
+  repositoryId: string,
+  login: string,
+  added: { commits: number; pushes: number; charges: ViolationHit[] },
+): Promise<Standing> {
+  const now = new Date();
   const existing = await prisma.memberStat.findUnique({
     where: { repositoryId_login: { repositoryId, login } },
   });
 
   const counts = readCounts(existing?.violationCounts);
-  for (const hit of violations) {
+  for (const hit of added.charges) {
     counts[hit.ruleId] = (counts[hit.ruleId] ?? 0) + 1;
   }
 
@@ -38,15 +72,15 @@ export async function recordPush(input: {
     create: {
       repositoryId,
       login,
-      totalCommits: commitCount,
-      totalPushes: 1,
+      totalCommits: added.commits,
+      totalPushes: added.pushes,
       violationCounts: counts,
       firstSeenAt: now,
       lastSeenAt: now,
     },
     update: {
-      totalCommits: { increment: commitCount },
-      totalPushes: { increment: 1 },
+      totalCommits: { increment: added.commits },
+      totalPushes: { increment: added.pushes },
       violationCounts: counts,
       lastSeenAt: now,
     },

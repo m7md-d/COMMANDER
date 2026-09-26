@@ -32,11 +32,6 @@ const scenarios: Scenario[] = [
       story.reconcile();
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("large_diff@omar"),
-      because:
-        "The reconciler hands the merge over alone — its branch is on record — so its second parent is absent, weighing is refused and it counts at its full diff. The webhook road gives a clean verdict. (0009 §1, §4)",
-    },
   },
   {
     id: "reconciled-merge-branch-never-recorded",
@@ -47,11 +42,6 @@ const scenarios: Scenario[] = [
       story.reconcile();
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("batch_dump@sara", "direct_push@sara", "large_diff@omar", "large_diff@sara"),
-      because:
-        "Grouped by author, Sara's six commits become a push of her own on main — a direct push and a batch — and Omar's merge is charged its full diff on top. The webhook road charges Omar alone (merge-commit-branch-never-recorded). (0009 §1, §4)",
-    },
   },
   {
     id: "reconciled-direct-push",
@@ -63,6 +53,11 @@ const scenarios: Scenario[] = [
       story.reconcile();
     },
     expect: charged("direct_push@sara"),
+    defect: {
+      observed: CLEAN,
+      because:
+        "A recovered push names no pusher: the push event is gone, and git records who wrote and who committed a commit, never who pushed it. Naming the author instead, as grouping by author did, charged Sara with Lina's push in contributors-branch-pushed-by-a-maintainer-webhook-lost. GitHub's events timeline names the actor of each push, and is not read (reconciler.mapper.ts recoveredPush, 0009 §4).",
+    },
   },
   {
     // A pattern is not a branch the commits API can read; the reconciler matches
@@ -117,17 +112,17 @@ const scenarios: Scenario[] = [
     story: async (story) => {
       await seed(story);
       await story.branch(FEATURE, "main");
-      await work(story, { on: "main", by: SARA, commits: 2, width: 3 });
+      await work(story, { on: "main", by: SARA, commits: 2, width: 3, titles: ["wip"] });
       await story.push("main", SARA, { lost: true });
       await work(story, { on: FEATURE, by: OMAR, commits: 1, width: 2 });
       await story.push(FEATURE, OMAR);
       story.reconcile();
     },
-    expect: charged("direct_push@sara"),
+    expect: charged("direct_push@sara", "lazy_message@sara"),
     defect: {
       observed: CLEAN,
       because:
-        "The cursor is the newest commit on record anywhere in the repository. Omar's later push moved it past Sara's lost commits, so main is read from after them. Reading a branch back to the first commit on record, rather than by date, would not skip them. (reconciler.ts computeSince)",
+        "The cursor is the newest commit on record anywhere in the repository. Omar's later push moved it past Sara's lost commits, so main is read from after them and even her 'wip' is never seen. Reading a branch back to the first commit on record, rather than by date, would not skip them (reconciler.ts computeSince) — and would recover them as a push naming no pusher, charging the 'wip' alone (reconciled-direct-push).",
     },
   },
   {

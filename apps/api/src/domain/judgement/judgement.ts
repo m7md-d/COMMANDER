@@ -17,15 +17,16 @@ import {
   weighPush,
   type CheckConfigMap,
   type Commendation,
+  type Finding,
   type NormalizedPush,
-  type PushWeight,
   type Repository,
   type RuleConfigMap,
   type ViolationHit,
 } from "@commander/shared";
-import { judgeFile, type CheckOutcome, type Reading } from "@/domain/checks/judge.js";
+import { judgeFile, type Reading } from "@/domain/checks/judge.js";
 import type { TouchedFile } from "@/domain/tree/diff.js";
-import { evaluateRules, type RuleErrorReporter } from "@/domain/violations/engine.js";
+import type { RuleErrorReporter } from "@/domain/violations/engine.js";
+import { answered, handsOnPaths, judgeRules, pusherOf, type Named } from "./attribution.js";
 
 /**
  * Whether a push is read, and whether it is judged. Read without being judged
@@ -76,11 +77,17 @@ export interface PushFacts {
 export type Withheld = "clean_and_silent" | "discord_missing";
 
 export type Judgement = {
-  /** The rules' charges, then the checks'. */
+  /** The rules' charges, then the checks' — each naming who answers for it. */
   violations: ViolationHit[];
   commendations: Commendation[];
-  /** Who answers for every charge and every commendation: today, whoever pushed. */
-  login: string;
+  /**
+   * Found, with nobody the evidence names to answer for it: a commit whose
+   * author's address belongs to no account, a file two people changed in one
+   * push, what a recovered push did. Charged to nobody, and logged.
+   */
+  unattributed: Finding[];
+  /** Whoever pushed: whose push this counts as. Null for a recovered push. */
+  pusher: string | null;
 } & (
   // Written to the record — commits, counters, ledger — and then reported.
   | { recorded: true; withheld: null }
@@ -89,38 +96,40 @@ export type Judgement = {
 );
 
 export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Judgement {
-  const { push } = facts;
-  const weight = weighPush({ push, knownShas: facts.knownShas });
-  const checked = judgeChanges(facts.checks, weight);
-  const found = {
-    violations: [
-      ...evaluateRules({ push, timezoneOffset: facts.timezoneOffset, weight }, facts.rules, onRuleError),
-      ...checked.violations,
-    ],
-    commendations: checked.commendations,
-    login: push.actorLogin,
+  const { push, knownShas } = facts;
+  const weight = weighPush({ push, knownShas });
+  const ruled = judgeRules({ push, weight, knownShas, rules: facts.rules, timezoneOffset: facts.timezoneOffset }, onRuleError);
+  const checked = judgeChanges(facts.checks, handsOnPaths(push, weight));
+  const found = [...ruled, ...checked.violations];
+  const judged = {
+    violations: answered(found),
+    commendations: answered(checked.commendations),
+    unattributed: [...found, ...checked.commendations]
+      .filter((entry) => entry.login === null)
+      .map(({ ruleId, detail }) => ({ ruleId, detail })),
+    pusher: pusherOf(push),
   };
 
-  const withheld = withholding(facts, found.violations.length + found.commendations.length);
-  return withheld === null ? { ...found, recorded: true, withheld } : { ...found, recorded: false, withheld };
+  const withheld = withholding(facts, judged.violations.length + judged.commendations.length);
+  return withheld === null ? { ...judged, recorded: true, withheld } : { ...judged, recorded: false, withheld };
 }
 
 /**
- * The checks, on new work only. A file only carried by commits already on
- * record was judged when they arrived, and judging it again charges the same
- * crossing twice — the second time to whoever merged. Without the weight, new
- * work cannot be told from carried work, and nothing is judged.
+ * The checks, on the paths new work touched, each naming whose work it was. A
+ * file only carried by commits already on record was judged when they arrived,
+ * and judging it again charges the same crossing twice — the second time to
+ * whoever merged. A push that cannot be weighed has no new work to tell from
+ * carried work, so nothing is judged.
  */
-function judgeChanges(checks: ChecksFacts, weight: PushWeight): CheckOutcome {
-  const outcome: CheckOutcome = { violations: [], commendations: [] };
-  if (!weight.measured) return outcome;
+function judgeChanges(checks: ChecksFacts, hands: ReadonlyMap<string, string | null>) {
+  const outcome: { violations: Named[]; commendations: Named[] } = { violations: [], commendations: [] };
 
-  const fresh = new Set(weight.paths);
   for (const file of checks.changes) {
-    if (!fresh.has(file.path)) continue;
+    if (!hands.has(file.path)) continue;
+    const login = hands.get(file.path) ?? null;
     const judged = judgeFile(checks.config, file, checks.readings);
-    outcome.violations.push(...judged.violations);
-    outcome.commendations.push(...judged.commendations);
+    outcome.violations.push(...judged.violations.map((finding) => ({ ...finding, login })));
+    outcome.commendations.push(...judged.commendations.map((finding) => ({ ...finding, login })));
   }
   return outcome;
 }

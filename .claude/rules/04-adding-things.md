@@ -21,11 +21,16 @@ immediately, which is the whole reason the shared package exists.
 
 ## A violation rule
 
-One file in `apps/api/src/domain/violations/rules/`, one line in `registry.ts`, one line in
-`engine.ts`, a default in shared, and three i18n keys. **Nothing else is touched.** Forgetting
-the registry or the engine is a compile error by design — `mergeWithDefaults` lists every rule
-key by hand rather than looping, so adding a `RuleId` fails to compile exactly where the reminder
-is useful.
+One file in `apps/api/src/domain/violations/rules/`, one line in each of `registry.ts`'s two
+maps, one line in `engine.ts`, a default in shared, and three i18n keys. **Nothing else is
+touched.** Forgetting the registry or the engine is a compile error by design — `mergeWithDefaults`
+lists every rule key by hand rather than looping, so adding a `RuleId` fails to compile exactly
+where the reminder is useful.
+
+The second map, `RULE_ANSWERER`, says who answers for what the rule finds: `pusher` for what a
+push did, `author` for what a commit holds. It decides what the rule reads — the push's commits,
+or one author's commits the record has not judged yet — so a content rule declared `pusher`
+judges carried commits again and charges them to whoever pushed.
 
 ## A check metric
 

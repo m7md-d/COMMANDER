@@ -53,6 +53,22 @@ export function praiseLabel(locale: LocaleId, entry: Commendation): string {
 }
 
 /**
+ * A charge that names whose it is when it is not the addressee's. The
+ * communiqué speaks to one member, and a charge listed without a name reads as
+ * theirs: the model would scold whoever pushed for a commit someone else wrote.
+ */
+export function chargeLabel(locale: LocaleId, hit: ViolationHit, addressee: string): string {
+  const label = violationLabel(locale, hit);
+  return hit.login === addressee ? label : t(locale, "report.chargedTo", { label, login: hit.login });
+}
+
+/** A credit, named the same way — praise read as the addressee's is praise stolen from its author. */
+export function creditLabel(locale: LocaleId, entry: Commendation, addressee: string): string {
+  const label = praiseLabel(locale, entry);
+  return entry.login === addressee ? label : t(locale, "report.creditedTo", { label, login: entry.login });
+}
+
+/**
  * One commit as the model sees it. Files and lines are stated as distinct
  * quantities — the old single triplet was read as line counts and turned an
  * unenriched push into "صفر أسطر مضافة". When enrichment has not run, the line
@@ -81,9 +97,9 @@ export function buildCommitBlock(push: NormalizedPush, locale: LocaleId, quote: 
   return push.truncated ? `${lines}\n${t(locale, "report.truncated")}` : lines;
 }
 
-export function buildViolationBlock(violations: ViolationHit[], locale: LocaleId): string {
+export function buildViolationBlock(violations: ViolationHit[], locale: LocaleId, addressee: string): string {
   if (violations.length === 0) return t(locale, "report.noViolations");
-  return violations.map((hit) => `- ${violationLabel(locale, hit)}`).join("\n");
+  return violations.map((hit) => `- ${chargeLabel(locale, hit, addressee)}`).join("\n");
 }
 
 /**
@@ -93,10 +109,10 @@ export function buildViolationBlock(violations: ViolationHit[], locale: LocaleId
  * every push that nobody improved anything learns that improvement is the
  * exception worth remarking on; told nothing, it simply has nothing to say.
  */
-export function buildCommendationBlock(entries: Commendation[], locale: LocaleId): string {
+export function buildCommendationBlock(entries: Commendation[], locale: LocaleId, addressee: string): string {
   if (entries.length === 0) return "";
 
-  const lines = entries.map((entry) => `- ${praiseLabel(locale, entry)}`).join("\n");
+  const lines = entries.map((entry) => `- ${creditLabel(locale, entry, addressee)}`).join("\n");
   return `${t(locale, "report.commendationsHeading")}\n${lines}`;
 }
 

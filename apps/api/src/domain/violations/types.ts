@@ -4,7 +4,7 @@
  * engine testable without a database or a server.
  */
 
-import type { NormalizedPush, PushWeight, RuleDetail } from "@commander/shared";
+import type { NormalizedCommit, NormalizedPush, PushWeight, RuleDetail } from "@commander/shared";
 
 export interface RuleContext {
   push: NormalizedPush;
@@ -17,6 +17,13 @@ export interface RuleContext {
    * so a merge is not charged for the branch it closes (see weighPush).
    */
   weight: PushWeight;
+  /**
+   * The commits under judgement. For a rule the author answers for, one
+   * author's commits the record has not judged yet — so a commit is judged once,
+   * when it first arrives, and against whoever wrote it. For a rule the pusher
+   * answers for, every commit the push carries.
+   */
+  commits: NormalizedCommit[];
 }
 
 /**

@@ -8,8 +8,10 @@
  * that did land, and the communiqué cannot be rebuilt at all.
  */
 
-import type { Commendation, NormalizedPush, ViolationHit } from "@commander/shared";
+import type { NormalizedPush } from "@commander/shared";
 import { createLogger } from "@/core/logger/logger.js";
+import { filedUnder } from "@/domain/judgement/attribution.js";
+import type { Judgement } from "@/domain/judgement/judgement.js";
 import {
   recordCommendations,
   recordCommits,
@@ -23,43 +25,39 @@ const log = createLogger("processor");
  * decay and discount later. A failure here must not lose the report, so it is
  * logged rather than thrown — the score can be rebuilt, the communiqué cannot.
  *
- * Every row goes to the `login` the judgement named. Who answers for a push is
- * a decision, and decisions are `judgePush`'s — this file only writes it down.
+ * Every row goes to the login its entry carries, and every commit to the member
+ * `filedUnder` names. Who answers for a push is a decision, and decisions are
+ * `judgePush`'s — this file only writes it down, and says what it left out.
  */
 export async function writeLedger(input: {
   repositoryId: string;
-  login: string;
   push: NormalizedPush;
-  violations: ViolationHit[];
-  commendations: Commendation[];
+  judgement: Pick<Judgement, "violations" | "commendations" | "unattributed">;
   deliveryId: string;
 }): Promise<void> {
-  const { repositoryId, login, push, violations, commendations, deliveryId } = input;
+  const { repositoryId, push, judgement, deliveryId } = input;
   const when = new Date();
 
+  if (judgement.unattributed.length > 0) {
+    // For the operator: found, and charged to nobody, because nothing named anyone.
+    log.info("findings nobody answers for", {
+      repo: push.repoFullName,
+      branch: push.branch,
+      rules: judgement.unattributed.map((entry) => entry.ruleId),
+    });
+  }
+
   await Promise.all([
-    recordViolations({
-      repositoryId,
-      login,
-      entries: violations,
-      occurredAt: when,
-      deliveryId,
-    }),
+    recordViolations({ repositoryId, entries: judgement.violations, occurredAt: when, deliveryId }),
     // The same timestamp and the same delivery id: both directions of one push
     // are one event in the record, and dating them apart would let the timeline
     // show a person fixing something before they were charged for it.
-    recordCommendations({
-      repositoryId,
-      login,
-      entries: commendations,
-      occurredAt: when,
-      deliveryId,
-    }),
+    recordCommendations({ repositoryId, entries: judgement.commendations, occurredAt: when, deliveryId }),
     recordCommits({
       repositoryId,
-      login,
       commits: push.commits.map((commit) => ({
         sha: commit.sha,
+        login: filedUnder(commit, push),
         title: commit.title,
         timestamp: commit.timestamp,
         filesTouched: commit.filesAdded + commit.filesRemoved + commit.filesModified,

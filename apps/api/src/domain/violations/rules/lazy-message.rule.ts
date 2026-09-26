@@ -14,10 +14,10 @@ function normalize(title: string): string {
  * six characters and gets flagged — punishing exactly the convention we would
  * want to encourage.
  */
-export const lazyMessageRule: RuleEvaluator<LazyMessageRuleConfig> = ({ push }, config) => {
+export const lazyMessageRule: RuleEvaluator<LazyMessageRuleConfig> = ({ commits }, config) => {
   const words = config.words.map((word) => word.toLowerCase());
 
-  for (const commit of push.commits) {
+  for (const commit of commits) {
     const body = normalize(commit.title);
     if (!body) continue;
     if (body.length < config.minLength || words.includes(body)) {

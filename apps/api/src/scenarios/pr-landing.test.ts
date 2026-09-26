@@ -48,11 +48,6 @@ const scenarios: Scenario[] = [
       await land(story, "merge");
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("batch_dump@omar", "large_diff@omar"),
-      because:
-        "Sara's commits were never recorded (her branch is not watched), so the merge re-delivers them as new: six commits and 60 file-touches, charged to Omar for pressing Merge. GitHub marks them distinct: false; the mapper does not read it. (0009 §2, §4)",
-    },
   },
   {
     id: "merge-after-update-branch",
@@ -159,11 +154,6 @@ const scenarios: Scenario[] = [
       await land(story, "merge");
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("lazy_message@omar"),
-      because:
-        "lazy_message reads every commit in the push, re-delivered ones included: the 'wip' already charged to Sara at her push is charged again, to Omar. (0009 §4)",
-    },
   },
   {
     id: "night-commits-already-on-record",
@@ -173,11 +163,6 @@ const scenarios: Scenario[] = [
       await land(story, "merge", { at: "2026-08-11T11:00:00+03:00" });
     },
     expect: CLEAN,
-    defect: {
-      observed: charged("night_ops@omar"),
-      because:
-        "night_ops reads every commit in the push: Sara's 02:30 work, already on record, is charged again to Omar, who merged at 11:00. (0009 §4)",
-    },
   },
   {
     id: "lazy-commit-first-seen-at-merge",
@@ -188,11 +173,6 @@ const scenarios: Scenario[] = [
       await land(story, "merge");
     },
     expect: charged("lazy_message@sara"),
-    defect: {
-      observed: charged("lazy_message@omar"),
-      because:
-        "The charge is right and the person is wrong: every entry is written against the push's sender (delivery.ledger.ts), never the commit's author. (0009 §4)",
-    },
   },
 ];
 

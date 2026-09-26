@@ -704,6 +704,8 @@ export const AR = {
   "report.fieldViolations": "المخالفات",
   "report.fieldCommendations": "ما يُحمد",
   "report.commendationsHeading": "ما استُحقّ عليه المدح في هذه الدفعة (حقائق مقيسة، امدحها بالاسم):",
+  "report.chargedTo": "{label} — يُسأل عنها {login}",
+  "report.creditedTo": "{label} — يُحسب لـ{login}",
   "report.footer": "هيئة مراقبة الانضباط البرمجي",
   "report.noConstitution": "لم يُعثر على ملف قوانين في هذا الريبو.",
   "report.noStructure": "لم تُفحص هيكلة المشروع بعد.",

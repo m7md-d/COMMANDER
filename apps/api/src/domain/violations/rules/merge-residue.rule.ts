@@ -1,4 +1,4 @@
-import type { RuleConfigBase } from "@commander/shared";
+import { isMerge, type RuleConfigBase } from "@commander/shared";
 import type { RuleEvaluator } from "../types.js";
 
 /**
@@ -18,9 +18,13 @@ import type { RuleEvaluator } from "../types.js";
  * here would be an injection route through a rule that exists to catch bad
  * faith. Whoever reads the finding has the merge in front of them.
  */
-export const mergeResidueRule: RuleEvaluator<RuleConfigBase> = ({ weight }) => {
+export const mergeResidueRule: RuleEvaluator<RuleConfigBase> = ({ weight, commits }) => {
   // Never on an unmeasured push: a truncated payload or a missing branch head
   // makes an honest merge look like it wrote the whole branch by itself.
-  if (!weight.measured || weight.residue.length === 0) return null;
-  return { files: weight.residue.length };
+  if (!weight.measured) return null;
+
+  // The merges under judgement are one author's, so the residue is theirs alone.
+  const merges = new Set(commits.filter(isMerge).map((commit) => commit.sha));
+  const residue = new Set(weight.work.filter((entry) => merges.has(entry.sha)).flatMap((entry) => entry.paths));
+  return residue.size === 0 ? null : { files: residue.size };
 };

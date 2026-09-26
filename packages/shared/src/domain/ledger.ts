@@ -31,4 +31,6 @@ export type LedgerKind = (typeof LEDGER_KINDS)[number];
 export interface Commendation {
   ruleId: ViolationId;
   detail: RuleDetail;
+  /** Who earned it: the author of the work that brought the file back under. */
+  login: string;
 }

@@ -1,15 +1,17 @@
 /**
- * The engine's two promises: a disabled rule never runs, and a rule that throws
- * is reported rather than raised — one broken rule must not silence every
- * report for a repository.
+ * The engine's three promises: a disabled rule never runs, a rule runs only for
+ * the answerer it is written against, and a rule that throws is reported rather
+ * than raised — one broken rule must not silence every report for a repository.
  */
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { NormalizedCommit, NormalizedPush, PushWeight, RuleId } from "@commander/shared";
+import { RULE_IDS, type NormalizedCommit, type NormalizedPush, type PushWeight, type RuleId } from "@commander/shared";
 import { evaluateRules, mergeWithDefaults } from "./engine.js";
+import { RULE_ANSWERER, type Answerer } from "./registry.js";
+import type { RuleContext } from "./types.js";
 
-const UNWEIGHED: PushWeight = { newCommits: 0, filesTouched: 0, residue: [], paths: [], measured: false };
+const UNWEIGHED: PushWeight = { newCommits: 0, filesTouched: 0, work: [], measured: false };
 
 /**
  * A forced deletion whose commits cannot be read. Every rule that reads the
@@ -33,28 +35,43 @@ const UNREADABLE: NormalizedPush = {
   },
 };
 
-function evaluate(stored: unknown) {
+/** The commits under judgement cannot be read either. */
+const CONTEXT: RuleContext = {
+  push: UNREADABLE,
+  timezoneOffset: 3,
+  weight: UNWEIGHED,
+  get commits(): NormalizedCommit[] {
+    throw new Error("unreadable");
+  },
+};
+
+function evaluate(stored: unknown, answerer: Answerer) {
   const thrown: RuleId[] = [];
-  const hits = evaluateRules(
-    { push: UNREADABLE, timezoneOffset: 3, weight: UNWEIGHED },
-    mergeWithDefaults(stored),
-    (ruleId) => {
-      thrown.push(ruleId);
-    },
-  );
+  const hits = evaluateRules({ context: CONTEXT, rules: mergeWithDefaults(stored), answerer }, (ruleId) => {
+    thrown.push(ruleId);
+  });
   return { hits: hits.map((hit) => hit.ruleId), thrown: thrown.sort() };
 }
 
 test("a rule that throws is reported, and the rules after it still run", () => {
-  const { hits, thrown } = evaluate({});
+  assert.deepEqual(evaluate({}, "pusher"), { hits: ["force_push", "branch_deleted"], thrown: ["direct_push"] });
+  assert.deepEqual(evaluate({}, "author"), { hits: [], thrown: ["lazy_message", "merge_residue", "night_ops"] });
+});
 
-  assert.deepEqual(thrown, ["direct_push", "lazy_message", "night_ops"]);
-  assert.deepEqual(hits, ["force_push", "branch_deleted"]);
+test("a rule runs only for the answerer it is written against", () => {
+  const everyRuleOn = Object.fromEntries(RULE_IDS.map((id) => [id, { enabled: true }]));
+
+  for (const answerer of ["pusher", "author"] as const) {
+    const { hits, thrown } = evaluate(everyRuleOn, answerer);
+    const ran = [...hits, ...thrown].sort();
+    const own = new Set<string>(RULE_IDS.filter((id) => RULE_ANSWERER[id] === answerer));
+    assert.ok(ran.every((id) => own.has(id)), `${answerer} ran ${ran.join(", ")}`);
+  }
 });
 
 test("a disabled rule never runs, so it can neither charge nor throw", () => {
   const off = { enabled: false };
-  const { hits, thrown } = evaluate({
+  const stored = {
     force_push: off,
     batch_dump: off,
     direct_push: off,
@@ -62,8 +79,9 @@ test("a disabled rule never runs, so it can neither charge nor throw", () => {
     night_ops: off,
     branch_deleted: off,
     merge_residue: off,
-  });
+  };
 
-  assert.deepEqual(hits, []);
-  assert.deepEqual(thrown, []);
+  for (const answerer of ["pusher", "author"] as const) {
+    assert.deepEqual(evaluate(stored, answerer), { hits: [], thrown: [] });
+  }
 });

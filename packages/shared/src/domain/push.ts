@@ -12,8 +12,16 @@ export interface NormalizedCommit {
   filesAdded: number;
   filesRemoved: number;
   filesModified: number;
+  /** The GitHub account the commit's author address belongs to; empty when it belongs to none. */
   authorLogin: string;
   committerLogin: string;
+  /**
+   * GitHub's own answer to "is this new work": false when the commit had
+   * already been pushed to this repository, on any branch. Only the push
+   * webhook carries it — a recovered push and a row queued before it was read
+   * leave it undefined, and the record alone then decides what is new.
+   */
+  distinct?: boolean;
   /**
    * Lines changed. Undefined until enrichment asks GitHub for them: neither the
    * push webhook nor the commits list carries line counts, and reporting a zero
@@ -61,8 +69,19 @@ export interface NormalizedPush {
    */
   before?: string;
   after?: string;
+  /**
+   * Whoever pushed, and whom the communiqué addresses. On a recovered push
+   * nobody is known to have pushed, and this only names the author of its
+   * newest commit, for the communiqué to address.
+   */
   actorLogin: string;
   actorAvatarUrl: string;
+  /**
+   * Rebuilt by the reconciler from the branch's history after its webhook was
+   * lost. Git records who wrote and who committed each commit, never who
+   * pushed it, so a recovered push names no pusher (0009 §4).
+   */
+  recovered?: true;
   commits: NormalizedCommit[];
   /**
    * GitHub caps `commits` at 20 entries per push payload. When true, counters

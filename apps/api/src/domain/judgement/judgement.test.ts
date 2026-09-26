@@ -1,7 +1,8 @@
 /**
  * The decision about a push, without the I/O around it. The scenario reference
  * plays these functions against real git; this pins what no scenario reaches —
- * the fronts that stay silent, or have nowhere to send.
+ * the fronts that stay silent, or have nowhere to send — and who answers for
+ * each finding, one rule at a time.
  */
 
 import assert from "node:assert/strict";
@@ -12,8 +13,9 @@ import { mergeWithDefaults, type RuleErrorReporter } from "@/domain/violations/e
 import { admitPush, judgePush, type ChecksFacts, type PushFacts } from "./judgement.js";
 
 const SARA = "sara";
+const OMAR = "omar";
 
-function commit(sha: string): NormalizedCommit {
+function commit(sha: string, overrides: Partial<NormalizedCommit> = {}): NormalizedCommit {
   return {
     sha,
     title: "Record the ledger totals by month",
@@ -26,6 +28,7 @@ function commit(sha: string): NormalizedCommit {
     committerLogin: SARA,
     parents: ["p0"],
     paths: ["src/ledger.ts"],
+    ...overrides,
   };
 }
 
@@ -60,6 +63,9 @@ const QUIET = mergeWithDefaults({
 });
 /** Quiet, except that any new commit at all is a batch: a charge exactly when new work arrives. */
 const ANY_NEW_WORK = mergeWithDefaults({ ...QUIET, batch_dump: { enabled: true, threshold: 0 } });
+/** Quiet, except for the shipped lazy-message rule: a charge on what a commit holds. */
+const LAZY = mergeWithDefaults({ ...QUIET, lazy_message: { enabled: true } });
+const DIRECT = mergeWithDefaults({ ...QUIET, direct_push: { enabled: true } });
 
 const lines = (count: number): Reading => ({
   lines: count,
@@ -124,25 +130,67 @@ test("a push with no commits is read but not judged, unless it deletes the branc
   assert.deepEqual(admitPush({ repository: front, push: push([commit("c1")]) }), { read: true, judged: true });
 });
 
-test("the rules' charges come before the checks', and one login answers for all of them", () => {
-  const judgement = judge({ rules: ANY_NEW_WORK, checks: ledger(190, 210) });
+test("the pusher answers for what the push did, the author for what the commit holds", () => {
+  // Omar pushed Sara's commit: the batch is his act, the crossing her work.
+  const judgement = judge({ push: push([commit("c1")], { actorLogin: OMAR }), rules: ANY_NEW_WORK, checks: ledger(190, 210) });
 
   assert.deepEqual(
-    judgement.violations.map((hit) => hit.ruleId),
-    ["batch_dump", "file_lines"],
+    judgement.violations.map((hit) => `${hit.ruleId}@${hit.login}`),
+    ["batch_dump@omar", "file_lines@sara"],
   );
-  assert.equal(judgement.login, SARA);
+  assert.equal(judgement.pusher, OMAR);
   assert.deepEqual([judgement.recorded, judgement.withheld], [true, null]);
 });
 
-test("a file brought back under its limit is credited, not charged", () => {
-  const judgement = judge({ checks: ledger(210, 190) });
+test("a file brought back under its limit is credited to whoever's work did it", () => {
+  const judgement = judge({ push: push([commit("c1")], { actorLogin: OMAR }), checks: ledger(210, 190) });
 
   assert.deepEqual(judgement.violations, []);
   assert.deepEqual(
-    judgement.commendations.map((entry) => entry.ruleId),
-    ["file_lines"],
+    judgement.commendations.map((entry) => `${entry.ruleId}@${entry.login}`),
+    ["file_lines@sara"],
   );
+});
+
+test("a commit is judged for what it holds once, when it first arrives", () => {
+  const wip = commit("c1", { title: "wip" });
+
+  assert.deepEqual(judge({ push: push([wip], { actorLogin: OMAR }), rules: LAZY }).violations.map((hit) => hit.login), [SARA]);
+  assert.deepEqual(judge({ push: push([wip]), rules: LAZY, knownShas: new Set(["c1"]) }).violations, []);
+});
+
+test("work pushed elsewhere first is not this push's size, and is still judged for what it holds", () => {
+  const elsewhere = commit("c1", { title: "wip", distinct: false });
+  const judgement = judge({ push: push([elsewhere], { actorLogin: OMAR }), rules: mergeWithDefaults({ ...ANY_NEW_WORK, lazy_message: { enabled: true } }) });
+
+  assert.deepEqual(judgement.violations.map((hit) => `${hit.ruleId}@${hit.login}`), ["lazy_message@sara"]);
+});
+
+test("each author answers for their own commits in a push that holds several", () => {
+  const judgement = judge({
+    push: push([commit("c1", { title: "wip" }), commit("c2", { title: "temp", authorLogin: "lina" })]),
+    rules: LAZY,
+  });
+
+  assert.deepEqual(judgement.violations.map((hit) => hit.login).sort(), ["lina", SARA]);
+});
+
+test("a finding the evidence names nobody for is charged to nobody", () => {
+  // An author address GitHub ties to no account; a recovered push, whose pusher git never recorded.
+  const unlinked = judge({ push: push([commit("c1", { title: "wip", authorLogin: "" })]), rules: LAZY });
+  const recovered = judge({ push: push([commit("c1")], { recovered: true }), rules: DIRECT });
+
+  for (const judgement of [unlinked, recovered]) assert.deepEqual(judgement.violations, []);
+  assert.deepEqual(unlinked.unattributed.map((entry) => entry.ruleId), ["lazy_message"]);
+  assert.deepEqual(recovered.unattributed.map((entry) => entry.ruleId), ["direct_push"]);
+  assert.equal(recovered.pusher, null);
+});
+
+test("a file two people changed in one push is charged to neither", () => {
+  const judgement = judge({ push: push([commit("c1"), commit("c2", { authorLogin: "lina" })]), checks: ledger(190, 210) });
+
+  assert.deepEqual(judgement.violations, [], "which of them crossed it would take a measurement per commit");
+  assert.deepEqual(judgement.unattributed.map((entry) => entry.ruleId), ["file_lines"]);
 });
 
 test("work already on record weighs nothing, and its crossings are not judged again", () => {
