@@ -31,7 +31,10 @@ deliver`. Nothing in the first waits on the second.
    recursive listing per push — a single request whatever the project's size — written
    differentially. Measurements live in `blob_metrics` keyed by **content hash, not path**, so a
    rename or a revert costs nothing. `tree_files.first_seen_at` is the anchor a check's baseline
-   is drawn from, which is why a moved file is `update`d and never replaced.
+   is drawn from, which is why a moved file is `update`d and never replaced. The snapshot is the
+   project's *state* — the panel, the digest and the notes read it — and never the evidence a
+   check charges on: that is the push's own two trees
+   ([domain/judgement/changes.ts](../../apps/api/src/domain/judgement/changes.ts)).
 7. **[reconciler.ts](../../apps/api/src/queue/reconciler.ts) pulls what push missed.** Nothing
    guarantees the host was awake, and GitHub gives up after a few retries. It asks the GitHub App
    for commits newer than the last on record and replays the gap through the same pipeline. The

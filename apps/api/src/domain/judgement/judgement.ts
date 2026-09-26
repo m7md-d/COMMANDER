@@ -15,12 +15,16 @@
 import {
   branchIsWatched,
   weighPush,
+  type CheckConfigMap,
   type Commendation,
   type NormalizedPush,
+  type PushWeight,
   type Repository,
   type RuleConfigMap,
   type ViolationHit,
 } from "@commander/shared";
+import { judgeFile, type CheckOutcome, type Reading } from "@/domain/checks/judge.js";
+import type { TouchedFile } from "@/domain/tree/diff.js";
 import { evaluateRules, type RuleErrorReporter } from "@/domain/violations/engine.js";
 
 /**
@@ -46,6 +50,15 @@ export function admitPush(input: {
   return { read: true, judged: true };
 }
 
+/** What the checks have to go on: the push's own changes (`changes.ts`), and their measurements. */
+export interface ChecksFacts {
+  config: CheckConfigMap;
+  /** Every file the push changed between its base and head, with the blob it replaced. */
+  changes: TouchedFile[];
+  /** Measurements by blob hash — both sides of every change, where they could be taken. */
+  readings: ReadonlyMap<string, Reading>;
+}
+
 export interface PushFacts {
   /** The push as enrichment left it. */
   push: NormalizedPush;
@@ -53,8 +66,7 @@ export interface PushFacts {
   knownShas: ReadonlySet<string>;
   rules: RuleConfigMap;
   timezoneOffset: number;
-  /** What the checks measured on the files the push touched. */
-  checks: { violations: ViolationHit[]; commendations: Commendation[] };
+  checks: ChecksFacts;
   silentWhenClean: boolean;
   /** Whether there is a channel to send to at all. */
   hasChannel: boolean;
@@ -79,17 +91,38 @@ export type Judgement = {
 export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Judgement {
   const { push } = facts;
   const weight = weighPush({ push, knownShas: facts.knownShas });
+  const checked = judgeChanges(facts.checks, weight);
   const found = {
     violations: [
       ...evaluateRules({ push, timezoneOffset: facts.timezoneOffset, weight }, facts.rules, onRuleError),
-      ...facts.checks.violations,
+      ...checked.violations,
     ],
-    commendations: facts.checks.commendations,
+    commendations: checked.commendations,
     login: push.actorLogin,
   };
 
   const withheld = withholding(facts, found.violations.length + found.commendations.length);
   return withheld === null ? { ...found, recorded: true, withheld } : { ...found, recorded: false, withheld };
+}
+
+/**
+ * The checks, on new work only. A file only carried by commits already on
+ * record was judged when they arrived, and judging it again charges the same
+ * crossing twice — the second time to whoever merged. Without the weight, new
+ * work cannot be told from carried work, and nothing is judged.
+ */
+function judgeChanges(checks: ChecksFacts, weight: PushWeight): CheckOutcome {
+  const outcome: CheckOutcome = { violations: [], commendations: [] };
+  if (!weight.measured) return outcome;
+
+  const fresh = new Set(weight.paths);
+  for (const file of checks.changes) {
+    if (!fresh.has(file.path)) continue;
+    const judged = judgeFile(checks.config, file, checks.readings);
+    outcome.violations.push(...judged.violations);
+    outcome.commendations.push(...judged.commendations);
+  }
+  return outcome;
 }
 
 function withholding(facts: PushFacts, findings: number): Withheld | null {

@@ -6,7 +6,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { diffTree, type StoredFile } from "./diff.js";
+import { diffListings, diffTree, type StoredFile } from "./diff.js";
 
 const STORED: StoredFile[] = [
   { path: "src/app.ts", blobSha: "a1" },
@@ -114,4 +114,14 @@ test("touched carries what was at each path before, and nothing that was untouch
     { path: "src/new.ts", sha: "c1", previousSha: null },
     { path: "src/app.ts", sha: "a2", previousSha: "a1" },
   ]);
+});
+
+test("two listings diff exactly as a stored snapshot and a fresh one do", () => {
+  const before = STORED.map((row) => ({ path: row.path, sha: row.blobSha }));
+  const after = listing([
+    ["src/app.ts", "a2"],
+    ["src/new.ts", "c1"],
+  ]);
+
+  assert.deepEqual(diffListings(before, after), diffTree(STORED, after));
 });

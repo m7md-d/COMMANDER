@@ -43,6 +43,26 @@ export async function listCommits(input: {
   return { ok: true, data: result.data.map(toCommitListEntry) };
 }
 
+interface RawCommitObject {
+  tree?: { sha?: string };
+}
+
+/**
+ * The tree a commit points at, by `GET /git/commits/{sha}`. The trees endpoint
+ * documents a tree sha or a ref name; a commit sha is not in that list, so it is
+ * resolved here first rather than trusted to work.
+ */
+export async function fetchCommitTree(
+  installationId: string,
+  repoFullName: string,
+  commitSha: string,
+): Promise<Result<string>> {
+  const result = await request<RawCommitObject>(installationId, `/repos/${repoFullName}/git/commits/${commitSha}`);
+  if (!result.ok) return result;
+  const tree = result.data.tree?.sha;
+  return tree ? { ok: true, data: tree } : { ok: false, error: "no_tree", notFound: false };
+}
+
 interface RawTree {
   sha: string;
   truncated?: boolean;

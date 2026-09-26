@@ -1,66 +1,59 @@
 /**
- * Judging what a push did to the files it touched.
+ * The measurements behind the checks, kept up to date. Two jobs, and neither
+ * decides anything.
  *
- * The measurement is content-addressed and the judgement is pure; this file only
- * joins them — it reads the two readings a path had, asks the domain what that
- * means, and hands back entries in exactly the shape the rule engine produces.
- * Downstream, a crossing is a violation like any other: same ledger, same repeat
- * bands, same dossier.
- *
- * Both directions leave here. `judgeCheck` has always returned `improved` for a
- * limit crossed back the right way, and for a while this file dropped it on the
- * floor — which made the subsystem a one-way ratchet that could only ever find
- * fault, while the panel's own manual told operators that improvement is praised.
+ * For the stored snapshot — the project's state, which the panel and the digest
+ * read — it measures what the snapshot moved and anchors each path's baseline.
+ * For a push, it measures both sides of what the push changed and hands the
+ * readings back for `judgePush` to judge. The judgement itself is pure
+ * (`domain/checks/judge.ts`) and never reads the snapshot: the snapshot follows
+ * one branch, and judging its movements charged pushes with other branches'
+ * work.
  *
  * Fail-safe throughout. A file whose *before* was never measured cannot be shown
- * to have crossed anything, so it is not charged to anyone — the baseline is
- * recorded and the matter is closed. Charging on a guess is the one outcome this
- * subsystem must never produce.
+ * to have crossed anything, so it is not charged to anyone. Charging on a guess
+ * is the one outcome this subsystem must never produce.
  */
 
 import type { TouchedFile } from "@/domain/tree/diff.js";
+import { wanted, type Reading } from "@/domain/checks/judge.js";
 import { prisma } from "@/db/prisma.js";
-import { createLogger } from "@/core/logger/logger.js";
 import { MEASURE_BATCH_PUSH } from "@/config/constants.js";
-import { measureBlobs, wanted, type MeasureTarget } from "./checks.measure.js";
-import { judgeFile, type CheckOutcome, type Reading } from "./checks.judge.js";
+import { measureBlobs, measureListed, type MeasureTarget } from "./checks.measure.js";
 
-export type { CheckOutcome } from "./checks.judge.js";
-
-const log = createLogger("checks");
-
-export async function evaluateChecks(
-  target: MeasureTarget,
-  touched: TouchedFile[],
-): Promise<CheckOutcome> {
+/** What the snapshot moved: measured, and each path's baseline anchored the first time it can be. */
+export async function measureSnapshot(target: MeasureTarget, touched: TouchedFile[]): Promise<void> {
   const relevant = touched.filter((file) => wanted(target.checks, file.path));
-  if (relevant.length === 0) return { violations: [], commendations: [] };
+  if (relevant.length === 0) return;
 
   const paths = relevant.map((file) => file.path);
-  // Measure what this push brought in before reading anything: the "after" value
-  // of a file nobody has counted yet does not exist until now.
+  // Measure what the snapshot brought in before reading anything: the value of
+  // a file nobody has counted yet does not exist until now.
   await measureBlobs(target, paths, MEASURE_BATCH_PUSH);
 
   const readings = await readMeasurements(relevant);
   const baselines = await readBaselines(target.repositoryId, paths);
-
-  const outcome: CheckOutcome = { violations: [], commendations: [] };
   for (const file of relevant) {
-    const judged = judgeFile(target, file, readings);
-    outcome.violations.push(...judged.violations);
-    outcome.commendations.push(...judged.commendations);
     await anchorBaseline({ repositoryId: target.repositoryId, file, readings, baselines });
   }
-
-  if (outcome.violations.length > 0 || outcome.commendations.length > 0) {
-    log.info("checks judged", {
-      repositoryId: target.repositoryId,
-      crossed: outcome.violations.length,
-      improved: outcome.commendations.length,
-    });
-  }
-  return outcome;
 }
+
+/**
+ * Both sides of what a push changed, measured by content — a blob on a work
+ * branch is as measurable as one on main — and read back by hash.
+ */
+export async function measureChanges(
+  target: MeasureTarget,
+  input: { changes: TouchedFile[]; bytes: ReadonlyMap<string, number> },
+): Promise<Map<string, Reading>> {
+  const blobs = input.changes.flatMap((file) =>
+    sides(file).map((sha) => ({ path: file.path, sha, bytes: input.bytes.get(sha) ?? 0 })),
+  );
+  await measureListed(target, blobs, MEASURE_BATCH_PUSH);
+  return readMeasurements(input.changes);
+}
+
+const sides = (file: TouchedFile): string[] => (file.previousSha ? [file.sha, file.previousSha] : [file.sha]);
 
 /** Every blob involved, old and new, in one read. */
 async function readMeasurements(touched: TouchedFile[]): Promise<Map<string, Reading>> {

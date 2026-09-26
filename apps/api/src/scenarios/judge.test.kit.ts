@@ -12,17 +12,20 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { NormalizedPush, RuleConfigMap } from "@commander/shared";
+import { DEFAULT_CHECKS, type CheckConfigMap, type NormalizedPush, type RuleConfigMap } from "@commander/shared";
 import { RECONCILE_LOOKBACK_MS } from "@/config/constants.js";
-import { admitPush, judgePush } from "@/domain/judgement/judgement.js";
+import { wanted } from "@/domain/checks/judge.js";
+import { pushChanges, pushSpan } from "@/domain/judgement/changes.js";
+import { admitPush, judgePush, type ChecksFacts } from "@/domain/judgement/judgement.js";
 import { mergeWithDefaults } from "@/domain/violations/engine.js";
 import { toCommitDetail, toCommitListEntry } from "@/integrations/github/commit.mapper.js";
 import { isBranchRef, normalizePush } from "@/modules/webhook/push.mapper.js";
 import { enrichWith } from "@/queue/push.detail.js";
 import type { CommitListEntry } from "@/integrations/github/commits.client.js";
 import { branchesToReconcile, buildSyntheticPushes, type BranchRead } from "@/queue/reconciler.mapper.js";
+import { Contents } from "./contents.test.kit.js";
 import { GitHubView } from "./github.test.kit.js";
-import { REPOSITORY, Story, type PushEvent, type RemoteEvent } from "./story.test.kit.js";
+import { REPOSITORY, Story, type PushEvent, type ReconcileEvent, type RemoteEvent } from "./story.test.kit.js";
 
 export interface Front {
   /** Watched branches. Empty is every branch — the shipped default. */
@@ -30,6 +33,8 @@ export interface Front {
   /** Whether the GitHub App is installed, which every enrichment needs. */
   app: boolean;
   rules: RuleConfigMap;
+  /** The measurement limits: the shipped ones unless a scenario says otherwise. */
+  checks: CheckConfigMap;
 }
 
 /**
@@ -39,12 +44,10 @@ export interface Front {
  */
 export const SUITE_RULES: RuleConfigMap = mergeWithDefaults({ large_diff: { enabled: true, threshold: 40 } });
 
-const DEFAULT_FRONT: Front = { watch: [], app: true, rules: SUITE_RULES };
+const DEFAULT_FRONT: Front = { watch: [], app: true, rules: SUITE_RULES, checks: DEFAULT_CHECKS };
 const TIMEZONE_OFFSET = 3;
 /** reconciler.ts `computeSince` — the minute of overlap against clock skew. */
 const OVERLAP_MS = 60_000;
-/** The checks measure the stored tree, which the reference does not model. */
-const NO_CHECKS = { violations: [], commendations: [] };
 
 export type Outcome = "judged" | "ignored" | "unwatched" | "skipped" | "lost";
 
@@ -75,12 +78,16 @@ export interface Scenario {
   defect?: { observed: Verdict; because: string };
 }
 
+/** Every branch's head by name, as GitHub held them at the event being handled. */
+type Heads = ReadonlyMap<string, string>;
+
 interface Run {
   story: Story;
   view: GitHubView;
   front: Front;
   /** commit_records: sha → committedAt (ms), as `recordCommits` would write it. */
   known: Map<string, number>;
+  contents: Contents;
 }
 
 /** Plays a scenario on a fresh repository and returns its last verdict, with the trail. */
@@ -90,7 +97,8 @@ export async function play(scenario: Scenario): Promise<{ verdict: Verdict; trai
     await scenario.story(story);
     if (story.events.length === 0) throw new Error(`${scenario.id}: the story emits no event`);
 
-    const run: Run = { story, view: new GitHubView(story.git), front: { ...DEFAULT_FRONT, ...scenario.front }, known: new Map() };
+    const front = { ...DEFAULT_FRONT, ...scenario.front };
+    const run: Run = { story, view: new GitHubView(story.git), front, known: new Map(), contents: new Contents(story.git) };
     const trail: string[] = [];
     let verdict = CLEAN;
     for (const event of story.events) {
@@ -104,7 +112,7 @@ export async function play(scenario: Scenario): Promise<{ verdict: Verdict; trai
 }
 
 function judge(run: Run, event: RemoteEvent): Promise<Verdict> {
-  if (event.kind === "reconcile") return reconcile(run);
+  if (event.kind === "reconcile") return reconcile(run, event);
   if (event.lost) return Promise.resolve(LOST);
   return receive(run, event);
 }
@@ -135,7 +143,7 @@ async function handle(run: Run, received: NormalizedPush): Promise<Verdict> {
     knownShas: new Set(run.known.keys()),
     rules: run.front.rules,
     timezoneOffset: TIMEZONE_OFFSET,
-    checks: NO_CHECKS,
+    checks: await readChanges(run, push),
     silentWhenClean: false,
     hasChannel: true,
   };
@@ -160,15 +168,15 @@ function remember(known: Map<string, number>, push: NormalizedPush): void {
  * reconciler.ts `reconcileRepo`, from the branch list to the synthetic pushes —
  * which it queues, so each is handled exactly as a live push is.
  */
-async function reconcile(run: Run): Promise<Verdict> {
-  const existing = [...run.story.remote.keys()];
+async function reconcile(run: Run, event: ReconcileEvent): Promise<Verdict> {
+  const existing = [...event.remote.keys()];
   const reads = branchesToReconcile({ watch: run.front.watch, existing, defaultBranch: "main" });
-  const since = cursor(run);
+  const since = cursor(run, event.clock);
   const charges: string[] = [];
 
   for (const read of reads) {
     // reconcileBranch — drop what is on record.
-    const fresh = (await missed(run, read, since)).filter((entry) => !run.known.has(entry.sha));
+    const fresh = (await missed(run, { read, since, remote: event.remote })).filter((entry) => !run.known.has(entry.sha));
     for (const push of buildSyntheticPushes({ fullName: REPOSITORY }, read.branch, fresh)) {
       charges.push(...(await handle(run, push)).charges);
     }
@@ -177,20 +185,37 @@ async function reconcile(run: Run): Promise<Verdict> {
 }
 
 /** reconciler.read.ts `readMissed`, oldest first: the default branch by its history, any other beyond it. */
-async function missed(run: Run, read: BranchRead, since: number): Promise<CommitListEntry[]> {
-  const head = run.story.remote.get(read.branch);
+async function missed(run: Run, at: { read: BranchRead; since: number; remote: Heads }): Promise<CommitListEntry[]> {
+  const { read, since, remote } = at;
+  const head = remote.get(read.branch);
   if (!head) return [];
   if (read.beyond === null) return (await run.view.list(head, since)).map(toCommitListEntry).reverse();
 
-  const base = run.story.remote.get(read.beyond);
+  const base = remote.get(read.beyond);
   if (!base) return [];
   const { commits } = await run.view.compare(base, head);
   return commits.map(toCommitListEntry).filter((entry) => Date.parse(entry.timestamp) >= since);
 }
 
+/**
+ * delivery.checks.ts `readChanges`: the push's own tree before against after,
+ * both sides measured. The worker resolves each commit to its tree first; git
+ * reads a commit's tree directly, which is the same listing.
+ */
+async function readChanges(run: Run, push: NormalizedPush): Promise<ChecksFacts> {
+  const config = run.front.checks;
+  const span = run.front.app ? pushSpan(push) : null;
+  if (!span) return { config, changes: [], readings: new Map() };
+
+  const [before, after] = await Promise.all([run.contents.tree(span.base), run.contents.tree(span.head)]);
+  const changes = pushChanges({ before, after, push }).filter((file) => wanted(config, file.path));
+  const blobs = changes.flatMap((file) => [file, ...(file.previousSha ? [{ path: file.path, sha: file.previousSha }] : [])]);
+  return { config, changes, readings: await run.contents.measure(blobs) };
+}
+
 /** reconciler.ts `computeSince`. */
-function cursor(run: Run): number {
-  const floor = run.story.git.clock - RECONCILE_LOOKBACK_MS;
+function cursor(run: Run, now: number): number {
+  const floor = now - RECONCILE_LOOKBACK_MS;
   const newest = Math.max(floor, ...run.known.values());
   return Math.max(newest - OVERLAP_MS, floor);
 }

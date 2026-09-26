@@ -22,6 +22,8 @@ interface RawCommit {
 
 interface RawPushPayload {
   ref?: string;
+  before?: string;
+  after?: string;
   forced?: boolean;
   created?: boolean;
   deleted?: boolean;
@@ -61,6 +63,8 @@ export function normalizePush(payload: unknown): NormalizedPush {
     created: Boolean(raw.created),
     deleted: Boolean(raw.deleted),
     compareUrl: raw.compare ?? "",
+    ...(raw.before && { before: raw.before }),
+    ...(raw.after && { after: raw.after }),
     actorLogin: raw.sender?.login ?? raw.pusher?.name ?? "unknown",
     actorAvatarUrl: raw.sender?.avatar_url ?? "",
     commits: commits.map(mapCommit),

@@ -41,7 +41,7 @@ function context(weight: Partial<PushWeight>): RuleContext {
       truncated: false,
     },
     timezoneOffset: 3,
-    weight: { newCommits: 0, filesTouched: 0, residue: [], measured: true, ...weight },
+    weight: { newCommits: 0, filesTouched: 0, residue: [], paths: [], measured: true, ...weight },
   };
 }
 

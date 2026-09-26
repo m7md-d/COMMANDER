@@ -19,7 +19,7 @@ import { recordPush } from "@/modules/stats/stats.service.js";
 import { reviewPushCommits } from "@/modules/dossier/review.service.js";
 import { recordedShas } from "@/modules/dossier/dossier.ledger.js";
 import { composeReport, logRuleError } from "./report.pipeline.js";
-import { refreshTodos, refreshTree, runChecks } from "./delivery.checks.js";
+import { readChanges, refreshMeasurements, refreshTodos, refreshTree } from "./delivery.checks.js";
 import { writeLedger } from "./delivery.ledger.js";
 import { deliver } from "./delivery.dispatch.js";
 import { processDigest } from "./digest.processor.js";
@@ -85,10 +85,10 @@ async function run(job: PrismaDelivery, received: NormalizedPush): Promise<void>
   // Real file and line counts before either the rules or the report read them.
   const push = await enrichPush(repository, received);
   const knownShas = await recordedShas(repository.id, push);
-  // Rules read the push, checks read the tree — and from here down the charges
-  // are one list, so the tone, the embed and the dossier need to know about
-  // neither. What was earned travels separately; see runChecks.
-  const checks = await runChecks(repository, touched);
+  // The checks' evidence is what this push changed on its own branch. The
+  // snapshot is the project's state — measured and noted, charged to nobody.
+  const checks = await readChanges(repository, push);
+  await refreshMeasurements(repository, touched);
   // After the measurement, which is what fills in the notes it reads.
   await refreshTodos(repository.id, touched);
 

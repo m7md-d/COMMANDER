@@ -7,8 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_CHECKS, type CheckConfigMap } from "@commander/shared";
-import { judgeFile, type Reading } from "@/modules/checks/checks.judge.js";
-import type { MeasureTarget } from "@/modules/checks/checks.measure.js";
+import { judgeFile, readingOf, type Reading } from "./judge.js";
 
 const LIMIT = 200;
 
@@ -21,13 +20,6 @@ const checks: CheckConfigMap = {
   nesting_depth: { ...DEFAULT_CHECKS.nesting_depth, enabled: false },
   brace_depth: { ...DEFAULT_CHECKS.brace_depth, enabled: false },
   line_length: { ...DEFAULT_CHECKS.line_length, enabled: false },
-};
-
-const target: MeasureTarget = {
-  installationId: "1",
-  fullName: "unit/test",
-  repositoryId: "repo",
-  checks,
 };
 
 const reading = (lines: number | null): Reading => ({
@@ -44,7 +36,7 @@ function judge(before: number | null, after: number) {
   if (before !== null) readings.set("before", reading(before));
 
   return judgeFile(
-    target,
+    checks,
     { path: "src/a.ts", sha: "after", previousSha: before === null ? null : "before" },
     readings,
   );
@@ -103,7 +95,7 @@ test("a file created over the limit is charged, and claims no `before`", () => {
 test("a file that was never measured before is not charged on a guess", () => {
   const readings = new Map<string, Reading>([["after", reading(210)]]);
   const outcome = judgeFile(
-    target,
+    checks,
     { path: "src/a.ts", sha: "after", previousSha: "gone" },
     readings,
   );
@@ -118,7 +110,7 @@ test("an unmeasurable file produces neither charge nor credit", () => {
     ["before", reading(190)],
   ]);
   const outcome = judgeFile(
-    target,
+    checks,
     { path: "src/a.ts", sha: "after", previousSha: "before" },
     readings,
   );
@@ -128,10 +120,7 @@ test("an unmeasurable file produces neither charge nor credit", () => {
 });
 
 test("a disabled metric is silent in both directions", () => {
-  const off: MeasureTarget = {
-    ...target,
-    checks: { ...checks, file_lines: { ...checks.file_lines, enabled: false } },
-  };
+  const off: CheckConfigMap = { ...checks, file_lines: { ...checks.file_lines, enabled: false } };
   const readings = new Map<string, Reading>([
     ["after", reading(350)],
     ["before", reading(400)],
@@ -147,10 +136,7 @@ test("a disabled metric is silent in both directions", () => {
 });
 
 test("a path outside the metric's scope is not judged", () => {
-  const scoped: MeasureTarget = {
-    ...target,
-    checks: { ...checks, file_lines: { ...checks.file_lines, exclude: ["src/**"] } },
-  };
+  const scoped: CheckConfigMap = { ...checks, file_lines: { ...checks.file_lines, exclude: ["src/**"] } };
 
   const readings = new Map<string, Reading>([
     ["after", reading(210)],
@@ -163,4 +149,16 @@ test("a path outside the metric's scope is not judged", () => {
   );
 
   assert.equal(outcome.violations.length, 0);
+});
+
+test("a blob is read once for every metric, and the parser reads only what it knows", () => {
+  const source = "export function total(a: number) {\n  if (a > 1) {\n    return a;\n  }\n  return 0;\n}\n";
+
+  const typed = readingOf("src/total.ts", source);
+  assert.equal(typed.lines, 6);
+  assert.equal(typed.functionLines, 6, "the parser measures the function from its first line to its last");
+
+  const other = readingOf("src/total.py", source);
+  assert.equal(other.lines, 6, "every text is counted");
+  assert.equal(other.functionLines, null, "a language the parser does not read is not measured, not zero");
 });

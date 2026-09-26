@@ -84,6 +84,17 @@ test("a merge carrying a path no commit of its own touched is the smuggled line"
   assert.equal(weight.filesTouched, 1, "charged for what it added, not for what it carried");
 });
 
+test("the paths new work touched: a new commit's every path, a new merge's residue alone", () => {
+  const known = commit("c1", ["src/a.ts"]);
+  const fresh = commit("c2", ["src/b.ts", "src/c.ts"]);
+  const merge = commit("m", ["src/a.ts", "src/b.ts", "src/c.ts", "src/auth.ts"], ["p0", "c2"]);
+
+  const weight = weighPush({ push: push([known, fresh, merge]), knownShas: new Set(["c1"]) });
+
+  assert.deepEqual([...weight.paths].sort(), ["src/auth.ts", "src/b.ts", "src/c.ts"]);
+  assert.ok(!weight.paths.includes("src/a.ts"), "a path only a recorded commit touched was judged when it arrived");
+});
+
 test("a truncated push is not weighed: the constituents it dropped are invisible", () => {
   const merge = commit("m", ["src/a.ts", "src/b.ts"], ["p0", "c2"]);
 

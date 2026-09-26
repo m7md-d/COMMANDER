@@ -62,6 +62,9 @@ export function applyDetail(commit: NormalizedCommit, detail: CommitDetail): Nor
     // branch it carries — see weighPush.
     parents: detail.parents,
     paths: touchedPaths(detail.files),
+    moves: detail.files.flatMap((file): [string, string][] =>
+      file.previousPath === undefined ? [] : [[file.previousPath, file.path]],
+    ),
   };
 }
 

@@ -34,6 +34,12 @@ export interface PushWeight {
   filesTouched: number;
   /** Paths a merge introduced that no commit it brings in introduced. */
   residue: string[];
+  /**
+   * Paths new work touched: every path of a new commit, and a new merge's
+   * residue. What the checks may judge — a file only carried by commits already
+   * on record was judged when they arrived. Empty when unmeasured.
+   */
+  paths: string[];
   /** True only when every commit carried the parents and paths to weigh it. */
   measured: boolean;
 }
@@ -89,6 +95,7 @@ export function weighPush(input: {
       newCommits: fresh.length,
       filesTouched: fresh.reduce((sum, commit) => sum + filesIn(commit), 0),
       residue: [],
+      paths: [],
       measured: false,
     };
   }
@@ -100,18 +107,23 @@ export function weighPush(input: {
   }
 
   const residue = new Set<string>();
+  const paths = new Set<string>();
   let filesTouched = 0;
 
   for (const commit of fresh) {
     if (!isMerge(commit)) {
       filesTouched += filesIn(commit);
+      (commit.paths ?? []).forEach((path) => paths.add(path));
       continue;
     }
     // The merge's own contribution, and nothing it merely transports.
     const own = (commit.paths ?? []).filter((path) => !carried.has(path));
-    own.forEach((path) => residue.add(path));
+    own.forEach((path) => {
+      residue.add(path);
+      paths.add(path);
+    });
     filesTouched += own.length;
   }
 
-  return { newCommits: fresh.length, filesTouched, residue: [...residue], measured: true };
+  return { newCommits: fresh.length, filesTouched, residue: [...residue], paths: [...paths], measured: true };
 }

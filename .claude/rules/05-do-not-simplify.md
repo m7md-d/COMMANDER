@@ -23,6 +23,16 @@ code.
   this the first mid-life repository drowns its team in charges for last year's code — the
   `direct_push` lesson again. **A file whose *before* was never measured is never charged:**
   accusation on a guess is the one output this subsystem must not produce.
+- **Checks judge what the push changed on its own branch, never the stored snapshot.**
+  `readChanges` lists the push's two trees (`pushSpan`, `pushChanges`) — four requests when the
+  snapshot is already in the database, which looks like waste. It is not: the snapshot follows
+  one branch and moves with whatever landed there, and judging its movements charged pushes with
+  other branches' work (measured in `apps/api/src/scenarios/checks.test.ts`). The snapshot is the
+  project's state and never evidence. And the checks judge **new work only** (`weight.paths`): a
+  file carried by commits already on record was judged when they arrived, and judging the merge
+  that carries it charges the same crossing twice, the second time to whoever merged.
+- **A moved file keeps the blob it had at its old path** (`pushChanges`). Read as created at the
+  new path, a file moved while already over its limit is a crossing charged to whoever moved it.
 - **The record is `ledger_events`, not `violation_events`, and every query names its `kind`.** A
   record that can only hold accusations produces a system that can only accuse, so `improved` is
   written as a `commendation` beside the charge — never netted against it, never in place of it.

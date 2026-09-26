@@ -35,6 +35,13 @@ export interface NormalizedCommit {
    * answer what a merge commit contains that the commits it brings in do not.
    */
   paths?: string[];
+  /**
+   * Files this commit moved, as [from, to], from GitHub's `previous_filename`.
+   * Undefined until enrichment. What lets a moved file keep its history: without
+   * it, a file moved while over a limit reads as created over it — a crossing
+   * charged to whoever moved it.
+   */
+  moves?: [from: string, to: string][];
 }
 
 export interface NormalizedPush {
@@ -46,6 +53,14 @@ export interface NormalizedPush {
   created: boolean;
   deleted: boolean;
   compareUrl: string;
+  /**
+   * The branch's head before and after the push, as GitHub sent them — all
+   * zeros for a branch created or deleted. Absent from a push the reconciler
+   * rebuilt, which has no event to read them from, and from rows queued before
+   * the fields existed. What the push changed is measured between these two.
+   */
+  before?: string;
+  after?: string;
   actorLogin: string;
   actorAvatarUrl: string;
   commits: NormalizedCommit[];

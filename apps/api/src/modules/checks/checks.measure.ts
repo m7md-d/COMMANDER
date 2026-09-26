@@ -12,19 +12,14 @@
  * rate-limit ban halfway through building a record nobody can tell is partial.
  */
 
-import {
-  CHECK_METRICS,
-  inScope,
-  measureContent,
-  readMarkers,
-  type CheckConfigMap,
-} from "@commander/shared";
-import { readSyntax } from "@/domain/checks/syntax.js";
+import { CHECK_METRICS, readMarkers, type CheckConfigMap } from "@commander/shared";
+import { readingOf, wanted } from "@/domain/checks/judge.js";
 import { prisma } from "@/db/prisma.js";
 import { toJson } from "@/core/json.js";
 import { createLogger } from "@/core/logger/logger.js";
 import { MEASURE_MAX_BYTES } from "@/config/constants.js";
 import { fetchBlob } from "@/integrations/github/github.client.js";
+import { recordBlobs } from "@/modules/tree/tree.write.js";
 
 const log = createLogger("checks");
 
@@ -57,13 +52,41 @@ export async function measureBlobs(
   paths: string[],
   limit: number,
 ): Promise<string[]> {
-  // The cheapest request is the one nobody makes: with every metric switched
-  // off there is nothing a blob's contents could be wanted for.
-  if (CHECK_METRICS.every((metric) => !target.checks[metric].enabled)) return [];
+  if (nothingEnabled(target)) return [];
+  return measurePending(target, await pendingBlobs(target, paths, limit));
+}
 
-  const pending = await pendingBlobs(target, paths, limit);
-  if (pending.length === 0) return [];
+/**
+ * Measures blobs named by their content rather than by the stored snapshot:
+ * both sides of what a push changed, on whatever branch it was pushed. Their
+ * rows are created first — a blob on a work branch was never in the snapshot —
+ * and only those still unmeasured are read, up to `limit`.
+ */
+export async function measureListed(
+  target: MeasureTarget,
+  blobs: { path: string; sha: string; bytes: number }[],
+  limit: number,
+): Promise<void> {
+  const eligible = blobs.filter((blob) => wanted(target.checks, blob.path));
+  if (nothingEnabled(target) || eligible.length === 0) return;
 
+  const bytes = new Map(eligible.map((blob) => [blob.sha, blob.bytes]));
+  await recordBlobs([...bytes].map(([sha, size]) => ({ sha, bytes: size })));
+
+  const rows = await prisma.blobMetric.findMany({
+    where: { sha: { in: [...bytes.keys()] }, bytes: { lte: MEASURE_MAX_BYTES }, OR: [{ lines: null }, { markersAt: null }] },
+    select: { sha: true },
+    take: limit,
+  });
+  const path = new Map(eligible.map((blob) => [blob.sha, blob.path]));
+  await measurePending(target, rows.map((row) => ({ sha: row.sha, path: path.get(row.sha) ?? "" })));
+}
+
+/** The cheapest request is the one nobody makes: with every metric off, no blob's bytes are wanted. */
+const nothingEnabled = (target: MeasureTarget): boolean =>
+  CHECK_METRICS.every((metric) => !target.checks[metric].enabled);
+
+async function measurePending(target: MeasureTarget, pending: Pending[]): Promise<string[]> {
   const measured: string[] = [];
   for (const blob of pending) {
     const content = await fetchBlob(target.installationId, target.fullName, blob.sha);
@@ -75,18 +98,12 @@ export async function measureBlobs(
     // One pass, every metric. Fetching the bytes is the expensive part, so the
     // fifth measurement costs no more than the first once the request is paid
     // for — including the parse, which is microseconds beside a round trip.
-    const reading = measureContent(content.data);
-    const syntax = readSyntax(blob.path, content.data);
     const now = new Date();
 
     await prisma.blobMetric.update({
       where: { sha: blob.sha },
       data: {
-        lines: reading.lines,
-        functionLines: syntax.functionLines,
-        nestingDepth: syntax.nestingDepth,
-        braceDepth: reading.braceDepth,
-        longestLine: reading.longestLine,
+        ...readingOf(blob.path, content.data),
         measuredAt: now,
         // Stamped separately from `measuredAt` so a blob measured before markers
         // existed is visibly *unscanned* rather than silently note-free — the
@@ -153,9 +170,4 @@ export async function scopedPaths(
   });
 
   return rows.map((row) => row.path).filter((path) => wanted(checks, path));
-}
-
-/** True when at least one enabled metric claims this path. */
-export function wanted(checks: CheckConfigMap, path: string): boolean {
-  return CHECK_METRICS.some((metric) => checks[metric].enabled && inScope(checks[metric], path));
 }

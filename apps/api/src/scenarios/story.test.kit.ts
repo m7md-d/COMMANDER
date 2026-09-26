@@ -29,11 +29,22 @@ export interface PushEvent {
   sender: Person;
   /** Every branch head GitHub held just before this push, this branch's included. */
   heads: string[];
+  /** Every branch by name, as it stood just after this push. The reference plays
+   *  the events once the story is over, so anything read while handling one must
+   *  be read from here — the story's own `remote` is where things ended up. */
+  remote: ReadonlyMap<string, string>;
   /** The webhook never arrived — the server was down. Only the reconciler can see it. */
   lost: boolean;
 }
 
-export type RemoteEvent = PushEvent | { kind: "reconcile" };
+export interface ReconcileEvent {
+  kind: "reconcile";
+  remote: ReadonlyMap<string, string>;
+  /** The story's clock when the pass ran: its "now". */
+  clock: number;
+}
+
+export type RemoteEvent = PushEvent | ReconcileEvent;
 
 export type MergeStyle = "merge" | "squash" | "rebase";
 
@@ -100,13 +111,14 @@ export class Story {
       after,
       sender: by,
       heads: [...this.remote.values()],
+      remote: new Map(this.remote),
       lost: false,
     });
   }
 
   /** The reconciler's periodic pass, which is the only thing that sees a lost push. */
   reconcile(): void {
-    this.events.push({ kind: "reconcile" });
+    this.events.push({ kind: "reconcile", remote: new Map(this.remote), clock: this.git.clock });
   }
 
   /** The green button, in each of its three styles, then the push GitHub sends. */
@@ -142,12 +154,17 @@ export class Story {
     await this.push(spec.on, spec.by, { lost: lost ?? false });
   }
 
-  private record(event: Omit<PushEvent, "kind" | "before" | "heads">, branch: string): void {
+  private record(event: Omit<PushEvent, "kind" | "before" | "heads" | "remote">, branch: string): void {
+    const remote = new Map(this.remote);
+    if (event.after === ZERO) remote.delete(branch);
+    else remote.set(branch, event.after);
+
     this.events.push({
       kind: "push",
       ...event,
       before: this.remote.get(branch) ?? ZERO,
       heads: [...this.remote.values()],
+      remote,
     });
   }
 }

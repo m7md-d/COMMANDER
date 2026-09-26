@@ -56,7 +56,7 @@ function push(commits: NormalizedCommit[]): NormalizedPush {
 
 /** This rule reads commits, not weight. Neutral so the two stay independent:
  *  a direct push is one whether or not the repository has seen it before. */
-const UNWEIGHED: PushWeight = { newCommits: 0, filesTouched: 0, residue: [], measured: false };
+const UNWEIGHED: PushWeight = { newCommits: 0, filesTouched: 0, residue: [], paths: [], measured: false };
 
 const evaluate = (commits: NormalizedCommit[]) =>
   directPushRule({ push: push(commits), timezoneOffset: 3, weight: UNWEIGHED }, ENABLED);

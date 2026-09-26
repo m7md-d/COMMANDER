@@ -67,3 +67,15 @@ export function diffTree<T extends TreeEntry>(stored: StoredFile[], entries: T[]
     })),
   };
 }
+
+/**
+ * Two listings of the same repository diffed as a stored snapshot and a fresh
+ * one are — for a push measured between its own two commits rather than
+ * against the snapshot.
+ */
+export function diffListings<T extends TreeEntry>(before: TreeEntry[], after: T[]): TreeChanges<T> {
+  return diffTree(
+    before.map((entry) => ({ path: entry.path, blobSha: entry.sha })),
+    after,
+  );
+}

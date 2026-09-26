@@ -6,9 +6,10 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Commendation, NormalizedCommit, NormalizedPush, ViolationHit } from "@commander/shared";
+import { DEFAULT_CHECKS, type NormalizedCommit, type NormalizedPush } from "@commander/shared";
+import type { Reading } from "@/domain/checks/judge.js";
 import { mergeWithDefaults, type RuleErrorReporter } from "@/domain/violations/engine.js";
-import { admitPush, judgePush, type PushFacts } from "./judgement.js";
+import { admitPush, judgePush, type ChecksFacts, type PushFacts } from "./judgement.js";
 
 const SARA = "sara";
 
@@ -60,8 +61,28 @@ const QUIET = mergeWithDefaults({
 /** Quiet, except that any new commit at all is a batch: a charge exactly when new work arrives. */
 const ANY_NEW_WORK = mergeWithDefaults({ ...QUIET, batch_dump: { enabled: true, threshold: 0 } });
 
-const CROSSING: ViolationHit = { ruleId: "file_lines", detail: { before: 190, after: 210, limit: 200 } };
-const IMPROVED: Commendation = { ruleId: "file_lines", detail: { before: 210, after: 190, limit: 200 } };
+const lines = (count: number): Reading => ({
+  lines: count,
+  functionLines: null,
+  nestingDepth: null,
+  braceDepth: null,
+  longestLine: null,
+});
+
+/** The push took `src/ledger.ts` from `before` lines to `after` — the path commit c1 touched. */
+function ledger(before: number, after: number): ChecksFacts {
+  const [from, to] = [`ledger@${before}`, `ledger@${after}`];
+  return {
+    config: DEFAULT_CHECKS,
+    changes: [{ path: "src/ledger.ts", sha: to, previousSha: from }],
+    readings: new Map([
+      [from, lines(before)],
+      [to, lines(after)],
+    ]),
+  };
+}
+
+const NO_CHANGES: ChecksFacts = { config: DEFAULT_CHECKS, changes: [], readings: new Map() };
 
 const failOnRuleError: RuleErrorReporter = (ruleId) => {
   throw new Error(`rule ${ruleId} threw`);
@@ -73,7 +94,7 @@ function facts(overrides: Partial<PushFacts> = {}): PushFacts {
     knownShas: new Set(),
     rules: QUIET,
     timezoneOffset: 3,
-    checks: { violations: [], commendations: [] },
+    checks: NO_CHANGES,
     silentWhenClean: false,
     hasChannel: true,
     ...overrides,
@@ -104,19 +125,45 @@ test("a push with no commits is read but not judged, unless it deletes the branc
 });
 
 test("the rules' charges come before the checks', and one login answers for all of them", () => {
-  const judgement = judge({ rules: ANY_NEW_WORK, checks: { violations: [CROSSING], commendations: [IMPROVED] } });
+  const judgement = judge({ rules: ANY_NEW_WORK, checks: ledger(190, 210) });
 
   assert.deepEqual(
     judgement.violations.map((hit) => hit.ruleId),
     ["batch_dump", "file_lines"],
   );
-  assert.deepEqual(judgement.commendations, [IMPROVED]);
   assert.equal(judgement.login, SARA);
   assert.deepEqual([judgement.recorded, judgement.withheld], [true, null]);
 });
 
-test("work already on record weighs nothing", () => {
-  assert.deepEqual(judge({ rules: ANY_NEW_WORK, knownShas: new Set(["c1"]) }).violations, []);
+test("a file brought back under its limit is credited, not charged", () => {
+  const judgement = judge({ checks: ledger(210, 190) });
+
+  assert.deepEqual(judgement.violations, []);
+  assert.deepEqual(
+    judgement.commendations.map((entry) => entry.ruleId),
+    ["file_lines"],
+  );
+});
+
+test("work already on record weighs nothing, and its crossings are not judged again", () => {
+  const judgement = judge({ rules: ANY_NEW_WORK, knownShas: new Set(["c1"]), checks: ledger(190, 210) });
+
+  assert.deepEqual(judgement.violations, [], "c1 was judged when it arrived — here it is only carried");
+});
+
+test("a change new work did not touch is not judged", () => {
+  const elsewhere: ChecksFacts = {
+    ...ledger(190, 210),
+    changes: [{ path: "src/report.ts", sha: "ledger@210", previousSha: "ledger@190" }],
+  };
+
+  assert.deepEqual(judge({ checks: elsewhere }).violations, [], "no commit of this push touched src/report.ts");
+});
+
+test("a push that cannot be weighed has nothing judged by the checks", () => {
+  const unweighed = push([{ ...commit("c1"), paths: undefined }]);
+
+  assert.deepEqual(judge({ push: unweighed, checks: ledger(190, 210) }).violations, []);
 });
 
 test("a silent front withholds a push that found nothing, and records none of it", () => {
@@ -126,7 +173,7 @@ test("a silent front withholds a push that found nothing, and records none of it
 });
 
 test("a commendation alone breaks the silence", () => {
-  const judgement = judge({ silentWhenClean: true, checks: { violations: [], commendations: [IMPROVED] } });
+  const judgement = judge({ silentWhenClean: true, checks: ledger(210, 190) });
 
   assert.deepEqual([judgement.recorded, judgement.withheld], [true, null]);
 });

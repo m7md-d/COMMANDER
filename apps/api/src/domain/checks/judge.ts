@@ -1,10 +1,10 @@
 /**
  * Reading a measurement and deciding what it means.
  *
- * Separated from the service because these are two different kinds of code: the
- * service talks to the database and the measurement fetcher, this only compares
- * numbers. Keeping it apart is what lets the metric-to-column map and the
- * verdict split be read in one screen, and it is the half most likely to be
+ * Pure — it only compares numbers — and in the domain so the decision about a
+ * push (`judgePush`) and the scenario reference can both call it with no
+ * database in reach. Kept in one file so the metric-to-column map and the
+ * verdict split can be read in one screen: it is the half most likely to be
  * wrong in a way tests can catch.
  */
 
@@ -12,13 +12,15 @@ import {
   CHECK_METRICS,
   inScope,
   judgeCheck,
+  measureContent,
+  type CheckConfigMap,
   type CheckMetric,
   type Commendation,
   type RuleDetail,
   type ViolationHit,
 } from "@commander/shared";
 import type { TouchedFile } from "@/domain/tree/diff.js";
-import type { MeasureTarget } from "./checks.measure.js";
+import { readSyntax } from "./syntax.js";
 
 /**
  * What one push did to the files it touched, in both directions.
@@ -42,6 +44,28 @@ export interface Reading {
 }
 
 /**
+ * Every measurement of one blob, from one pass over its content. The worker
+ * stores this against the blob's hash; the scenario reference reads it straight
+ * from git — the same numbers either way.
+ */
+export function readingOf(path: string, content: string): Reading {
+  const counted = measureContent(content);
+  const syntax = readSyntax(path, content);
+  return {
+    lines: counted.lines,
+    functionLines: syntax.functionLines,
+    nestingDepth: syntax.nestingDepth,
+    braceDepth: counted.braceDepth,
+    longestLine: counted.longestLine,
+  };
+}
+
+/** True when at least one enabled metric claims this path — the only paths worth a blob's bytes. */
+export function wanted(checks: CheckConfigMap, path: string): boolean {
+  return CHECK_METRICS.some((metric) => checks[metric].enabled && inScope(checks[metric], path));
+}
+
+/**
  * Which column answers which metric.
  *
  * Written out rather than derived from the name: a metric and its column are two
@@ -58,13 +82,17 @@ const READ: Record<CheckMetric, (reading: Reading) => number | null> = {
 };
 
 /** Every enabled metric that claims this path, judged on its own numbers. */
-export function judgeFile(target: MeasureTarget, file: TouchedFile, readings: Map<string, Reading>) {
+export function judgeFile(
+  checks: CheckConfigMap,
+  file: TouchedFile,
+  readings: ReadonlyMap<string, Reading>,
+): CheckOutcome {
   const after = readings.get(file.sha);
   const previous = file.previousSha === null ? null : readings.get(file.previousSha);
   const outcome: CheckOutcome = { violations: [], commendations: [] };
 
   for (const metric of CHECK_METRICS) {
-    const config = target.checks[metric];
+    const config = checks[metric];
     if (!config.enabled || !inScope(config, file.path)) continue;
 
     const now = after ? READ[metric](after) : null;

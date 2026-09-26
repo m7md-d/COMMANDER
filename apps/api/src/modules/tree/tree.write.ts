@@ -34,7 +34,7 @@ function chunk<T>(items: T[], size: number): T[][] {
  */
 export async function writeMetrics(
   tx: Prisma.TransactionClient,
-  entries: RepoTreeEntry[],
+  entries: Pick<RepoTreeEntry, "sha" | "bytes">[],
 ): Promise<void> {
   const unique = new Map(entries.map((entry) => [entry.sha, entry.bytes]));
   const rows = [...unique].map(([sha, bytes]) => ({ sha, bytes }));
@@ -80,4 +80,14 @@ export function stampRepository(
     where: { id: repositoryId },
     data: { treeSha: tree.sha, treeSyncedAt: new Date(), treeTruncated: tree.truncated },
   });
+}
+
+/**
+ * Records blobs seen outside the snapshot — both sides of what a push changed,
+ * on whatever branch — so the checks can measure them. Whether a metric row
+ * exists is this module's decision (CHECKS-ROADMAP §3); these rows carry no
+ * tree pointer, so no snapshot invariant is touched.
+ */
+export function recordBlobs(entries: Pick<RepoTreeEntry, "sha" | "bytes">[]): Promise<void> {
+  return writeMetrics(prisma, entries);
 }

@@ -9,7 +9,7 @@ import { test } from "node:test";
 import type { NormalizedCommit, NormalizedPush, PushWeight, RuleId } from "@commander/shared";
 import { evaluateRules, mergeWithDefaults } from "./engine.js";
 
-const UNWEIGHED: PushWeight = { newCommits: 0, filesTouched: 0, residue: [], measured: false };
+const UNWEIGHED: PushWeight = { newCommits: 0, filesTouched: 0, residue: [], paths: [], measured: false };
 
 /**
  * A forced deletion whose commits cannot be read. Every rule that reads the

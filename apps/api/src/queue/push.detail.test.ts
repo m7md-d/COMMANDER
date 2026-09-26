@@ -44,3 +44,15 @@ test("a path renamed away and written again in the same commit is listed once", 
 
   assert.deepEqual(paths, ["src/b.ts", "src/a.ts"]);
 });
+
+test("a rename is kept as a move, so a moved file can be followed to where it was", () => {
+  const applied = applyDetail(COMMIT, {
+    sha: "c1",
+    additions: 0,
+    deletions: 0,
+    parents: ["p0"],
+    files: [file("src/totals.ts", "renamed", "src/totals-legacy.ts"), file("src/ledger.ts", "modified")],
+  });
+
+  assert.deepEqual(applied.moves, [["src/totals-legacy.ts", "src/totals.ts"]]);
+});
