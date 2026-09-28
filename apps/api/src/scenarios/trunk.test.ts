@@ -10,9 +10,30 @@
 
 import { LINA, OMAR, SARA } from "./git.test.kit.js";
 import { charged, runCatalog, type Scenario } from "./judge.test.kit.js";
-import { modules, REPOSITORY, seed, work } from "./story.test.kit.js";
+import { modules, REPOSITORY, seed, work, type Story } from "./story.test.kit.js";
 
 const FEATURE = "feature/export";
+
+/** Sara edits the same 15 report modules in three commits, and pushes them to main. */
+async function threePasses(story: Story) {
+  await seed(story);
+  for (const round of [1, 2, 3]) {
+    const write = modules({ dir: "src/reports", count: 15, stamp: `round-${round}` });
+    await story.commit({ on: "main", by: SARA, title: `Tune the report layout, pass ${round}`, write });
+  }
+  await story.push("main", SARA);
+}
+
+/** Lina pushes 48 files to main; Sara, behind, commits — twice on two files by default — pulls with a merge, and pushes. */
+async function pulledThenPushed(story: Story, own = { commits: 2, width: 2 }) {
+  await seed(story);
+  await story.branch("sara-clone", "main");
+  await work(story, { on: "main", by: LINA, commits: 3, width: 20, dir: "src/reports" });
+  await story.push("main", LINA);
+  await work(story, { on: "sara-clone", by: SARA, ...own, dir: "src/export" });
+  await story.merge({ into: "sara-clone", from: "main", by: SARA, message: `Merge branch 'main' of github.com:${REPOSITORY}` });
+  await story.push("sara-clone", SARA, { to: "main" });
+}
 
 const scenarios: Scenario[] = [
   {
@@ -38,20 +59,8 @@ const scenarios: Scenario[] = [
   {
     id: "same-files-edited-three-times",
     title: "three commits editing the same 15 files, pushed to main",
-    story: async (story) => {
-      await seed(story);
-      for (const round of [1, 2, 3]) {
-        const write = modules({ dir: "src/reports", count: 15, stamp: `round-${round}` });
-        await story.commit({ on: "main", by: SARA, title: `Tune the report layout, pass ${round}`, write });
-      }
-      await story.push("main", SARA);
-    },
+    story: threePasses,
     expect: charged("direct_push@sara"),
-    defect: {
-      observed: charged("direct_push@sara", "large_diff@sara"),
-      because:
-        "weighPush sums files per commit, so 15 files edited three times count as 45 — while large_diff is defined as files touched. (0009 §6)",
-    },
   },
   {
     id: "commit-titled-merge",
@@ -101,21 +110,8 @@ const scenarios: Scenario[] = [
   {
     id: "git-pull-merge-then-push",
     title: "Sara pulls Lina's 48-file change with a merge, then pushes her two commits",
-    story: async (story) => {
-      await seed(story);
-      await story.branch("sara-clone", "main");
-      await work(story, { on: "main", by: LINA, commits: 3, width: 20, dir: "src/reports" });
-      await story.push("main", LINA);
-      await work(story, { on: "sara-clone", by: SARA, commits: 2, width: 2, dir: "src/export" });
-      await story.merge({ into: "sara-clone", from: "main", by: SARA, message: `Merge branch 'main' of github.com:${REPOSITORY}` });
-      await story.push("sara-clone", SARA, { to: "main" });
-    },
+    story: pulledThenPushed,
     expect: charged("direct_push@sara"),
-    defect: {
-      observed: charged("direct_push@sara", "large_diff@sara"),
-      because:
-        "The direct push is seen — a merge made on a laptop is one, whatever its title (0009 §2). The size is not: the pull merge's second parent is main's old head, outside the push, so weighPush refuses to weigh it and counts the merge at its whole first-parent diff — Lina's 48 files, brought in by the pull (weighPush's fallback for an unweighable push).",
-    },
   },
   {
     id: "foxtrot-merge",
@@ -128,11 +124,6 @@ const scenarios: Scenario[] = [
       await story.push(FEATURE, SARA, { to: "main" });
     },
     expect: charged("direct_push@sara"),
-    defect: {
-      observed: charged("direct_push@sara", "large_diff@sara"),
-      because:
-        "The pull merge's shape again: the direct push is seen, and the merge is counted at its whole first-parent diff — Lina's 48 files, main's work — because its second parent is outside the push (weighPush's fallback for an unweighable push).",
-    },
   },
   {
     id: "edited-in-the-browser",
@@ -189,6 +180,26 @@ const scenarios: Scenario[] = [
       await story.push("main", SARA);
     },
     expect: charged("direct_push@sara", "force_push@sara"),
+  },
+  {
+    id: "same-files-edited-three-times-without-the-app",
+    title: "three commits editing the same 15 files, pushed to main, on a front with no GitHub App",
+    front: { app: false },
+    story: threePasses,
+    expect: charged("direct_push@sara"),
+  },
+  {
+    id: "git-pull-merge-over-a-large-change",
+    title: "Sara commits 48 files of her own, pulls Lina's 48 with a merge, and pushes",
+    story: (story) => pulledThenPushed(story, { commits: 3, width: 20 }),
+    expect: charged("direct_push@sara", "large_diff@sara"),
+  },
+  {
+    id: "git-pull-merge-without-the-app",
+    title: "Sara pulls Lina's 48-file change with a merge and pushes, on a front with no GitHub App",
+    front: { app: false },
+    story: pulledThenPushed,
+    expect: charged("direct_push@sara"),
   },
 ];
 

@@ -9,6 +9,7 @@
 
 import {
   isCheckMetric,
+  readInPart,
   t,
   type Commendation,
   type LocaleId,
@@ -104,7 +105,8 @@ function commitLine(locale: LocaleId, commit: NormalizedCommit, quote: Quote): s
 export function buildCommitBlock(push: NormalizedPush, locale: LocaleId, quote: Quote): string {
   const lines = push.commits.map((commit) => commitLine(locale, commit, quote)).join("\n");
   if (!lines) return t(locale, "report.noViolations");
-  return push.truncated ? `${lines}\n${t(locale, "report.truncated")}` : lines;
+  const notes = [push.truncated && "report.truncated", readInPart(push) && "report.unmeasured"] as const;
+  return [lines, ...notes.filter((key) => key !== false).map((key) => t(locale, key))].join("\n");
 }
 
 export function buildViolationBlock(violations: ViolationHit[], locale: LocaleId, addressee: string): string {

@@ -5,8 +5,13 @@
 
 import type { NormalizedCommit, NormalizedPush } from "@commander/shared";
 
-/** GitHub caps the commits array at 20 entries per push payload. */
-const COMMIT_ARRAY_CAP = 20;
+/**
+ * GitHub caps a push webhook's commits array at 2,048 ("a maximum of 2048
+ * commits", push event docs). Twenty is the Events *timeline*'s cap, and read as
+ * this one it marked every push of twenty commits or more truncated — neither
+ * weighed nor measured (scenario `crossing-in-a-twenty-commit-push`).
+ */
+const COMMIT_ARRAY_CAP = 2048;
 
 interface RawCommit {
   id?: string;

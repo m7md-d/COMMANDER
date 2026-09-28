@@ -5,7 +5,7 @@
 
 import { createLogger } from "@/core/logger/logger.js";
 import { getInstallationToken } from "./app-auth.js";
-import { toCommitDetail, type RawCommit } from "./commit.mapper.js";
+import { COMMIT_FILES_CAP, COMMIT_FILES_PAGE, nextPage, toCommitDetail, type RawCommit } from "./commit.mapper.js";
 
 const log = createLogger("github");
 const API = "https://api.github.com";
@@ -30,6 +30,8 @@ export interface CommitDetail {
   /** Two or more means a merge, which is the only way to tell one apart
    *  reliably — a "Merge ..." title is a convention anybody can type or omit. */
   parents: string[];
+  /** False when the file listing reached GitHub's cap and may have stopped short. */
+  complete: boolean;
 }
 
 export interface RepoFile {
@@ -42,10 +44,16 @@ export type Result<T> = { ok: true; data: T } | { ok: false; error: string; notF
 
 /** The shared authenticated GET. Exported so sibling clients (commits.client)
  *  reuse the same token handling, timeout and 404-is-not-an-error contract. */
-export async function request<T>(
+export async function request<T>(installationId: string, path: string): Promise<Result<T>> {
+  const page = await requestPage<T>(installationId, path);
+  return page.ok ? { ok: true, data: page.data.data } : page;
+}
+
+/** The same GET, with the path of the next page when GitHub links one. */
+async function requestPage<T>(
   installationId: string,
   path: string,
-): Promise<Result<T>> {
+): Promise<Result<{ data: T; next: string | null }>> {
   const auth = await getInstallationToken(installationId);
   // The blocker travels as the error string rather than being flattened to
   // "no_installation_token": callers that only log it lose nothing, and the one
@@ -74,7 +82,7 @@ export async function request<T>(
       return { ok: false, error: `http_${response.status}`, notFound };
     }
 
-    return { ok: true, data: (await response.json()) as T };
+    return { ok: true, data: { data: (await response.json()) as T, next: nextPage(response.headers.get("link")) } };
   } catch (error) {
     return { ok: false, error: String(error), notFound: false };
   } finally {
@@ -91,9 +99,20 @@ export async function fetchCommitDetail(
   repoFullName: string,
   sha: string,
 ): Promise<Result<CommitDetail>> {
-  const result = await request<RawCommit>(installationId, `/repos/${repoFullName}/commits/${sha}`);
-  if (!result.ok) return result;
-  return { ok: true, data: toCommitDetail(result.data) };
+  const first = await requestPage<RawCommit>(installationId, `/repos/${repoFullName}/commits/${sha}`);
+  if (!first.ok) return first;
+
+  // Past 300 files the rest come in pages GitHub links, up to its cap. A page
+  // that fails fails the commit: a listing with a hole in it is not a listing.
+  const more: RawCommit[] = [];
+  let next = first.data.next;
+  while (next !== null && more.length < COMMIT_FILES_CAP / COMMIT_FILES_PAGE - 1) {
+    const page = await requestPage<RawCommit>(installationId, next);
+    if (!page.ok) return page;
+    more.push(page.data.data);
+    next = page.data.next;
+  }
+  return { ok: true, data: toCommitDetail(first.data.data, more) };
 }
 
 interface RawContent {

@@ -69,6 +69,25 @@ const BASE = {
   },
 };
 
+test("a push read only in part says it was not measured, and a whole one says nothing", () => {
+  const read = commit({ additions: 3, deletions: 0, paths: ["a.ts"], parents: ["p"] });
+  const commitsOf = (commits: NormalizedCommit[]) => String(buildPromptValues({ ...BASE, push: push(commits) }).commits);
+  const notice = "لم تُقَس هذه الدفعة";
+
+  // Twenty-five commits and details for twenty: nothing in it was judged, and silence must not read as clean.
+  assert.match(commitsOf([read, commit()]), new RegExp(notice));
+  assert.doesNotMatch(commitsOf([read, read]), new RegExp(notice));
+  assert.doesNotMatch(commitsOf([commit(), commit()]), new RegExp(notice), "no App at all is the setup's to say, not every report's");
+});
+
+test("a truncated push names GitHub's real cap, never the twenty it once claimed", () => {
+  const truncated = { ...push([commit()]), truncated: true };
+  const commits = String(buildPromptValues({ ...BASE, push: truncated }).commits);
+
+  assert.match(commits, /2048/);
+  assert.doesNotMatch(commits, /\b20\b/);
+});
+
 test("an enriched commit states its real line counts", () => {
   const values = buildPromptValues({
     ...BASE,

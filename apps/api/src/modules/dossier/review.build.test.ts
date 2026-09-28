@@ -22,7 +22,7 @@ function file(path: string, patch: string): CommitFileChange {
 }
 
 function detail(files: CommitFileChange[]): CommitDetail {
-  return { sha: "a".repeat(40), additions: 1, deletions: 0, files, parents: ["p0"] };
+  return { sha: "a".repeat(40), additions: 1, deletions: 0, files, parents: ["p0"], complete: true };
 }
 
 const promptFor = (files: CommitFileChange[]): string =>

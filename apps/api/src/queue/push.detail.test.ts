@@ -31,7 +31,17 @@ const file = (path: string, status: string, previousPath?: string): CommitFileCh
 });
 
 const pathsOf = (files: CommitFileChange[]) =>
-  applyDetail(COMMIT, { sha: "c1", additions: 1, deletions: 0, parents: ["p0"], files }).paths;
+  applyDetail(COMMIT, { sha: "c1", additions: 1, deletions: 0, parents: ["p0"], files, complete: true }).paths;
+
+test("a listing GitHub may have cut keeps its lines and parents, and gives no paths", () => {
+  // Paths missing from it would read as work nobody did, or as a merge's own.
+  const read = applyDetail(COMMIT, { sha: "c1", additions: 9, deletions: 2, parents: ["p0", "p1"], files: [file("src/a.ts", "added")], complete: false });
+
+  assert.equal(read.additions, 9);
+  assert.deepEqual(read.parents, ["p0", "p1"], "still a merge, whatever its files");
+  assert.equal(read.paths, undefined);
+  assert.equal(read.moves, undefined);
+});
 
 test("a rename touches the path it left as well as the one it made", () => {
   const paths = pathsOf([file("src/totals.ts", "renamed", "src/totals-legacy.ts")]);
@@ -52,6 +62,7 @@ test("a rename is kept as a move, so a moved file can be followed to where it wa
     deletions: 0,
     parents: ["p0"],
     files: [file("src/totals.ts", "renamed", "src/totals-legacy.ts"), file("src/ledger.ts", "modified")],
+    complete: true,
   });
 
   assert.deepEqual(applied.moves, [["src/totals-legacy.ts", "src/totals.ts"]]);

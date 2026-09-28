@@ -108,43 +108,38 @@ async function run(job: PrismaDelivery, received: NormalizedPush): Promise<void>
     },
     logRuleError,
   );
+  // Recorded whether or not it is sent: silence means "do not send", never
+  // "do not remember" (0009 §5).
+  const history = await record(job, { push, knownShas, repository, judgement });
   if (judgement.withheld !== null) return markSkipped(job.id, judgement.withheld);
 
-  await record(job, { push, knownShas, repository, settings, judgement, webhookUrl });
+  const { violations, commendations, event } = judgement;
+  const watcher = resolveWatcher(repository.watchers, push.branch);
+  await report(job, { push, event, repository, settings, violations, commendations, history, webhookUrl, watcher });
 }
 
 /**
- * Everything the push leaves behind, then the communiqué itself.
+ * Everything the push leaves behind — for every judged push, sent or not.
  *
  * Counters advance before generation so the report can cite a total that
  * includes the push being reported on.
  */
 async function record(
   job: PrismaDelivery,
-  ctx: {
-    push: NormalizedPush;
-    knownShas: ReadonlySet<string>;
-    repository: Repository;
-    settings: Settings;
-    judgement: Judgement;
-    webhookUrl: string;
-  },
-): Promise<void> {
-  const { push, repository, settings, judgement, webhookUrl } = ctx;
-  const { violations, commendations, event } = judgement;
+  ctx: { push: NormalizedPush; knownShas: ReadonlySet<string>; repository: Repository; judgement: Judgement },
+): Promise<Awaited<ReturnType<typeof recordPush>>> {
+  const { push, repository, judgement } = ctx;
 
   const history = await recordPush({
     repositoryId: repository.id,
     pusher: judgement.pusher,
     commits: newCommitsBy(push, ctx.knownShas),
-    violations,
+    violations: judgement.violations,
     addressee: push.actorLogin,
   });
 
   await writeLedger({ repositoryId: repository.id, push, judgement, deliveryId: job.id });
-
-  const watcher = resolveWatcher(repository.watchers, push.branch);
-  await report(job, { push, event, repository, settings, violations, commendations, history, webhookUrl, watcher });
+  return history;
 }
 
 /**

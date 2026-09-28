@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { GITHUB_UI_COMMITTER } from "@commander/shared";
+import { GITHUB_UI_COMMITTER, isTrunk } from "@commander/shared";
 import type { CommitListEntry } from "@/integrations/github/commits.client.js";
 import { branchesToReconcile, recoveredPush } from "@/queue/reconciler.mapper.js";
 
@@ -49,6 +49,19 @@ test("it names no pusher, and is addressed to the author of its newest commit", 
   assert.equal(push?.recovered, true, "git records who wrote and who committed, never who pushed");
   assert.equal(push?.actorLogin, "ahmad");
   assert.equal(recoveredPush(REPO, "main", [entry({ authorLogin: "" })])?.actorLogin, "unknown");
+});
+
+test("it carries the default branch, so what it holds on main is weighed as main-line work", () => {
+  const roleOf = (branch: string) => {
+    const push = recoveredPush(REPO, branch, [entry()]);
+    assert.equal(push?.defaultBranch, "main");
+    return isTrunk({ branch, defaultBranch: push?.defaultBranch, watchers: [] });
+  };
+
+  // Without it a charge on main recovered here was recorded as a work branch's,
+  // at half the weight of the same charge arriving by webhook (docs/DEFECTS.md D-17).
+  assert.equal(roleOf("main"), true);
+  assert.equal(roleOf("feature/export"), false);
 });
 
 test("a web-flow merge keeps its committer login, which the event is read from", () => {

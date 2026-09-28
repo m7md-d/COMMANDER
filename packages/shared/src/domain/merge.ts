@@ -38,8 +38,14 @@ import type { NormalizedCommit, NormalizedPush } from "./push.js";
 export interface PushWeight {
   /** Commits this push brought: pushed nowhere in the repository before, and not on record. */
   newCommits: number;
-  /** Files those commits touched; a merge contributes only its residue. */
-  filesTouched: number;
+  /**
+   * Files those commits touched, each once however many of them touched it; a
+   * merge contributes only its residue. Null when a brought commit came without
+   * its paths or parents — no App, or a detail call that failed or was not made:
+   * a merge cannot then be told from ordinary work, and its first-parent diff,
+   * someone else's work, would be counted as the pusher's.
+   */
+  filesTouched: number | null;
   /**
    * What each commit the record has not judged yet did on its own — every path
    * of a commit; of a merge, its residue: the paths it introduced that no
@@ -62,9 +68,6 @@ export function isMerge(commit: NormalizedCommit): boolean {
   return (commit.parents?.length ?? 0) >= 2;
 }
 
-const filesIn = (commit: NormalizedCommit): number =>
-  commit.filesAdded + commit.filesRemoved + commit.filesModified;
-
 /**
  * Can a residue be trusted at all?
  *
@@ -72,9 +75,10 @@ const filesIn = (commit: NormalizedCommit): number =>
  * introduced the entire branch on its own — the exact false accusation this is
  * here to prevent:
  *
- * - **A commit without paths.** It looks like it introduced nothing, so its
- *   files get attributed to the merge instead.
- * - **A truncated payload.** GitHub caps a push at 20 commits; the ones it
+ * - **A commit without paths or parents.** It looks like it introduced nothing,
+ *   so its files get attributed to the merge instead — or it is a merge nobody
+ *   can see.
+ * - **A truncated payload.** GitHub caps a push at 2,048 commits; the ones it
  *   dropped are constituents we would never see.
  * - **A merge whose branch is not in this push.** Its second parent identifies
  *   the branch head; if that sha is absent, the commits it stands for are absent
@@ -82,7 +86,7 @@ const filesIn = (commit: NormalizedCommit): number =>
  */
 function isWeighable(push: NormalizedPush): boolean {
   if (push.commits.length === 0 || push.truncated) return false;
-  if (!push.commits.every((commit) => commit.paths !== undefined)) return false;
+  if (push.commits.some(isUnread)) return false;
 
   const present = new Set(push.commits.map((commit) => commit.sha));
   return push.commits
@@ -105,28 +109,49 @@ export function weighPush(input: {
   // Undefined on a recovered push: the record is then the only answer there is.
   const brought = unjudged.filter((commit) => commit.distinct !== false);
 
-  if (!isWeighable(push)) {
-    return {
-      newCommits: brought.length,
-      filesTouched: brought.reduce((sum, commit) => sum + filesIn(commit), 0),
-      work: [],
-      measured: false,
-    };
-  }
+  const own = ownPaths(push);
+  const filesTouched = brought.some(isUnread) ? null : new Set(brought.flatMap(own)).size;
 
-  const carried = new Set<string>();
-  for (const commit of push.commits) {
-    if (isMerge(commit)) continue;
-    for (const path of commit.paths ?? []) carried.add(path);
-  }
-  // The merge's own contribution, and nothing it merely transports.
-  const own = (commit: NormalizedCommit): string[] =>
-    isMerge(commit) ? (commit.paths ?? []).filter((path) => !carried.has(path)) : commit.paths ?? [];
-
+  if (!isWeighable(push)) return { newCommits: brought.length, filesTouched, work: [], measured: false };
   return {
     newCommits: brought.length,
-    filesTouched: brought.reduce((sum, commit) => sum + (isMerge(commit) ? own(commit).length : filesIn(commit)), 0),
+    filesTouched,
     work: unjudged.map((commit) => ({ sha: commit.sha, paths: own(commit) })),
     measured: true,
+  };
+}
+
+/** A commit enrichment did not reach: its paths, and whether it is a merge, are unknown. */
+const isUnread = (commit: NormalizedCommit): boolean => commit.paths === undefined || commit.parents === undefined;
+
+/**
+ * Enrichment ran and did not reach every commit — the push was longer than it
+ * reads (`MAX_ENRICHED_COMMITS`), or a detail call failed. Nothing in it is then
+ * weighed or measured, and the communiqué says so: silence must not read as a
+ * clean push. A push nothing was read of is a front with no App, which the setup
+ * states once rather than every report.
+ */
+export function readInPart(push: NormalizedPush): boolean {
+  return push.commits.some(isUnread) && !push.commits.every(isUnread);
+}
+
+/**
+ * What each commit of a push did on its own: an ordinary commit, every path; a
+ * merge, only what none of the push's commits touched — its residue.
+ *
+ * A merge whose other side is outside the push — `git pull`, a foxtrot — joins
+ * history already on a branch. Its first-parent diff is that history, someone
+ * else's work, and what is its own cannot be told from paths alone: it adds
+ * nothing, so a count built on it can only be low (scenario
+ * `git-pull-merge-then-push`).
+ */
+function ownPaths(push: NormalizedPush): (commit: NormalizedCommit) => string[] {
+  const present = new Set(push.commits.map((commit) => commit.sha));
+  const carried = new Set(push.commits.filter((commit) => !isMerge(commit)).flatMap((commit) => commit.paths ?? []));
+
+  return (commit) => {
+    if (!isMerge(commit)) return commit.paths ?? [];
+    const joined = (commit.parents ?? []).slice(1).some((sha) => present.has(sha));
+    return joined ? (commit.paths ?? []).filter((path) => !carried.has(path)) : [];
   };
 }

@@ -107,12 +107,13 @@ export type Judgement = {
   event: { kind: PushKind; pull: number | null };
   /** Whether the push was on a main line (`isTrunk`): kept with every charge, which weighs double there. */
   mainLine: boolean;
-} & (
-  // Written to the record — commits, counters, ledger — and then reported.
-  | { recorded: true; withheld: null }
-  // Neither. Recording is still tied to sending here; 0009 §5 separates them.
-  | { recorded: false; withheld: Withheld }
-);
+  /**
+   * Why the communiqué is not sent — and only that. Every judged push is
+   * recorded, commits, counters and ledger alike, whatever this says:
+   * `silentWhenClean` means "do not send", not "do not remember" (0009 §5).
+   */
+  withheld: Withheld | null;
+};
 
 export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Judgement {
   const { push, pull } = facts;
@@ -135,8 +136,7 @@ export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Jud
     mainLine: trunk,
   };
 
-  const withheld = withholding(facts, judged.violations.length + judged.commendations.length);
-  return withheld === null ? { ...judged, recorded: true, withheld } : { ...judged, recorded: false, withheld };
+  return { ...judged, withheld: withholding(facts, judged.violations.length + judged.commendations.length) };
 }
 
 /**

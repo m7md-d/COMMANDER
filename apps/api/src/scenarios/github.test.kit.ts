@@ -13,7 +13,7 @@
  * | `distinct`              | not reachable from any head GitHub held before    | GitHub docs: "distinct from any that have been pushed before" |
  * | a merge's files         | its diff against the first parent                 | not documented; it is what produced the complaint b0be5de answers |
  * | a rename in the webhook | `removed` old path + `added` new path              | the webhook has no rename field |
- * | commit API `files`      | the first page — 300 — with `previous_filename`   | GitHub docs, "Get a commit" |
+ * | commit API `files`      | pages of 300, each named by the last one's `Link`, 3,000 in all; with `previous_filename` | GitHub docs, "Get a commit": past 300 files, "pagination link headers for the remaining files, up to a limit of 3000" |
  * | `timestamp`             | the author date                                   | assumption |
  * | list API `since`        | compared with the committer date                  | assumption |
  * | compare API `commits`   | the base..head set, oldest first, never cut        | GitHub docs, "Compare two commits": `git log BASE..HEAD`, chronological; 250 without paging |
@@ -31,6 +31,7 @@ const FIELD = "\x1f";
 const RECORD = "\x1e";
 const FORMAT = ["%H", "%T", "%an", "%ae", "%aI", "%cn", "%ce", "%cI", "%P", "%B"].join("%x1f") + "%x1e";
 const FILES_PAGE = 300;
+const FILES_CAP = 3000;
 const WEB = `https://github.com/${REPOSITORY}`;
 
 interface Who {
@@ -126,13 +127,17 @@ export class GitHubView {
     };
   }
 
-  /** `GET /repos/{owner}/{repo}/commits/{sha}`, first page. */
-  async commit(sha: string) {
+  /** `GET /repos/{owner}/{repo}/commits/{sha}` and each page its `Link` names: 300 files to a page, 3,000 in all. */
+  async commitPages(sha: string) {
     const [meta] = await this.meta([sha]);
     if (!meta) throw new Error(`no commit ${sha} in the story`);
     const files = await this.entries(meta);
+    const listed = files.slice(0, FILES_CAP);
+    const pages = Array.from({ length: Math.max(1, Math.ceil(listed.length / FILES_PAGE)) }, (_, at) =>
+      listed.slice(at * FILES_PAGE, (at + 1) * FILES_PAGE).map(apiFile),
+    );
 
-    return {
+    return pages.map((page) => ({
       sha,
       commit: {
         message: meta.message,
@@ -144,8 +149,8 @@ export class GitHubView {
       committer: account(meta.committer.email),
       parents: meta.parents.map((parent) => ({ sha: parent })),
       stats: totals(files),
-      files: files.slice(0, FILES_PAGE).map(apiFile),
-    };
+      files: page,
+    }));
   }
 
   /** `GET /repos/{owner}/{repo}/commits?sha=<head>&since=…`, newest first. */

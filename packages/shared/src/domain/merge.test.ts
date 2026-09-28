@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isMerge, weighPush } from "./merge.js";
+import { isMerge, readInPart, weighPush } from "./merge.js";
 import type { NormalizedCommit, NormalizedPush } from "./push.js";
 
 function commit(sha: string, paths: string[], parents: string[] = ["p0"]): NormalizedCommit {
@@ -138,14 +138,34 @@ test("a merge whose branch head is absent is not weighed", () => {
   assert.deepEqual(weight.work, []);
 });
 
-test("an unenriched push falls back to the old count rather than guessing", () => {
-  // No App, or a failed detail call: no paths, so no residue can be honest.
+test("an unenriched push is not counted: a merge in it cannot be told from work", () => {
+  // No App, or a failed detail call: no parents, so a merge's first-parent diff —
+  // someone else's work — would read as the pusher's (git-pull-merge-without-the-app).
   const bare: NormalizedCommit = { ...commit("c1", ["src/a.ts"]), paths: undefined };
+  const orphan: NormalizedCommit = { ...commit("c2", ["src/b.ts"]), parents: undefined };
 
-  const weight = weighPush({ push: push([bare]), knownShas: NONE });
+  for (const unread of [bare, orphan]) {
+    const weight = weighPush({ push: push([commit("c0", ["src/z.ts"]), unread]), knownShas: NONE });
+    assert.equal(weight.measured, false);
+    assert.equal(weight.filesTouched, null, unread.sha);
+  }
+});
 
-  assert.equal(weight.measured, false);
-  assert.equal(weight.filesTouched, 1, "the pre-existing count, unchanged");
+test("a file touched by several commits is counted once", () => {
+  const passes = ["c1", "c2", "c3"].map((sha, at) => commit(sha, ["src/a.ts", "src/b.ts"], [at === 0 ? "p0" : `c${at}`]));
+
+  assert.equal(weighPush({ push: push(passes), knownShas: NONE }).filesTouched, 2, "not six");
+});
+
+test("a merge joining history outside the push adds nothing, and its own commits still count", () => {
+  // git pull: Sara's two commits, then a merge whose second parent is main's old head.
+  const mine = [commit("c1", ["src/x.ts"]), commit("c2", ["src/y.ts"], ["c1"])];
+  const pull = commit("m", ["src/lina-1.ts", "src/lina-2.ts", "src/lina-3.ts"], ["c2", "main-head"]);
+
+  const weight = weighPush({ push: push([...mine, pull]), knownShas: NONE });
+
+  assert.equal(weight.measured, false, "its residue cannot be told");
+  assert.equal(weight.filesTouched, 2, "Sara's two files, never Lina's three");
 });
 
 test("an ordinary push is unaffected by any of this", () => {
@@ -158,4 +178,13 @@ test("an ordinary push is unaffected by any of this", () => {
   assert.equal(weight.newCommits, 2);
   assert.equal(weight.filesTouched, 3);
   assert.deepEqual(workOf(weight), { c1: ["src/a.ts", "src/b.ts"], c2: ["src/c.ts"] });
+});
+
+test("readInPart: some commits read and some not — never all read, never none", () => {
+  const read = commit("c1", ["src/a.ts"]);
+  const unread: NormalizedCommit = { ...commit("c2", ["src/b.ts"]), paths: undefined, parents: undefined };
+
+  assert.equal(readInPart(push([read, unread])), true, "enrichment stopped, or a detail call failed");
+  assert.equal(readInPart(push([read, read])), false);
+  assert.equal(readInPart(push([unread, unread])), false, "no App: the setup says so, not each report");
 });

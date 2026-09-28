@@ -13,7 +13,7 @@
 import { LINA, OMAR, SARA } from "./git.test.kit.js";
 import { CLEAN, charged, credited, runCatalog, type Scenario } from "./judge.test.kit.js";
 import { mergeWithDefaults } from "@/domain/violations/engine.js";
-import { seed, type Story } from "./story.test.kit.js";
+import { modules, seed, work, type Story } from "./story.test.kit.js";
 
 const FEATURE = "feature/export";
 const RELEASE = "release/1.0";
@@ -62,6 +62,15 @@ async function mergedWithLedgerAt(story: Story, lines: number) {
   await story.push("main", OMAR);
 }
 
+/** Sara's branch: `before` ordinary commits, then the one taking the ledger to 210 — pushed at once. */
+async function crossingAfter(story: Story, before: number) {
+  await ledgerOnMain(story);
+  await story.branch(FEATURE, "main");
+  await work(story, { on: FEATURE, by: SARA, commits: before, width: 1 });
+  await story.commit({ on: FEATURE, by: SARA, title: "Track refunds in the ledger", write: { [LEDGER]: sized(210, "refunds") } });
+  await story.push(FEATURE, SARA);
+}
+
 /** …then Sara takes it to 210 on her own branch and pushes the branch. */
 async function sarasCrossing(story: Story) {
   await ledgerOnMain(story);
@@ -77,6 +86,38 @@ const scenarios: Scenario[] = [
     front: { rules: QUIET },
     story: sarasCrossing,
     expect: charged("file_lines@sara"),
+  },
+  {
+    id: "crossing-in-a-twenty-commit-push",
+    title: "Sara's crossing is the last of twenty commits on her branch, pushed at once",
+    front: { rules: QUIET },
+    story: (story) => crossingAfter(story, 19),
+    expect: charged("file_lines@sara"),
+  },
+  {
+    id: "crossing-in-a-commit-of-310-files",
+    title: "Sara's one commit touches 309 modules and takes the ledger to 210 — the ledger last by path",
+    front: { rules: QUIET },
+    story: async (story) => {
+      await ledgerOnMain(story);
+      await story.branch(FEATURE, "main");
+      const write = { ...modules({ dir: "src/bulk", count: 309, stamp: "bulk" }), [LEDGER]: sized(210, "refunds") };
+      await story.commit({ on: FEATURE, by: SARA, title: "Regenerate the bulk modules and track refunds", write });
+      await story.push(FEATURE, SARA);
+    },
+    expect: charged("file_lines@sara"),
+  },
+  {
+    id: "crossing-in-a-twenty-five-commit-push",
+    title: "Sara's crossing is the last of twenty-five commits on her branch, pushed at once",
+    front: { rules: QUIET },
+    story: (story) => crossingAfter(story, 24),
+    expect: charged("file_lines@sara"),
+    defect: {
+      observed: CLEAN,
+      because:
+        "Enrichment reads at most twenty commits' details (push.detail.ts MAX_ENRICHED_COMMITS), a bound on API calls per push. The other five are unread, so no commit can be told from a merge: the push is neither weighed nor measured, and the communiqué says it was not (report.unmeasured, 0009 §6). An accepted limit.",
+    },
   },
   {
     // Sara answered when her branch was pushed; the crossing is still there when

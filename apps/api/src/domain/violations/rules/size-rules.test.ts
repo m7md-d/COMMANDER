@@ -73,6 +73,12 @@ test("a merge that re-delivers recorded work is charged for neither size", () =>
   assert.equal(largeDiffRule(merge, THRESHOLD), null);
 });
 
+test("files nobody could count are not charged", () => {
+  const unread = context({ newCommits: 3, filesTouched: null });
+
+  assert.equal(largeDiffRule(unread, { enabled: true, threshold: 1 }), null);
+});
+
 test("genuinely new work is charged exactly as before", () => {
   const busy = context({ newCommits: 9, filesTouched: 31 });
 

@@ -19,7 +19,8 @@ checklist nobody starts.
 |---|---|
 | A pure function in `domain/` | Its test. Enforced: `tests/coverage/domain-tests.test.ts` fails on any exported domain function no test names |
 | A rule's behaviour | The test that pinned the old behaviour, rewritten to pin the new one. Deleting it instead is how a rule silently reverts |
-| How a push is judged — a rule, a gate, the mapper, the enrichment, who is charged | The scenario reference in [apps/api/src/scenarios/](../../apps/api/src/scenarios/): delete the `defect` record your change fixes, update the one it moves, and add the git shape it did not cover. It fails if a fixed defect is left on file |
+| How a push is judged — a rule, a gate, the mapper, the enrichment, who is charged | The scenario reference in [apps/api/src/scenarios/](../../apps/api/src/scenarios/): delete the `defect` record your change fixes, update the one it moves, and add the git shape it did not cover. It fails if a fixed defect is left on file. Then [docs/DEFECTS.md](../../docs/DEFECTS.md): move the fixed entry with its cause and fix, or add the one you found |
+| A defect you found, or are about to fix | **The test comes first**, and is seen working before any fix: break the suspected cause and watch it flip, then restore. After the fix, remove the fix and watch the test fail, then restore. The order and the log entry are in [docs/DEFECTS.md](../../docs/DEFECTS.md) |
 | A repo-wide invariant | A guard in `tests/`. Read [tests/README.md](../../tests/README.md) first — the five rules for writing one are there |
 | A number: limit, budget, threshold | [tests/lib/budgets.ts](../../tests/lib/budgets.ts) and nowhere else, so raising one is a reviewable diff on a single file |
 | A user-visible string | A key in `packages/shared/src/i18n/`, in **both** dictionaries |

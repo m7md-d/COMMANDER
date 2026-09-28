@@ -41,6 +41,26 @@ Five statements. Everything else in `.claude/rules/` is detail beneath them.
 | [05-do-not-simplify.md](.claude/rules/05-do-not-simplify.md) | Decisions that look wrong until you know why — do not "clean these up" |
 | [06-where-to-write.md](.claude/rules/06-where-to-write.md) | Which document takes an idea, a decision, a rule, a number |
 
+## Known defects
+
+[docs/DEFECTS.md](docs/DEFECTS.md) is the permanent log of what the platform judges wrongly:
+every defect open today, and every one fixed, with its cause and its fix. Read it before
+touching how a push is judged — the defect you are about to "discover" may be written there.
+**No defect without a test, and no fix before the test.** The order is binding:
+
+1. **A test that proves the defect exists** — a `defect` record in the scenario reference, or
+   a test pinning today's wrong behaviour — before any line of the fix.
+2. **Proof the test does real work, the first time.** A test that skips, or passes for a reason
+   other than the one written, looks like coverage and is worse than none. Break the suspected
+   cause temporarily and watch the test flip, then restore it; at the least, change the recorded
+   verdict and watch it fail. Write what you did in the entry's **الإثبات** line.
+3. **The fix** — the same test flips. Then prove it guards the fix: remove the fix temporarily,
+   watch the test fail, restore it. A fix no test catches reverting is not done (D-17 was one).
+4. **The log** — the entry moves to the fixed section with its cause and fix. Never deleted.
+
+`tests/coverage/defects.test.ts` keeps the open section and the reference's `defect` records
+naming the same scenarios, and fails an open entry that names no test or no proof.
+
 @.claude/rules/01-the-loop.md
 @.claude/rules/02-hard-limits.md
 @.claude/rules/03-architecture.md

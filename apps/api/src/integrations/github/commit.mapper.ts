@@ -10,7 +10,7 @@
  */
 
 import type { CommitPull } from "@/domain/judgement/event.js";
-import type { CommitDetail } from "./github.client.js";
+import type { CommitDetail, CommitFileChange } from "./github.client.js";
 import type { CommitListEntry } from "./commits.client.js";
 
 /** `GET /repos/{owner}/{repo}/commits/{ref}`, the fields read from it. */
@@ -37,21 +37,49 @@ export interface RawListCommit {
   committer?: { login?: string } | null;
 }
 
-export function toCommitDetail(raw: RawCommit): CommitDetail {
+/**
+ * GitHub lists at most 3,000 of a commit's files ("Get a commit": past 300, the
+ * rest come in pages announced by a `Link` header, up to 3,000). A listing that
+ * long may have stopped short, and nothing in it says whether it did.
+ */
+export const COMMIT_FILES_CAP = 3000;
+export const COMMIT_FILES_PAGE = 300;
+
+/** A commit read from its first page and every page after it, in order. */
+export function toCommitDetail(raw: RawCommit, more: RawCommit[] = []): CommitDetail {
+  const files = [raw, ...more].flatMap((page) => (page.files ?? []).map(toFileChange));
   return {
     sha: raw.sha,
     parents: (raw.parents ?? []).map((parent) => parent.sha ?? "").filter(Boolean),
     additions: raw.stats?.additions ?? 0,
     deletions: raw.stats?.deletions ?? 0,
-    files: (raw.files ?? []).map((file) => ({
-      path: file.filename,
-      additions: file.additions ?? 0,
-      deletions: file.deletions ?? 0,
-      status: file.status ?? "modified",
-      ...(file.patch !== undefined && { patch: file.patch }),
-      ...(file.previous_filename !== undefined && { previousPath: file.previous_filename }),
-    })),
+    files,
+    complete: files.length < COMMIT_FILES_CAP,
   };
+}
+
+function toFileChange(file: NonNullable<RawCommit["files"]>[number]): CommitFileChange {
+  return {
+    path: file.filename,
+    additions: file.additions ?? 0,
+    deletions: file.deletions ?? 0,
+    status: file.status ?? "modified",
+    ...(file.patch !== undefined && { patch: file.patch }),
+    ...(file.previous_filename !== undefined && { previousPath: file.previous_filename }),
+  };
+}
+
+const API_ORIGIN = "https://api.github.com";
+
+/**
+ * The page a `Link` header names as next, as a path on GitHub's API — or null.
+ * Only a link on the API itself is followed: the installation token goes with
+ * every request, and a header is not a place to learn where to send it.
+ */
+export function nextPage(link: string | null): string | null {
+  const next = link?.split(",").find((part) => /;\s*rel="next"/.test(part));
+  const url = next?.match(/<([^>]+)>/)?.[1];
+  return url?.startsWith(`${API_ORIGIN}/`) ? url.slice(API_ORIGIN.length) : null;
 }
 
 export function toCommitListEntry(raw: RawListCommit): CommitListEntry {

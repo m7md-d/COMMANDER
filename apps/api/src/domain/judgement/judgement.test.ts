@@ -144,7 +144,7 @@ test("the pusher answers for what the push did, the author for what the commit h
     ["batch_dump@omar", "file_lines@sara"],
   );
   assert.equal(judgement.pusher, OMAR);
-  assert.deepEqual([judgement.recorded, judgement.withheld], [true, null]);
+  assert.equal(judgement.withheld, null);
 });
 
 test("a file brought back under its limit is credited to whoever's work did it", () => {
@@ -265,19 +265,25 @@ test("the rules about landing work hold on a main line only; what a commit holds
   assert.deepEqual([onFeature.mainLine, onMain.mainLine], [false, true], "kept with every charge, which weighs double on a main line");
 });
 
-test("a silent front withholds a push that found nothing, and records none of it", () => {
+test("a silent front withholds a push that found nothing — withholding is about sending, never recording", () => {
   const judgement = judge({ silentWhenClean: true });
 
-  assert.deepEqual([judgement.recorded, judgement.withheld], [false, "clean_and_silent"]);
+  assert.equal(judgement.withheld, "clean_and_silent");
+  // No flag says whether to record: every judged push is, so the record has no
+  // holes and the reconciler does not recover a silent push again every pass
+  // (0009 §5). It was once tied to sending, and a front with no channel lost its
+  // charges with it (lazy-commit-on-a-front-with-no-channel).
+  assert.equal("recorded" in judgement, false);
 });
 
 test("a commendation alone breaks the silence", () => {
-  const judgement = judge({ silentWhenClean: true, checks: ledger(210, 190) });
-
-  assert.deepEqual([judgement.recorded, judgement.withheld], [true, null]);
+  assert.equal(judge({ silentWhenClean: true, checks: ledger(210, 190) }).withheld, null);
 });
 
-test("with nowhere to send, a push is withheld — and silence is the reason given first", () => {
-  assert.equal(judge({ hasChannel: false }).withheld, "discord_missing");
+test("with nowhere to send, a push is withheld — its charges stand, and silence is the reason given first", () => {
+  const unsent = judge({ hasChannel: false, rules: ANY_NEW_WORK });
+
+  assert.equal(unsent.withheld, "discord_missing");
+  assert.notDeepEqual(unsent.violations, [], "what is found is recorded whether or not it is sent");
   assert.equal(judge({ hasChannel: false, silentWhenClean: true }).withheld, "clean_and_silent");
 });

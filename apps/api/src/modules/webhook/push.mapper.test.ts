@@ -1,7 +1,8 @@
 /**
  * The fields of GitHub's push payload the judgement reads. The scenario
  * reference feeds `normalizePush` whole payloads; this pins the two whose
- * absence must stay distinguishable from their value.
+ * absence must stay distinguishable from their value, and the cap that decides
+ * whether the commits array is whole.
  */
 
 import assert from "node:assert/strict";
@@ -28,4 +29,14 @@ test("the default branch is read from the repository object, and left out when a
 
   assert.equal(named.defaultBranch, "trunk");
   assert.equal("defaultBranch" in normalizePush(payload({})), false);
+});
+
+test("a push is truncated only at the webhook's own cap, 2,048 commits — not at twenty", () => {
+  const withCommits = (count: number) =>
+    normalizePush({ ...payload({}), commits: Array.from({ length: count }, (_, at) => ({ id: String(at), message: "work" })) });
+
+  // Twenty is the Events timeline's cap; read as this one, every long push went unmeasured.
+  assert.equal(withCommits(20).truncated, false);
+  assert.equal(withCommits(2047).truncated, false);
+  assert.equal(withCommits(2048).truncated, true, "a full array may have been cut");
 });

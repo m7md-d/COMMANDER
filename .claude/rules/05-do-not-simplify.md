@@ -56,6 +56,17 @@ code.
   is not a heap dumped at once. Everything else reads what the record has *not judged yet*, so a
   commit is judged once, when it first arrives, on whatever branch. Collapsing them either
   charges whoever merged for the branch, or never judges work first seen at its landing.
+- **A push's size counts each file once, and only what can be told** (`filesTouched`, 0009 §6). A
+  sum per commit counted fifteen files edited three times as forty-five. A merge joining history
+  outside the push — `git pull`, a foxtrot — adds nothing: its first-parent diff is someone else's
+  work, and summing it charged Sara with Lina's 48 files. And with a commit's paths or parents
+  unknown (no App, enrichment stopped) the count is `null`, not the payload's sum: a merge cannot
+  then be told from work. A low count is safe; a guessed one is an accusation.
+- **A commit's files are followed across pages, and a listing that may be cut gives no paths**
+  (`fetchCommitDetail`, `toCommitDetail`). The first page stops at 300 files; GitHub stops at
+  3,000, silently. A partial path list reads as work nobody did or as a merge's own, so a commit
+  at the cap stays unread, and a push read in part says so in the communiqué (`readInPart`).
+  The next page is followed only on `api.github.com`: the installation token goes with it.
 - **A finding the evidence names nobody for is charged to nobody** (`unattributed`): an author
   address tied to no account, a file two people changed in one push, the pusher of a recovered
   push. Falling back to whoever pushed is a guess, and it lands on the person nearest the button.
@@ -83,6 +94,11 @@ code.
   the false charge again.
 - **A moved file keeps the blob it had at its old path** (`pushChanges`). Read as created at the
   new path, a file moved while already over its limit is a crossing charged to whoever moved it.
+- **Recording is not sending** (0009 §5). Every judged push is recorded — commits, counters,
+  ledger — and `withheld` says only why the communiqué is not sent. `silentWhenClean` means "do not
+  send", never "do not remember": tied together, a front with no channel lost every charge, and a
+  silent front's clean pushes left holes the reconciler recovered again on every pass. The order
+  in the processor is the whole fix, and `tests/coverage/recording.test.ts` holds it.
 - **The record is `ledger_events`, not `violation_events`, and every query names its `kind`.** A
   record that can only hold accusations produces a system that can only accuse, so `improved` is
   written as a `commendation` beside the charge — never netted against it, never in place of it.

@@ -51,8 +51,7 @@ export async function enrichWith(
  */
 export function applyDetail(commit: NormalizedCommit, detail: CommitDetail): NormalizedCommit {
   const counted = commit.filesAdded + commit.filesRemoved + commit.filesModified;
-
-  return {
+  const read = {
     ...commit,
     ...(counted === 0 && countByStatus(detail.files)),
     additions: detail.additions,
@@ -61,6 +60,13 @@ export function applyDetail(commit: NormalizedCommit, detail: CommitDetail): Nor
     // lets a merge be weighed on what it introduced rather than on the whole
     // branch it carries — see weighPush.
     parents: detail.parents,
+  };
+  // A listing that may have stopped short gives no paths: a path missing from it
+  // reads as work nobody did, or as a merge's own. The commit stays unread.
+  if (!detail.complete) return read;
+
+  return {
+    ...read,
     paths: touchedPaths(detail.files),
     moves: detail.files.flatMap((file): [string, string][] =>
       file.previousPath === undefined ? [] : [[file.previousPath, file.path]],

@@ -6,6 +6,7 @@ contradict itself within months, and then nobody can tell which line is still tr
 | What you have | Where it goes |
 |---|---|
 | An idea, not yet decided | [docs/proposals/](../../docs/proposals/) — a file from `TEMPLATE.md`. It answers "what measurement backs this?" or it is refused |
+| A defect: the platform judges something wrongly | [docs/DEFECTS.md](../../docs/DEFECTS.md), as open, when found — measured first by a `defect` record in the scenario reference where it can be. Fixed: the entry moves to the fixed section with its cause and fix, never deleted |
 | An approved item, not yet built | a row in [docs/ROADMAP.md](../../docs/ROADMAP.md) |
 | Something just built, and how it departed from the plan | [docs/CHECKS-ROADMAP.md](../../docs/CHECKS-ROADMAP.md) (engine) or [docs/UI-AUDIT.md](../../docs/UI-AUDIT.md) (panel) |
 | A UI observation | [docs/UI-AUDIT.md](../../docs/UI-AUDIT.md), **at the moment you meet it** — not gathered later from memory |

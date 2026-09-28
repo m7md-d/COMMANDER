@@ -9,7 +9,7 @@
 
 import { OMAR, SARA } from "./git.test.kit.js";
 import { CLEAN, charged, runCatalog, type Scenario } from "./judge.test.kit.js";
-import { seed, work, type Story } from "./story.test.kit.js";
+import { modules, seed, work, type Story } from "./story.test.kit.js";
 
 const FEATURE = "feature/export";
 const RELEASE = "release/1.0";
@@ -132,6 +132,18 @@ const scenarios: Scenario[] = [
     front: { app: false },
     story: (story) => prMerged(story, false),
     expect: CLEAN,
+  },
+  {
+    id: "lazy-commit-on-a-front-with-no-channel",
+    title: "Sara pushes a 'wip' to her branch, on a front with no Discord channel",
+    front: { channel: false },
+    story: async (story) => {
+      await seed(story);
+      await story.branch(FEATURE, "main");
+      await story.commit({ on: FEATURE, by: SARA, title: "wip", write: modules({ dir: "src/export", count: 2, stamp: "wip" }) });
+      await story.push(FEATURE, SARA);
+    },
+    expect: charged("lazy_message@sara"),
   },
 ];
 

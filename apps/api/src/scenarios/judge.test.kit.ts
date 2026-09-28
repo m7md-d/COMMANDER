@@ -20,7 +20,8 @@ import { admitPush, judgePush, type ChecksFacts } from "@/domain/judgement/judge
 import { landingMerge, type LandingSides } from "@/domain/judgement/landing.js";
 import { headOf, pullFact, type PullFact } from "@/domain/judgement/event.js";
 import { mergeWithDefaults } from "@/domain/violations/engine.js";
-import { toCommitDetail, toCommitListEntry, toCommitPull } from "@/integrations/github/commit.mapper.js";
+import { toCommitDetail, toCommitListEntry, toCommitPull, type RawCommit } from "@/integrations/github/commit.mapper.js";
+import type { CommitDetail } from "@/integrations/github/github.client.js";
 import { isBranchRef, normalizePush } from "@/modules/webhook/push.mapper.js";
 import { enrichWith } from "@/queue/push.detail.js";
 import type { CommitListEntry } from "@/integrations/github/commits.client.js";
@@ -39,6 +40,10 @@ export interface Front {
   rules: RuleConfigMap;
   /** The measurement limits: the shipped ones unless a scenario says otherwise. */
   checks: CheckConfigMap;
+  /** `silentWhenClean`: say nothing about a push with nothing to say. */
+  silent: boolean;
+  /** Whether the front has a Discord channel, its own or the default. */
+  channel: boolean;
 }
 
 /**
@@ -48,7 +53,7 @@ export interface Front {
  */
 export const SUITE_RULES: RuleConfigMap = mergeWithDefaults({ large_diff: { enabled: true, threshold: 40 } });
 
-const DEFAULT_FRONT: Front = { watch: [], watchers: [], app: true, rules: SUITE_RULES, checks: DEFAULT_CHECKS };
+const DEFAULT_FRONT: Front = { watch: [], watchers: [], app: true, rules: SUITE_RULES, checks: DEFAULT_CHECKS, silent: false, channel: true };
 const TIMEZONE_OFFSET = 3;
 /** reconciler.ts `computeSince` — the minute of overlap against clock skew. */
 const OVERLAP_MS = 60_000;
@@ -138,8 +143,8 @@ async function receive(run: Run, event: PushEvent): Promise<Verdict> {
 
 /**
  * delivery.processor.ts `run`: admit, enrich, read what is on record, judge,
- * record. This front is never silent and always has a channel; what the
- * judgement then says about recording is taken as it says it.
+ * record — every judged push, whether or not it is then sent. The verdict is
+ * what reaches the record.
  */
 async function handle(run: Run, received: NormalizedPush): Promise<Verdict> {
   const admission = admitPush({ repository: { enabled: true, branches: run.front.watch }, push: received });
@@ -147,7 +152,7 @@ async function handle(run: Run, received: NormalizedPush): Promise<Verdict> {
   if (!admission.judged) return SKIPPED;
 
   const push = run.front.app
-    ? (await enrichWith(received, async (sha) => ({ ok: true, data: toCommitDetail(await run.view.commit(sha)) }))).push
+    ? (await enrichWith(received, async (sha) => ({ ok: true, data: detailOf(await run.view.commitPages(sha)) }))).push
     : received;
 
   const knownShas = new Set(run.known.keys());
@@ -159,16 +164,22 @@ async function handle(run: Run, received: NormalizedPush): Promise<Verdict> {
     timezoneOffset: TIMEZONE_OFFSET,
     watchers: run.front.watchers,
     checks: await readChanges(run, push, knownShas),
-    silentWhenClean: false,
-    hasChannel: true,
+    silentWhenClean: run.front.silent,
+    hasChannel: run.front.channel,
   };
   const judgement = judgePush(facts, (id, error) => {
     throw new Error(`rule ${id} threw`, { cause: error });
   });
 
-  if (judgement.recorded) remember(run.known, push);
+  remember(run.known, push);
   const named = (entries: { ruleId: string; login: string }[]) => entries.map((entry) => `${entry.ruleId}@${entry.login}`);
   return credited(charged(...named(judgement.violations)), ...named(judgement.commendations));
+}
+
+/** github.client.ts `fetchCommitDetail`: the first page, then every page GitHub links. */
+function detailOf([first, ...more]: RawCommit[]): CommitDetail {
+  if (!first) throw new Error("GitHub always answers with a first page");
+  return toCommitDetail(first, more);
 }
 
 /** push.enrich.ts `readPull`: asked only of a head GitHub committed, only with the App — and off the default branch, of its closed pull requests too. */
