@@ -61,6 +61,16 @@ touching how a push is judged — the defect you are about to "discover" may be 
 `tests/coverage/defects.test.ts` keeps the open section and the reference's `defect` records
 naming the same scenarios, and fails an open entry that names no test or no proof.
 
+## Kept in mind while building
+
+[docs/proposals/0013-the-commander-listens.md](docs/proposals/0013-the-commander-listens.md) —
+the bot listening in Discord, a mood toward each member, and a pardon that lightens a charge's
+weight — is large, undecided, and not being built. It is kept in view so that what is built now
+does not close the road to it. Its **نقاط التماس** table lists the files it will need: when you
+change one — the member or ledger schema, the dossier's weighting, the prompt templates, the
+member page — reread its row, and update the row in the same edit if what you did moves it.
+Designing it is not your call; keeping its table true is.
+
 @.claude/rules/01-the-loop.md
 @.claude/rules/02-hard-limits.md
 @.claude/rules/03-architecture.md
