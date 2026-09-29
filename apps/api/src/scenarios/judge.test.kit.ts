@@ -58,7 +58,7 @@ const TIMEZONE_OFFSET = 3;
 /** reconciler.ts `computeSince` — the minute of overlap against clock skew. */
 const OVERLAP_MS = 60_000;
 
-export type Outcome = "judged" | "ignored" | "unwatched" | "skipped" | "lost";
+export type Outcome = "judged" | "ignored" | "unwatched" | "skipped" | "lost" | "resent";
 
 /** What happened to the last event of a story, who was charged with what, and who was credited. */
 export interface Verdict {
@@ -81,6 +81,8 @@ export const IGNORED: Verdict = { outcome: "ignored", charges: [], credits: [] }
 export const UNWATCHED: Verdict = { outcome: "unwatched", charges: [], credits: [] };
 export const SKIPPED: Verdict = { outcome: "skipped", charges: [], credits: [] };
 const LOST: Verdict = { outcome: "lost", charges: [], credits: [] };
+/** A delivery sent again: the communiqué goes out once more, and nothing new reaches the record. */
+export const RESENT: Verdict = { outcome: "resent", charges: [], credits: [] };
 
 export interface Scenario {
   /** Stable, kebab-case: the name a failure and a defect record are filed under. */
@@ -104,6 +106,10 @@ interface Run {
   front: Front;
   /** commit_records: sha → committedAt (ms), as `recordCommits` would write it. */
   known: Map<string, number>;
+  /** The push the last delivery row holds (`payload`), which a retry runs again. */
+  delivered?: NormalizedPush;
+  /** Whether that row kept its judgement (`report.kept.ts`), which a retry sends from. */
+  kept: boolean;
   contents: Contents;
 }
 
@@ -115,7 +121,7 @@ export async function play(scenario: Scenario): Promise<{ verdict: Verdict; trai
     if (story.events.length === 0) throw new Error(`${scenario.id}: the story emits no event`);
 
     const front = { ...DEFAULT_FRONT, ...scenario.front };
-    const run: Run = { story, view: new GitHubView(story.git, story.pulls), front, known: new Map(), contents: new Contents(story.git) };
+    const run: Run = { story, view: new GitHubView(story.git, story.pulls), front, known: new Map(), contents: new Contents(story.git), kept: false };
     const trail: string[] = [];
     let verdict = CLEAN;
     for (const event of story.events) {
@@ -130,6 +136,7 @@ export async function play(scenario: Scenario): Promise<{ verdict: Verdict; trai
 
 function judge(run: Run, event: RemoteEvent): Promise<Verdict> {
   if (event.kind === "reconcile") return reconcile(run, event);
+  if (event.kind === "retry") return redeliver(run);
   if (event.lost) return Promise.resolve(LOST);
   return receive(run, event);
 }
@@ -138,7 +145,21 @@ async function receive(run: Run, event: PushEvent): Promise<Verdict> {
   const payload = await run.view.webhook(event);
   // webhook.controller.ts — tag pushes arrive as pushes and are dropped.
   if (!isBranchRef(payload.ref)) return IGNORED;
-  return handle(run, normalizePush(payload));
+  run.delivered = normalizePush(payload);
+  run.kept = false;
+  const verdict = await handle(run, run.delivered);
+  run.kept = verdict.outcome === "judged";
+  return verdict;
+}
+
+/**
+ * outbox.service.ts `requeue`, then delivery.processor.ts `run`: a row that
+ * kept its judgement is only written and sent again; one that did not (a push
+ * skipped before judging) runs from the start.
+ */
+function redeliver(run: Run): Promise<Verdict> {
+  if (!run.delivered) throw new Error("a retry needs a delivery before it");
+  return run.kept ? Promise.resolve(RESENT) : handle(run, run.delivered);
 }
 
 /**
@@ -275,6 +296,7 @@ function cursor(run: Run, now: number): number {
 
 function describeEvent(event: RemoteEvent): string {
   if (event.kind === "reconcile") return "reconciler pass";
+  if (event.kind === "retry") return "outbox retries the last delivery";
   const range = `${event.before.slice(0, 7)}..${event.after.slice(0, 7)}`;
   return `${event.sender.login} → ${event.ref} ${range}${event.lost ? " (webhook lost)" : ""}`;
 }

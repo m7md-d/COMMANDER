@@ -5,10 +5,19 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./i18n/ar": {
+      "types": "./dist/i18n/ar.d.ts",
+      "default": "./dist/i18n/ar.js"
+    },
+    "./i18n/en": {
+      "types": "./dist/i18n/en.d.ts",
+      "default": "./dist/i18n/en.js"
     }
   },
   "scripts": {

@@ -6,7 +6,9 @@
  * other fails the build rather than silently rendering the raw key at runtime.
  */
 
-import { AR } from "./ar.js";
+// Type-only: the key set is the Arabic table's, and nothing that imports this
+// file — the panel's translator above all — may carry the table itself with it.
+import type { AR } from "./ar.js";
 
 export type TranslationKey = keyof typeof AR;
 export type Dictionary = Record<TranslationKey, string>;
@@ -28,27 +30,17 @@ export function directionOf(locale: LocaleId): Direction {
 export type Translate = (locale: LocaleId, key: string, vars?: TranslationVars) => string;
 
 /**
- * Binds the dictionaries once and returns the translator everything else calls.
+ * One dictionary's text for a key, its `{name}` variables filled. An unknown
+ * placeholder is left visible rather than blanked, and a key the table does not
+ * hold reads as the key itself — readable and greppable, never "undefined".
  *
- * The tables are a dependency, not an argument: they are the same on every one
- * of the thousands of calls a render makes, and passing them each time put this
- * function at four parameters (CONSTITUTION.md §4) for a value that never
- * varies. Closing over them leaves the call site with what actually changes.
- *
- * Resolution order: requested locale, then Arabic, then the key itself. A
- * missing translation degrades to something readable and greppable instead of
- * throwing or rendering "undefined".
+ * Takes the one table in use, so the panel can load a single locale and
+ * translate from it without the other in memory (ROADMAP 4.1).
  */
-export function createTranslate(dictionaries: Record<LocaleId, Dictionary>): Translate {
-  return (locale, key, vars) => {
-    const table = dictionaries[locale] ?? dictionaries.ar;
-    const template =
-      (table as Record<string, string>)[key] ?? (AR as Record<string, string>)[key] ?? key;
-
-    if (!vars) return template;
-
-    return template.replace(/\{(\w+)\}/g, (match, name: string) =>
-      Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : match,
-    );
-  };
+export function translateFrom(table: Readonly<Record<string, string>>, key: string, vars?: TranslationVars): string {
+  const template = table[key] ?? key;
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+    Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : match,
+  );
 }

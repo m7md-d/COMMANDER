@@ -197,6 +197,19 @@ model Delivery {
   model        String?
   errorMessage String? @map("error_message")
 
+  /// What was judged, kept once (0012): charges and who answers, the event, the
+  /// push as enriched, the standing it was reported against. A retry and the
+  /// resend button write and send from this, and never judge again (D-31).
+  /// Null on rows from before, and on rows not judged at all.
+  judgement    Json?
+  /// What the model was last given, as rendered.
+  systemPrompt String? @map("system_prompt")
+  userPrompt   String? @map("user_prompt")
+  /// The embed Discord received, exactly.
+  embed        Json?
+  /// The row this one rewrites, when it was asked for again after being sent.
+  resendOf     String? @map("resend_of")
+
   createdAt   DateTime  @default(now()) @map("created_at")
   completedAt DateTime? @map("completed_at")
   /// Null while active; set when moved to the archive shelf so the main list

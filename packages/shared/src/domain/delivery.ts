@@ -23,7 +23,11 @@ export const DELIVERY_REASONS = [
   "discord_missing",
   "discord_failed",
   "discord_rate_limited",
+  // Before 0012: the model failed and a fallback sentence went out. Kept for
+  // the rows it describes, and for the preview, which still shows that sentence.
   "llm_failed",
+  // Since 0012: the model failed and nothing was sent — retried, then held.
+  "llm_held",
   "unknown",
 ] as const;
 
@@ -52,4 +56,19 @@ export const MAX_RETRY_ATTEMPTS = 5;
 export function retryDelayMs(attempt: number): number {
   const base = 30_000 * 4 ** Math.max(0, attempt - 1);
   return Math.min(base, 3_600_000);
+}
+
+/**
+ * What pressing "resend" on a row does (0012). A row that never reached Discord
+ * — failed, or withheld — gets its first report written; a row that did is
+ * rewritten, the model told it is a rewrite, and sent as a new message. Only a
+ * row that kept its judgement can do either: sending one that did not would
+ * mean judging the push again, which records it twice (D-31).
+ */
+export type ResendKind = "first" | "rewrite";
+
+export function resendKind(row: { status: DeliveryStatus; judged: boolean }): ResendKind | null {
+  if (!row.judged) return null;
+  if (row.status === "sent") return "rewrite";
+  return row.status === "failed" || row.status === "skipped" ? "first" : null;
 }

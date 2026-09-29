@@ -25,8 +25,13 @@ function useDeliveryMutation<TArgs, TResult>(mutationFn: (args: TArgs) => Promis
   });
 }
 
-export function useRetryDelivery() {
-  return useDeliveryMutation((id: string) => deliveryApi.retry(id));
+export function useResendDelivery() {
+  return useDeliveryMutation((id: string) => deliveryApi.resend(id));
+}
+
+/** One row with what the model was given — asked for only once its details are opened. */
+export function useDeliveryDetail(id: string, enabled: boolean) {
+  return useQuery({ queryKey: deliveryKeys.detail(id), queryFn: () => deliveryApi.get(id), enabled });
 }
 
 export function useArchiveDelivery() {

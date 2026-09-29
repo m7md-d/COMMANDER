@@ -19,7 +19,7 @@ import {
   listDeliveries,
   purgeArchived,
   restoreDelivery,
-  retryDelivery,
+  resendDelivery,
 } from "./deliveries.service.js";
 import { runPreview } from "./preview.service.js";
 import { sendDigestNow } from "@/modules/digest/digest.service.js";
@@ -38,8 +38,8 @@ export async function read(req: Request, res: Response): Promise<void> {
   ok(res, await getDelivery(requireId(req)));
 }
 
-export async function retry(req: Request, res: Response): Promise<void> {
-  ok(res, await retryDelivery(requireId(req)));
+export async function resend(req: Request, res: Response): Promise<void> {
+  ok(res, await resendDelivery(requireId(req)));
 }
 
 export async function archive(req: Request, res: Response): Promise<void> {

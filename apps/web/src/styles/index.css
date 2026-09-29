@@ -23,6 +23,7 @@
 @import "./readouts.css"; /* the readout, tape and clock on the screens */
 @import "./console.css"; /* the headquarters and its console */
 @import "./dispatch.css"; /* the deliveries log as field message slips */
+@import "./dispatch-report.css"; /* what a slip was about: judgement, report, prompt (0012) */
 @import "./models.css"; /* the model picker as a spokesperson roster */
 @import "./board.css"; /* the fronts as slots on a situation board */
 @import "./file.css"; /* a front as a folder: letterhead, index tabs, punched sheet */

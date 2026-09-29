@@ -22,7 +22,8 @@ deliver`. Nothing in the first waits on the second.
    [domain/judgement/](../../apps/api/src/domain/judgement/): pure, and called as they are by
    the scenario reference. A gate added to the processor instead is one the reference cannot
    see. Every judged push is recorded, sent or not (0009 §5): the one order the processor keeps
-   is `record` before the `withheld` return.
+   is `record` before the `withheld` return. And it is judged once: the row keeps its judgement,
+   and a retry or a resend only writes and sends from it (0012).
 4. **Retry policy lives in `packages/shared/src/domain/delivery.ts`.** `NON_RETRYABLE_REASONS`
    exists because retrying a deleted webhook or an unregistered repo cannot change the outcome.
 5. **[report.pipeline.ts](../../apps/api/src/queue/report.pipeline.ts) is shared** by the worker

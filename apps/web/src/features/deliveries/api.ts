@@ -1,6 +1,7 @@
 import type {
   Delivery,
   DeliveryBulkResult,
+  DeliveryDetail,
   DeliveryPage,
   DeliveryScope,
   DeliveryStatus,
@@ -16,12 +17,15 @@ export interface DeliveryFilters {
 export const deliveryKeys = {
   all: ["deliveries"] as const,
   list: (filters: DeliveryFilters) => ["deliveries", filters] as const,
+  detail: (id: string) => ["deliveries", "detail", id] as const,
 };
 
 export const deliveryApi = {
   list: (filters: DeliveryFilters) =>
     api.get<DeliveryPage>("/deliveries", { ...filters, limit: 60 }),
-  retry: (id: string) => api.post<Delivery>(`/deliveries/${id}/retry`),
+  get: (id: string) => api.get<DeliveryDetail>(`/deliveries/${id}`),
+  // A row that never reached Discord gets its first report; one that did, a rewrite (0012).
+  resend: (id: string) => api.post<Delivery>(`/deliveries/${id}/resend`),
   archive: (id: string) => api.post<Delivery>(`/deliveries/${id}/archive`),
   restore: (id: string) => api.post<Delivery>(`/deliveries/${id}/restore`),
   // Bulk archive matches the same filters as the active list.

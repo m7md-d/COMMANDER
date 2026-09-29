@@ -8,7 +8,7 @@
  */
 
 import { OMAR, SARA } from "./git.test.kit.js";
-import { CLEAN, charged, runCatalog, type Scenario } from "./judge.test.kit.js";
+import { CLEAN, charged, RESENT, runCatalog, type Scenario } from "./judge.test.kit.js";
 import { modules, seed, work, type Story } from "./story.test.kit.js";
 
 const FEATURE = "feature/export";
@@ -144,6 +144,19 @@ const scenarios: Scenario[] = [
       await story.push(FEATURE, SARA);
     },
     expect: charged("lazy_message@sara"),
+  },
+  {
+    // Discord answers 429 or 5xx and the outbox runs the row again — or someone
+    // presses retry. What was judged was judged once; sending is all that is left.
+    id: "delivery-retried-after-discord-refused-it",
+    title: "Sara pushes a 'wip' straight to main; Discord refuses the report and the outbox retries it",
+    story: async (story) => {
+      await seed(story);
+      await story.commit({ on: "main", by: SARA, title: "wip", write: modules({ dir: "src/export", count: 2, stamp: "wip" }) });
+      await story.push("main", SARA);
+      story.retryLastDelivery();
+    },
+    expect: RESENT,
   },
 ];
 

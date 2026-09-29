@@ -1,16 +1,25 @@
 import type { Delivery as PrismaDelivery, Prisma } from "@prisma/client";
-import type {
-  Delivery,
-  DeliveryArchive,
-  DeliveryPage,
-  DeliveryQuery,
-  DeliveryReason,
+import {
+  resendKind,
+  type Delivery,
+  type DeliveryArchive,
+  type DeliveryDetail,
+  type DeliveryPage,
+  type DeliveryQuery,
+  type DeliveryReason,
 } from "@commander/shared";
 import { NotFoundError } from "@/core/errors/app-error.js";
 import { prisma } from "@/db/prisma.js";
 import { requeue } from "@/queue/outbox.service.js";
+import { judgementOf, readKeptReport } from "@/queue/report.kept.js";
+import { enqueueRewrite } from "@/queue/report.record.js";
 
-function toDto(row: PrismaDelivery): Delivery {
+/** A row as the list reads it: what the model was given stays out of a page of sixty. */
+type Listed = Omit<PrismaDelivery, "systemPrompt" | "userPrompt" | "embed">;
+const LISTED = { systemPrompt: true, userPrompt: true, embed: true } as const;
+
+function toDto(row: Listed): Delivery {
+  const kept = readKeptReport(row.judgement);
   return {
     id: row.id,
     repositoryId: row.repositoryId,
@@ -30,6 +39,9 @@ function toDto(row: PrismaDelivery): Delivery {
     createdAt: row.createdAt.toISOString(),
     completedAt: row.completedAt?.toISOString() ?? null,
     archivedAt: row.archivedAt?.toISOString() ?? null,
+    judgement: kept ? judgementOf(kept) : null,
+    resend: resendKind({ status: row.status, judged: kept !== null }),
+    resendOf: row.resendOf,
   };
 }
 
@@ -48,6 +60,7 @@ export async function listDeliveries(query: DeliveryQuery): Promise<DeliveryPage
 
   const rows = await prisma.delivery.findMany({
     where,
+    omit: LISTED,
     orderBy: { createdAt: "desc" },
     take: query.limit + 1,
     ...(query.cursor && { cursor: { id: query.cursor }, skip: 1 }),
@@ -62,17 +75,27 @@ export async function listDeliveries(query: DeliveryQuery): Promise<DeliveryPage
   };
 }
 
-export async function getDelivery(id: string): Promise<Delivery> {
+/** One row, with what the model was given — read when its details are opened. */
+export async function getDelivery(id: string): Promise<DeliveryDetail> {
   const row = await prisma.delivery.findUnique({ where: { id } });
   if (!row) throw new NotFoundError("delivery.notFound");
-  return toDto(row);
+  return { ...toDto(row), systemPrompt: row.systemPrompt, userPrompt: row.userPrompt };
 }
 
-/** Re-queues a terminal delivery. Only failures are eligible. */
-export async function retryDelivery(id: string): Promise<Delivery> {
-  const existing = await getDelivery(id);
-  if (existing.status !== "failed") throw new NotFoundError("delivery.notRetryable");
+/**
+ * The resend button (0012), from the judgement the row kept — never judging
+ * again, which records the push twice (D-31). A row that never reached Discord
+ * is queued again for its first report; one that did gets a new row, a rewrite
+ * pointing at it, so the log keeps what the team was told the first time.
+ */
+export async function resendDelivery(id: string): Promise<Delivery> {
+  const row = await prisma.delivery.findUnique({ where: { id } });
+  if (!row) throw new NotFoundError("delivery.notFound");
+  const kept = readKeptReport(row.judgement);
+  const kind = resendKind({ status: row.status, judged: kept !== null });
+  if (kind === null || kept === null) throw new NotFoundError("delivery.notResendable");
 
+  if (kind === "rewrite") return toDto(await enqueueRewrite(row, kept));
   await requeue(id);
   return getDelivery(id);
 }

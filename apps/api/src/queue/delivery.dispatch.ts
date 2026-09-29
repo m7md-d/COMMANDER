@@ -10,7 +10,9 @@
 import type { Delivery as PrismaDelivery } from "@prisma/client";
 import { sendEmbed } from "@/integrations/discord/discord.client.js";
 import type { ComposedReport } from "./report.pipeline.js";
+import { afterGeneration } from "@/domain/report/generation.js";
 import { markFailed, markSent } from "./outbox.service.js";
+import { keepGeneration } from "./report.record.js";
 
 export async function deliver(input: {
   job: PrismaDelivery;
@@ -19,7 +21,19 @@ export async function deliver(input: {
   violationCount: number;
 }): Promise<void> {
   const { job, webhookUrl, composed, violationCount } = input;
+  const given = { systemPrompt: composed.systemPrompt, userPrompt: composed.userPrompt, model: composed.model };
+
+  // A report the model did not write is never replaced by a sentence (0012):
+  // retried while waiting can mend it, then held for the resend button.
+  const next = afterGeneration(composed);
+  if (!next.send) {
+    await keepGeneration(job.id, { ...given, embed: null });
+    await markFailed({ id: job.id, attempts: job.attempts, reason: next.reason, errorMessage: next.error, retryable: next.retryable });
+    return;
+  }
+
   const delivery = await sendEmbed(webhookUrl, composed.embed);
+  await keepGeneration(job.id, { ...given, embed: delivery.ok ? composed.embed : null });
 
   if (!delivery.ok) {
     await markFailed({
@@ -39,11 +53,5 @@ export async function deliver(input: {
     return;
   }
 
-  await markSent(job.id, {
-    // Sent, but flagged so the panel shows the report was a fallback sentence.
-    reason: composed.llmOk ? "ok" : "llm_failed",
-    reportText: composed.reportText,
-    model: composed.model,
-    violationCount,
-  });
+  await markSent(job.id, { reason: "ok", reportText: composed.reportText, model: composed.model, violationCount });
 }

@@ -26,19 +26,22 @@ export const SIZE = {
  */
 export const BUNDLE_GZIP_KB = {
   /**
-   * Raised 110 → 114 on 2026-07-28, measured 110.3 after the assessment section.
+   * Lowered 114 → 80 on 2026-09-29, measured 75.6 once the dictionaries left it.
    *
-   * The growth is honest — a feature's text — but it exposed something worth
-   * fixing rather than absorbing: **both dictionaries ship in full to every
-   * browser, including keys only the server ever reads.** `digest.prompt`,
-   * `assess.instruction` and their kind are instructions to a model, rendered on
-   * the API and never by the panel, and the panel only ever displays one locale
-   * at a time. Splitting the dictionaries per locale and lazy-loading the one in
-   * use would return more than every feature since has cost. Recorded in
-   * docs/UI-AUDIT.md; until it is done this number will keep drifting upward,
-   * and that drift is the argument, not the problem.
+   * It had been raised 110 → 114 on 2026-07-28 for a feature's text, and was
+   * over again at 114.4 with the report log (0012). The cause was recorded then:
+   * both dictionaries shipped in full to every browser, though the panel shows
+   * one language at a time. Each now loads on its own, when needed (ROADMAP 4.1,
+   * UI-AUDIT #22), and bundle.test.ts fails if one rides in `index` again.
    */
-  index: 114,
+  index: 80,
+  /**
+   * One dictionary each, loaded when the panel shows that language. Still with
+   * the keys only the API reads (`digest.prompt`, `report.rewrite`…) — the other
+   * half of UI-AUDIT #22, not yet done.
+   */
+  ar: 24,
+  en: 21,
   vendor: 60,
   motion: 45,
   ui: 40,

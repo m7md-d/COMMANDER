@@ -2,10 +2,12 @@ import type { Delivery } from "@commander/shared";
 import { useTranslate } from "@/shared/i18n/I18nProvider";
 import { formatDateTime } from "@/shared/lib/format";
 import { Button } from "@/shared/components/Button";
+import { DeliveryReport } from "./DeliveryReport";
 
 interface DeliveryCardProps {
   delivery: Delivery;
-  onRetry: (id: string) => void;
+  /** The resend button (0012): a first report, or a rewrite of one already sent. */
+  onResend: (id: string) => void;
   onArchive: (id: string) => void;
   onRestore: (id: string) => void;
   busy: boolean;
@@ -24,7 +26,7 @@ interface DeliveryCardProps {
  */
 export function DeliveryCard({
   delivery,
-  onRetry,
+  onResend,
   onArchive,
   onRestore,
   busy,
@@ -55,9 +57,12 @@ export function DeliveryCard({
       </div>
 
       {compact ? null : (
-        <p className="dispatch-reason">
-          {t(`delivery.reason.${delivery.reason}`, delivery.reasonDetail)}
-        </p>
+        <>
+          <p className="dispatch-reason">
+            {t(`delivery.reason.${delivery.reason}`, delivery.reasonDetail)}
+          </p>
+          <DeliveryReport delivery={delivery} />
+        </>
       )}
 
       <footer className="dispatch-foot">
@@ -66,9 +71,9 @@ export function DeliveryCard({
           {t("delivery.attempts")}: {delivery.attempts}
         </span>
         <span className="spacer" />
-        {failed ? (
-          <Button size="sm" loading={busy} onClick={() => onRetry(delivery.id)}>
-            {t("action.retry")}
+        {delivery.resend ? (
+          <Button size="sm" loading={busy} onClick={() => onResend(delivery.id)}>
+            {t(`dispatch.resend.${delivery.resend}`)}
           </Button>
         ) : null}
         {archived ? (

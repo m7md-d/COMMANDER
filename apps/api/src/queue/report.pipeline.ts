@@ -33,6 +33,7 @@ import { requestCompletion } from "@/integrations/openrouter/openrouter.client.j
 import { readRepoConstitution } from "@/modules/dossier/enrichment.service.js";
 import { readStructureDigest } from "@/modules/repositories/scan.service.js";
 import { buildEmbed, type DiscordEmbed } from "@/integrations/discord/embed.builder.js";
+import { withRewrite } from "@/domain/report/generation.js";
 
 const log = createLogger("pipeline");
 
@@ -98,6 +99,8 @@ interface ComposeInput {
   reviews: ReviewedCommit[];
   /** The branch's watcher. Absent in the preview, which has no real branch. */
   watcher?: Watcher;
+  /** The text this report rewrites, when it is asked for again after being sent (0012). */
+  rewrites?: string | null;
 }
 
 /** Turns the push and the member's history into the two rendered prompts. */
@@ -151,10 +154,9 @@ export async function composeReport(input: ComposeInput): Promise<ComposedReport
     readRepoConstitution(repository.id).catch(() => null),
     readStructureDigest(repository.id).catch(() => null),
   ]);
-  const { values, systemPrompt, userPrompt } = renderPrompts(input, member, {
-    constitution,
-    structure,
-  });
+  const rendered = renderPrompts(input, member, { constitution, structure });
+  const { values, systemPrompt } = rendered;
+  const userPrompt = withRewrite(rendered.userPrompt, { locale, previous: input.rewrites ?? null });
 
   const completion = await requestCompletion({
     // Branch, then repository, then the global default. A sensitive branch may
@@ -166,8 +168,8 @@ export async function composeReport(input: ComposeInput): Promise<ComposedReport
     maxTokens: settings.maxTokens,
   });
 
-  // A failed generation must never block the report: Discord still gets a
-  // plain sentence, and the failure is recorded on the delivery row.
+  // The preview shows this sentence when the model fails; the worker never
+  // sends it — a failed report is retried or held (`afterGeneration`, 0012).
   const reportText = completion.ok ? completion.text : fallbackReport(locale, values);
 
   return {
@@ -183,6 +185,7 @@ export async function composeReport(input: ComposeInput): Promise<ComposedReport
       violations,
       commendations: input.commendations,
       reportText,
+      rewrite: Boolean(input.rewrites),
     }),
     llmOk: completion.ok,
     llmError: completion.ok ? null : completion.error,

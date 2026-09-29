@@ -44,7 +44,15 @@ export interface ReconcileEvent {
   clock: number;
 }
 
-export type RemoteEvent = PushEvent | ReconcileEvent;
+/**
+ * Not GitHub's: the outbox running the last delivery again — Discord refused it
+ * (a 429, a 5xx) and the worker retries, or someone pressed retry in the panel.
+ */
+export interface RetryEvent {
+  kind: "retry";
+}
+
+export type RemoteEvent = PushEvent | ReconcileEvent | RetryEvent;
 
 export type MergeStyle = "merge" | "squash" | "rebase";
 
@@ -126,6 +134,11 @@ export class Story {
       remote: new Map(this.remote),
       lost: false,
     });
+  }
+
+  /** The last delivery runs again, as the outbox runs it after Discord refused it. */
+  retryLastDelivery(): void {
+    this.events.push({ kind: "retry" });
   }
 
   /** The reconciler's periodic pass, which is the only thing that sees a lost push. */

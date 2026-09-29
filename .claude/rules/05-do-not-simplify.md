@@ -99,6 +99,13 @@ code.
   send", never "do not remember": tied together, a front with no channel lost every charge, and a
   silent front's clean pushes left holes the reconciler recovered again on every pass. The order
   in the processor is the whole fix, and `tests/coverage/recording.test.ts` holds it.
+- **A push is judged once; a report is sent as often as it takes** (0012). The row keeps its
+  judgement (`deliveries.judgement`, `report.kept.ts`), and everything after — the outbox's retry
+  when Discord refuses, the resend button, a rewrite — writes and sends from it. Running the
+  processor from the start again looks equivalent and is not: the pusher's charges were recorded
+  twice, and the commits now on record dropped out of the second report (D-31). A report the model
+  did not write is retried, then held with its reason — never replaced by a sentence
+  (`afterGeneration`). `tests/coverage/recording.test.ts` holds both orders.
 - **The record is `ledger_events`, not `violation_events`, and every query names its `kind`.** A
   record that can only hold accusations produces a system that can only accuse, so `improved` is
   written as a `commendation` beside the charge — never netted against it, never in place of it.

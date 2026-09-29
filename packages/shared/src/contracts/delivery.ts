@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { DELIVERY_STATUSES } from "../domain/delivery.js";
-import type { DeliveryReason, DeliveryStatus } from "../domain/delivery.js";
+import type { DeliveryReason, DeliveryStatus, ResendKind } from "../domain/delivery.js";
 
 /**
  * Which shelf to read. `active` is the default so the main view never shows
@@ -52,6 +52,32 @@ export interface Delivery {
   completedAt: string | null;
   /** Null while active; a timestamp once moved to the archive shelf. */
   archivedAt: string | null;
+  /** What the push was judged with, kept on the row (0012). Null before 0012, and on rows never judged. */
+  judgement: DeliveryJudgement | null;
+  /** What the resend button does here, or null when there is nothing to resend (`resendKind`). */
+  resend: ResendKind | null;
+  /** The row this one rewrites, when it was asked for again after being sent. */
+  resendOf: string | null;
+}
+
+/** One charge or credit, and who answers for it. */
+export interface DeliveryFinding {
+  ruleId: string;
+  login: string;
+}
+
+export interface DeliveryJudgement {
+  /** What happened (`PushKind`), and the pull request that landed it. */
+  event: { kind: string; pull: number | null };
+  mainLine: boolean;
+  charges: DeliveryFinding[];
+  credits: DeliveryFinding[];
+}
+
+/** One row read on its own: the list's fields, and what the model was given. */
+export interface DeliveryDetail extends Delivery {
+  systemPrompt: string | null;
+  userPrompt: string | null;
 }
 
 export interface DeliveryPage {

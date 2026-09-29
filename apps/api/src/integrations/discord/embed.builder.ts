@@ -63,6 +63,8 @@ interface EmbedInput {
   violations: ViolationHit[];
   commendations: Commendation[];
   reportText: string;
+  /** A report asked for again after it was sent: the channel sees it is the second (0012). */
+  rewrite?: boolean;
 }
 
 /** The identity line and the two ledgers, in reading order. */
@@ -105,7 +107,7 @@ export function buildEmbed(input: EmbedInput): DiscordEmbed {
     // something is a flagged push, and tinting it clean would bury the finding.
     color: violations.length > 0 ? EMBED_COLOR_FLAGGED : EMBED_COLOR_CLEAN,
     fields: buildFields(input),
-    footer: { text: t(locale, "report.footer") },
+    footer: { text: input.rewrite ? `${t(locale, "report.footer")} · ${t(locale, "report.rewriteFooter")}` : t(locale, "report.footer") },
     timestamp: new Date().toISOString(),
   };
 

@@ -1,12 +1,5 @@
 import type { Delivery as PrismaDelivery } from "@prisma/client";
-import type {
-  Commendation,
-  NormalizedPush,
-  Repository,
-  Settings,
-  ViolationHit,
-  Watcher,
-} from "@commander/shared";
+import type { DeliveryReason, NormalizedPush, Repository } from "@commander/shared";
 import { readOccasion, resolveWatcher } from "@commander/shared";
 import { fromJson } from "@/core/json.js";
 import { env } from "@/config/env.js";
@@ -26,6 +19,8 @@ import { deliver } from "./delivery.dispatch.js";
 import { processDigest } from "./digest.processor.js";
 import { enrichPush, readPull } from "./push.enrich.js";
 import { markFailed, markSkipped } from "./outbox.service.js";
+import { keptReport, readKeptReport, type KeptReport } from "./report.kept.js";
+import { keepJudgement } from "./report.record.js";
 
 const log = createLogger("processor");
 
@@ -65,23 +60,38 @@ function resolvePrompt(promptId: string | null) {
 }
 
 /**
- * Gathers the facts and does what `admitPush` and `judgePush` decide. Every
- * branch below acts on a decision; none of them makes one.
+ * A push is judged once and sent as often as it takes (0012). A row that kept
+ * its judgement — a retry after Discord refused it, the resend button, a
+ * rewrite — goes straight to writing and sending: judging it again recorded
+ * the pusher's charges twice and told a different story (D-31).
  */
 async function run(job: PrismaDelivery, received: NormalizedPush): Promise<void> {
+  const kept = readKeptReport(job.judgement);
+  if (kept) return send(job, kept);
+
+  const judged = await judge(job, received);
+  if (judged) await send(job, judged);
+}
+
+/**
+ * Gathers the facts, does what `admitPush` and `judgePush` decide, records the
+ * push and keeps its judgement on the row. Every branch acts on a decision; none
+ * of them makes one. Null when the push is not to be sent, the row marked why.
+ */
+async function judge(job: PrismaDelivery, received: NormalizedPush): Promise<KeptReport | null> {
   const settings = await getSettings();
-  if (settings.paused) return markSkipped(job.id, "system_paused");
+  if (settings.paused) return skip(job, "system_paused");
 
   const repository = await findByFullName(received.repoFullName);
-  if (!repository) return markSkipped(job.id, "repo_not_configured");
+  if (!repository) return skip(job, "repo_not_configured");
 
   const admission = admitPush({ repository, push: received });
-  if (!admission.read) return markSkipped(job.id, admission.reason);
+  if (!admission.read) return skip(job, admission.reason);
   // Before the judging gate, not after: a push we choose not to judge still
   // moved the code, and a snapshot that skips those pushes would drift until the
   // next reconcile and blame the wrong person for what it then finds.
   const touched = await refreshTree(repository.id);
-  if (!admission.judged) return markSkipped(job.id, admission.reason);
+  if (!admission.judged) return skip(job, admission.reason);
 
   // Real file and line counts before either the rules or the report read them.
   const push = await enrichPush(repository, received);
@@ -93,30 +103,24 @@ async function run(job: PrismaDelivery, received: NormalizedPush): Promise<void>
   // After the measurement, which is what fills in the notes it reads.
   await refreshTodos(repository.id, touched);
 
-  const webhookUrl = repository.discordWebhookUrl || env.DISCORD_WEBHOOK_URL || "";
-  const judgement = judgePush(
-    {
-      push,
-      knownShas,
-      pull,
-      rules: repository.rules,
-      timezoneOffset: settings.timezoneOffset,
-      watchers: repository.watchers,
-      checks,
-      silentWhenClean: repository.silentWhenClean,
-      hasChannel: webhookUrl !== "",
-    },
-    logRuleError,
-  );
+  const rules = { rules: repository.rules, timezoneOffset: settings.timezoneOffset, watchers: repository.watchers };
+  const gates = { silentWhenClean: repository.silentWhenClean, hasChannel: webhookOf(repository) !== "" };
+  const judgement = judgePush({ push, knownShas, pull, checks, ...rules, ...gates }, logRuleError);
   // Recorded whether or not it is sent: silence means "do not send", never
-  // "do not remember" (0009 §5).
+  // "do not remember" (0009 §5). Kept on the row, so a resend has it (0012).
   const history = await record(job, { push, knownShas, repository, judgement });
-  if (judgement.withheld !== null) return markSkipped(job.id, judgement.withheld);
-
-  const { violations, commendations, event } = judgement;
-  const watcher = resolveWatcher(repository.watchers, push.branch);
-  await report(job, { push, event, repository, settings, violations, commendations, history, webhookUrl, watcher });
+  const kept = keptReport({ push, judgement, history });
+  await keepJudgement(job.id, kept);
+  return judgement.withheld === null ? kept : skip(job, judgement.withheld);
 }
+
+async function skip(job: PrismaDelivery, reason: DeliveryReason): Promise<null> {
+  await markSkipped(job.id, reason);
+  return null;
+}
+
+/** The front's own channel, or the default. */
+const webhookOf = (repository: Repository): string => repository.discordWebhookUrl || env.DISCORD_WEBHOOK_URL || "";
 
 /**
  * Everything the push leaves behind — for every judged push, sent or not.
@@ -143,40 +147,27 @@ async function record(
 }
 
 /**
- * Generation and delivery. `judgePush` decided *whether* this push is reported;
- * this decides *what the report says* — and it is here that the code review
- * runs, before the model writes a word about work it would otherwise only see
- * the commit titles of.
+ * Writing and sending, from what was kept. Nothing here judges or records: a
+ * row may pass through it many times. The front is read afresh — its persona,
+ * channel and pause as they are now — and the code review runs here, before
+ * the model writes a word about work it would otherwise only see the titles of.
  */
-async function report(
-  job: PrismaDelivery,
-  ctx: {
-    push: NormalizedPush;
-    event: Judgement["event"];
-    repository: Repository;
-    settings: Settings;
-    violations: ViolationHit[];
-    commendations: Commendation[];
-    history: Awaited<ReturnType<typeof recordPush>>;
-    webhookUrl: string;
-    watcher: Watcher;
-  },
-): Promise<void> {
+async function send(job: PrismaDelivery, kept: KeptReport): Promise<void> {
+  const settings = await getSettings();
+  if (settings.paused) return markSkipped(job.id, "system_paused");
+  const repository = await findByFullName(kept.push.repoFullName);
+  if (!repository) return markSkipped(job.id, "repo_not_configured");
+  const webhookUrl = webhookOf(repository);
+  if (!webhookUrl) return markSkipped(job.id, "discord_missing");
+
+  const watcher = resolveWatcher(repository.watchers, kept.push.branch);
   const [prompt, reviews] = await Promise.all([
     // The branch's own persona when it names one, otherwise the repository's.
-    resolvePrompt(ctx.watcher.promptId ?? ctx.repository.promptId),
-    reviewPushCommits(
-      ctx.repository.id,
-      ctx.push.commits.map((commit) => commit.sha),
-    ).catch(() => []),
+    resolvePrompt(watcher.promptId ?? repository.promptId),
+    reviewPushCommits(repository.id, kept.push.commits.map((commit) => commit.sha)).catch(() => []),
   ]);
 
-  const composed = await composeReport({ ...ctx, prompt, reviews });
-  await deliver({
-    job,
-    webhookUrl: ctx.webhookUrl,
-    composed,
-    violationCount: ctx.violations.length,
-  });
+  const { push, event, violations, commendations, history, rewrites } = kept;
+  const composed = await composeReport({ push, event, repository, settings, violations, commendations, history, watcher, prompt, reviews, rewrites });
+  await deliver({ job, webhookUrl, composed, violationCount: violations.length });
 }
-

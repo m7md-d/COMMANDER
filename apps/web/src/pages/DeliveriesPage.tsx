@@ -7,7 +7,7 @@ import {
   useArchiveDelivery,
   useDeliveries,
   useRestoreDelivery,
-  useRetryDelivery,
+  useResendDelivery,
 } from "@/features/deliveries/hooks";
 import { useRepositories } from "@/features/repositories/hooks";
 import { SlipsSkeleton } from "@/features/deliveries/components/SlipsSkeleton";
@@ -40,10 +40,10 @@ export function DeliveriesPage() {
   };
   const deliveries = useDeliveries({ ...filters, scope });
 
-  const retry = useRetryDelivery();
+  const resend = useResendDelivery();
   const archive = useArchiveDelivery();
   const restore = useRestoreDelivery();
-  const busy = archive.isPending || restore.isPending || retry.isPending;
+  const busy = archive.isPending || restore.isPending || resend.isPending;
 
   const items: Delivery[] = sortDeliveries(deliveries.data?.items ?? [], sort);
   const fail = (error: unknown) =>
@@ -98,7 +98,7 @@ export function DeliveriesPage() {
                 delivery={delivery}
                 compact={compact}
                 busy={busy}
-                onRetry={(id) => retry.mutate(id, { onError: fail })}
+                onResend={(id) => resend.mutate(id, { onSuccess: () => notify(t("dispatch.resentToast")), onError: fail })}
                 onArchive={(id) =>
                   archive.mutate(id, { onSuccess: () => notify(t("dispatch.archivedToast")), onError: fail })
                 }

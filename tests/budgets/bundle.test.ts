@@ -77,3 +77,23 @@ test("vendor code stays split from ours", () => {
     assert.ok(names.has(expected), `expected a "${expected}" chunk, saw: ${[...names].join(", ")}`);
   }
 });
+
+/**
+ * The panel shows one language at a time, so it loads one dictionary, on its
+ * own, when it needs it (UI-AUDIT #22, ROADMAP 4.1). Both used to ride in
+ * `index`, and every feature's text was paid twice by every browser. A key that
+ * appears in `index` means a dictionary was pulled back in — by a static import
+ * of `t`, `DICTIONARIES` or a locale file.
+ */
+test("each dictionary loads on its own, and none rides in index", () => {
+  const files = readdirSync(ASSETS).filter((file) => file.endsWith(".js"));
+  const names = new Set(files.map(chunkName));
+  const index = files.filter((file) => chunkName(file) === "index").map((file) => readFileSync(join(ASSETS, file), "utf8")).join("");
+
+  for (const locale of ["ar", "en"]) {
+    assert.ok(names.has(locale), `expected a "${locale}" dictionary chunk, saw: ${[...names].join(", ")}`);
+  }
+  // A key only the API reads: the panel's own code never names it, so the only
+  // way it reaches `index` is inside a dictionary.
+  assert.ok(!index.includes('"report.fallback"'), 'the index chunk holds a dictionary (its "report.fallback" key): a static import pulled one back into it. Load the locale through I18nProvider\'s dynamic import.');
+});

@@ -16,7 +16,7 @@ import {
   purge,
   read,
   restore,
-  retry,
+  resend,
   sendDigest,
   testSend,
 } from "./deliveries.controller.js";
@@ -34,6 +34,6 @@ deliveriesRouter.post("/archive", validate(deliveryArchiveSchema), asyncHandler(
 deliveriesRouter.delete("/archive", asyncHandler(purge));
 
 deliveriesRouter.get("/:id", asyncHandler(read));
-deliveriesRouter.post("/:id/retry", asyncHandler(retry));
+deliveriesRouter.post("/:id/resend", asyncHandler(resend));
 deliveriesRouter.post("/:id/archive", asyncHandler(archive));
 deliveriesRouter.post("/:id/restore", asyncHandler(restore));
