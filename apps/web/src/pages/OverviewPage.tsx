@@ -12,7 +12,8 @@ import { Card } from "@/shared/components/Card";
 import { Button } from "@/shared/components/Button";
 import { Badge } from "@/shared/components/Badge";
 import { QueryState } from "@/shared/components/QueryState";
-import { RepositoryPicker, resolveSelected } from "@/shared/components/RepositoryPicker";
+import { RepositoryPicker } from "@/shared/components/RepositoryPicker";
+import { resolveSelected } from "@/shared/lib/defaultFront";
 import { Leaderboard } from "@/features/stats/components/Leaderboard";
 
 export function OverviewPage() {
@@ -41,13 +42,6 @@ export function OverviewPage() {
         eyebrow={t("nav.groupOperations")}
         title={t("overview.title")}
         subtitle={t("overview.subtitle")}
-        actions={
-          <RepositoryPicker
-            repositories={repositories.data?.repositories ?? []}
-            value={selected?.id ?? null}
-            onChange={setSelectedId}
-          />
-        }
       />
 
       {settings.data?.paused ? (
@@ -72,11 +66,20 @@ export function OverviewPage() {
       <Card
         title={t("overview.leaderboard")}
         actions={
-          selected ? (
-            <Button size="sm" variant="danger" onClick={handleReset} loading={reset.isPending}>
-              {t("overview.resetStats")}
-            </Button>
-          ) : null
+          // The picker filters this board alone: the tiles above count every
+          // front, and in the page header it read as their scope (W-09).
+          <div className="row">
+            <RepositoryPicker
+              repositories={repositories.data?.repositories ?? []}
+              value={selected?.id ?? null}
+              onChange={setSelectedId}
+            />
+            {selected ? (
+              <Button size="sm" variant="danger" onClick={handleReset} loading={reset.isPending}>
+                {t("overview.resetStats")}
+              </Button>
+            ) : null}
+          </div>
         }
       >
         {selected ? (

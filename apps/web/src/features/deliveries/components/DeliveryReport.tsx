@@ -1,7 +1,7 @@
 import type { Delivery, DeliveryFinding } from "@commander/shared";
 import { useTranslate } from "@/shared/i18n/I18nProvider";
 import { DeliveryPrompts } from "./DeliveryPrompts";
-import { ProviderFailure } from "./ProviderFailure";
+import { ProviderFailure } from "@/shared/components/ProviderFailure";
 
 interface DeliveryReportProps {
   delivery: Delivery;
@@ -56,7 +56,7 @@ function Findings({ title, entries }: { title: string; entries: DeliveryFinding[
       {entries.map((entry, index) => (
         <span key={`${entry.ruleId}-${entry.login}-${index}`} className="dispatch-finding">
           {t(`rule.${entry.ruleId}.label`)}
-          {" ← "}
+          {` ${t("dispatch.chargedTo")} `}
           <span className="ltr mono">{entry.login}</span>
         </span>
       ))}

@@ -6,7 +6,7 @@ import { ScreenReadout, type ReadoutRow } from "@/shared/components/ScreenReadou
 import { TelegraphTape, type TapeLine } from "@/shared/components/TelegraphTape";
 import { ConsoleButton } from "@/shared/components/ConsoleButton";
 import { Clock } from "@/shared/components/Clock";
-import { toReadout, toTape } from "@/features/command-post/present";
+import { retryFor, toReadout, toTape } from "@/features/command-post/present";
 import { CONSOLE_STATIONS } from "@/app/nav-items";
 
 /**
@@ -44,7 +44,7 @@ export function HeadquartersPage() {
           <ScreenReadout
             pending={stats.isPending}
             error={stats.error}
-            onRetry={() => void stats.refetch()}
+            onRetry={retryFor(stats.error, () => void stats.refetch())}
             rows={rows}
           />
         </CrtScreen>

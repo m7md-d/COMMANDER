@@ -4,6 +4,7 @@ import { useRepositories } from "@/features/repositories/hooks";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Card } from "@/shared/components/Card";
 import { Field } from "@/shared/components/Field";
+import { Input } from "@/shared/components/Input";
 import { CopyField } from "@/shared/components/CopyField";
 
 /**
@@ -38,8 +39,9 @@ export function SetupPage() {
         <Card title={t("setup.step2")} hint={t("setup.step2Hint")}>
           <div className="stack">
             <Field label={t("setup.payloadUrl")}>
-              {() => (
+              {(id) => (
                 <CopyField
+                  id={id}
                   value={repositories.data?.webhookUrl ?? ""}
                   copyLabel={t("action.copy")}
                   copiedLabel={t("action.copied")}
@@ -47,7 +49,7 @@ export function SetupPage() {
               )}
             </Field>
             <Field label={t("setup.secretField")} hint={t("setup.secretFieldHint")}>
-              {() => <p className="code-block ltr">GITHUB_WEBHOOK_SECRET</p>}
+              {(id) => <Input id={id} value="GITHUB_WEBHOOK_SECRET" readOnly ltr />}
             </Field>
           </div>
         </Card>

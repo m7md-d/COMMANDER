@@ -107,7 +107,9 @@
   --color-screen-bg: var(--palette-screen);
   --color-screen-text: var(--palette-phosphor);
   --color-screen-bright: var(--palette-phosphor-bright);
-  --color-screen-dim: rgb(95 200 120 / 45%);
+  /* 70% is 4.98 : 1 on the tube. It was 45% — 2.73 : 1, and the labels beside
+     the figures could barely be read (docs/UI-DEFECTS.md W-10). */
+  --color-screen-dim: rgb(95 200 120 / 70%);
   --color-screen-line: rgb(95 200 120 / 9%);
   --color-screen-glow: rgb(95 200 120 / 22%);
   --color-screen-edge: rgb(95 200 120 / 32%);

@@ -6,7 +6,7 @@ import {
 } from "@commander/shared";
 import { useTranslate } from "@/shared/i18n/I18nProvider";
 import { ChipInput } from "@/shared/components/ChipInput";
-import { Field } from "@/shared/components/Field";
+import { Field, labelOf } from "@/shared/components/Field";
 import { NumberField } from "@/shared/components/NumberField";
 import { Toggle } from "@/shared/components/Toggle";
 
@@ -73,8 +73,9 @@ export function CheckFields({ value, onChange, inherited }: CheckFieldsProps) {
                   label={t("checks.include")}
                   hint={t("checks.inherited", { value: base.include.length })}
                 >
-                  {() => (
+                  {(id) => (
                     <ChipInput
+                      labelledBy={labelOf(id)}
                       values={layer.include ?? base.include}
                       onChange={(include) => patch(metric, { include })}
                       addLabel={t("checks.patternAdd")}
@@ -87,8 +88,9 @@ export function CheckFields({ value, onChange, inherited }: CheckFieldsProps) {
                   label={t("checks.exclude")}
                   hint={t("checks.inherited", { value: base.exclude.length })}
                 >
-                  {() => (
+                  {(id) => (
                     <ChipInput
+                      labelledBy={labelOf(id)}
                       values={layer.exclude ?? base.exclude}
                       onChange={(exclude) => patch(metric, { exclude })}
                       addLabel={t("checks.patternAdd")}

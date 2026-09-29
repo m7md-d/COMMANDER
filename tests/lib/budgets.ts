@@ -65,3 +65,10 @@ export const RESPONSE_MS = {
 
 /** Where the built web assets land, relative to the repository root. */
 export const WEB_DIST = "apps/web/dist";
+
+/**
+ * The least contrast text may have against what it is drawn on — WCAG 2.1 AA
+ * for body-size text. The situation screens' labels drew at 2.73 : 1 and could
+ * barely be read (docs/UI-DEFECTS.md W-10).
+ */
+export const TEXT_CONTRAST_MIN = 4.5;

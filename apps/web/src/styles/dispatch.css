@@ -152,6 +152,13 @@
   color: var(--color-text-muted);
 }
 
+.dispatch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+
 .dispatch-actor {
   color: var(--color-text);
 }

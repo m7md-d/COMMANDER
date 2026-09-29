@@ -81,8 +81,12 @@ samp,
 }
 
 /* Code, URLs and repository names are LTR regardless of the surrounding text. */
+/* `direction` alone does nothing to an inline box: it still takes part in its
+   paragraph's reordering, and a login beside an Arabic label traded places with
+   it (docs/UI-DEFECTS.md W-05). Isolated, it keeps its own order. */
 .ltr {
   direction: ltr;
+  unicode-bidi: isolate;
   text-align: start;
 }
 

@@ -36,6 +36,8 @@ export interface PreviewResult {
   violations: { ruleId: string; detail: Record<string, string | number> }[];
   llmOk: boolean;
   llmError: string | null;
+  /** What the provider said, field by field, when it refused (`failureDetail`); null when no request was made. */
+  llmFailure: Record<string, string | number> | null;
   model: string;
 }
 

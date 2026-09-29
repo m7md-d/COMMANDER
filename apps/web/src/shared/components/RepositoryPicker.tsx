@@ -26,9 +26,3 @@ export function RepositoryPicker({ repositories, value, onChange }: RepositoryPi
     />
   );
 }
-
-/** Falls back to the first repository so a page is never empty by accident. */
-export function resolveSelected(repositories: Repository[], selected: string | null): Repository | null {
-  if (repositories.length === 0) return null;
-  return repositories.find((repository) => repository.id === selected) ?? repositories[0] ?? null;
-}

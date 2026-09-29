@@ -1,0 +1,15 @@
+{
+  /*
+   * Type-checks the web's unit tests, which tsconfig.json leaves out: they run
+   * under Node (node:test), so they need Node's types, and the panel's own code
+   * must not see them — a `process` that type-checks in a component is one the
+   * browser does not have. Same settings otherwise, nothing emitted. The API
+   * does the same (apps/api/tsconfig.test.json).
+   */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src/**/*.test.ts"],
+  "exclude": []
+}

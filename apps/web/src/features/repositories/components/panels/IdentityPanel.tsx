@@ -52,8 +52,9 @@ export function IdentityPanel({
 
       <PanelSection label={t("front.sectionLine")} hint={t("front.sectionLineHint")}>
         <Field label={t("repos.webhookUrl")}>
-          {() => (
+          {(id) => (
             <CopyField
+              id={id}
               value={webhookUrl}
               copyLabel={t("action.copy")}
               copiedLabel={t("action.copied")}

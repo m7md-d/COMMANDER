@@ -61,6 +61,7 @@ export async function runPreview(request: PreviewRequest): Promise<PreviewResult
     violations: composed.violations.map((hit) => ({ ruleId: hit.ruleId, detail: hit.detail })),
     llmOk: composed.llmOk,
     llmError: composed.llmError,
+    llmFailure: composed.llmFailure,
     model: composed.model,
   };
 }

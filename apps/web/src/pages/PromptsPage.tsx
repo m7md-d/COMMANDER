@@ -15,6 +15,7 @@ import { Textarea } from "@/shared/components/Textarea";
 import { Badge } from "@/shared/components/Badge";
 import { EmptyState } from "@/shared/components/EmptyState";
 import { QueryState } from "@/shared/components/QueryState";
+import { PreviewOutcome } from "@/features/prompts/components/PreviewOutcome";
 
 export function PromptsPage() {
   const t = useTranslate();
@@ -103,12 +104,7 @@ export function PromptsPage() {
             {preview.isPending ? (
               <EmptyState message={t("prompt.previewRunning")} />
             ) : preview.data ? (
-              <div className="stack">
-                {!preview.data.llmOk ? (
-                  <Badge tone="danger">{t("delivery.reason.llm_failed")}</Badge>
-                ) : null}
-                <div className="report-block">{preview.data.reportText}</div>
-              </div>
+              <PreviewOutcome result={preview.data} />
             ) : (
               <EmptyState message={t("prompt.previewEmpty")} />
             )}

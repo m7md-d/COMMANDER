@@ -50,6 +50,7 @@ npm run verify           # typecheck + lint + build + test  ← قبل ادّع�
 | `layering.test.ts` | §٢ و§٥.١ ودستور الفرونت §١ و§٨ — اتجاه الاعتماد |
 | `purity.test.ts` | §٢ و§٣ و§٦ — لا `any`، لا ابتلاع خطأ، لا نص مرئي في الكود |
 | `identity.test.ts` | دستور الفرونت §٢ و§٣ — التوكنز والاتجاه المنطقي |
+| `contrast.test.ts` | ألوان نصوص شاشات المقرّ دون `TEXT_CONTRAST_MIN` أمام الأنبوب. axe لا يحكم على نصٍّ فوق خلفية مركّبة، فالنسبة تُحسب من الرموز ([UI-DEFECTS.md](../docs/UI-DEFECTS.md) W-10) |
 | `naming.test.ts` | §٥ — الاصطلاحات، **وهي ليست زينة**: الحرّاس أعلاه يجدون ضحاياهم بلاحقة الدور |
 
 ### `coverage/` — لا شيء بلا فائدة، ولا ناقص
@@ -66,6 +67,7 @@ npm run verify           # typecheck + lint + build + test  ← قبل ادّع�
 | `tooling.test.ts` | سكربت npm يكتب محرّك حاويات حرفياً بدل `scripts/compose.sh` · سكربت يبني صورة ولا يستبدل الحاوية |
 | `images.test.ts` | صورة حاوية بلا اسم سجلّ — بودمان يسأل عنها، والنشر لا أحد عنده ليجيب |
 | `tracked.test.ts` | ملفّ مصدر يتجاهله git — أي لن يوجد في نسخة جديدة |
+| `field-labels.test.ts` | `<Field>` تُسقط دالةُ عرضه المعرّفَ، فتبقى التسمية مربوطة بلا شيء ويُقرأ الحقل بلا اسم ([UI-DEFECTS.md](../docs/UI-DEFECTS.md) W-12) |
 
 `tracked.test.ts` مكتوب من عطل وقع فعلاً: `.gitignore` فيها `coverage/` مقصودةً لمخرجات
 أداة تغطية، وgit يطابق الاسم **في أي عمق** — فابتلعت `tests/coverage/` بكاملها، ثمانية

@@ -37,7 +37,7 @@ export function FrontLetterhead({ front, serial, actions }: FrontLetterheadProps
         {actions}
       </div>
 
-      <strong className="file-subject ltr">{front.fullName || t("state.unnamed")}</strong>
+      <h1 className="file-subject ltr">{front.fullName || t("state.unnamed")}</h1>
 
       <dl className="file-particulars">
         <div>

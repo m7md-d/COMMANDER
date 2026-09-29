@@ -19,7 +19,9 @@ export function toReadout(stats: OverviewStats | undefined, t: Translate): Reado
     { key: "repositories", label: t("nav.repositories"), value: stats?.repositoryCount ?? null },
     { key: "members", label: t("nav.members"), value: stats?.memberCount ?? null },
     { key: "violations", label: t("dossier.totalViolations"), value: stats?.violationCount ?? null },
-    { key: "pending", label: t("nav.deliveries"), value: stats?.pendingDeliveries ?? null },
+    // What waits in the queue, named as the operations room names it. Under the
+    // dispatches page's name it read "dispatches 000" beside six on record (W-02).
+    { key: "pending", label: t("overview.pendingDeliveries"), value: stats?.pendingDeliveries ?? null },
   ];
 }
 
@@ -40,4 +42,15 @@ export function toTape(items: Delivery[]): TapeLine[] {
     text: `${delivery.repositoryFullName} · ${delivery.actorLogin || "—"}`,
     tone: TONE[delivery.status],
   }));
+}
+
+/**
+ * The screen's retry, or none. The public headquarters asks for data a visitor
+ * is not allowed to read: a 401 answers the same every time, so a retry beside
+ * it could never change anything (docs/UI-DEFECTS.md W-17). Anything else — a
+ * network blip, a restart — may pass.
+ */
+export function retryFor(error: unknown, refetch: () => void): (() => void) | undefined {
+  const unauthorized = typeof error === "object" && error !== null && "status" in error && error.status === 401;
+  return unauthorized ? undefined : refetch;
 }

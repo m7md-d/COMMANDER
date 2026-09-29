@@ -13,7 +13,10 @@ export function formatDateTime(value: string | null, fallback: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return fallback;
 
-  return date.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+  // First-strong isolated (FSI…PDI): the date is in the browser's language and
+  // the sentence around it in the panel's. Without it an Arabic date inside the
+  // English panel was reordered by its neighbours (docs/UI-DEFECTS.md W-06).
+  return `\u2068${date.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}\u2069`;
 }
 
 const KB = 1024;

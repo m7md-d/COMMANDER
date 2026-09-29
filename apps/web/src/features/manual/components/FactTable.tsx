@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { rowKey } from "@/features/manual/rowKey";
 
 interface FactTableProps {
   /** Column headings. Their count defines the table's width. */
@@ -31,7 +32,7 @@ export function FactTable({ head, rows }: FactTableProps) {
         </thead>
         <tbody>
           {rows.map((cells, row) => (
-            <tr key={String(cells[0]) || row}>
+            <tr key={rowKey(cells, row)}>
               {cells.map((cell, column) =>
                 column === 0 ? (
                   <th scope="row" key={column}>

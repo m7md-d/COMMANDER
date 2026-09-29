@@ -3,12 +3,14 @@ import { Button } from "./Button";
 import { Input } from "./Input";
 
 interface CopyFieldProps {
+  /** The id its Field's label points at. */
+  id: string;
   value: string;
   copyLabel: string;
   copiedLabel: string;
 }
 
-export function CopyField({ value, copyLabel, copiedLabel }: CopyFieldProps) {
+export function CopyField({ id, value, copyLabel, copiedLabel }: CopyFieldProps) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -24,7 +26,7 @@ export function CopyField({ value, copyLabel, copiedLabel }: CopyFieldProps) {
 
   return (
     <div className="row">
-      <Input value={value} readOnly ltr />
+      <Input id={id} value={value} readOnly ltr />
       <Button size="sm" onClick={() => void copy()}>
         {copied ? copiedLabel : copyLabel}
       </Button>

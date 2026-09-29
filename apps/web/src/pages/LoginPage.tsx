@@ -21,7 +21,7 @@ export function LoginPage({ configured }: { configured: boolean }) {
   };
 
   return (
-    <div className="auth-screen">
+    <main className="auth-screen">
       <div className="auth-card stack">
         <div>
           <h1 className="page-title">{t("auth.title")}</h1>
@@ -58,6 +58,6 @@ export function LoginPage({ configured }: { configured: boolean }) {
           options={LOCALES.map((entry) => ({ value: entry.id, label: entry.name }))}
         />
       </div>
-    </div>
+    </main>
   );
 }

@@ -20,7 +20,7 @@ export function Card({ title, hint, actions, accent = false, raised = false, chi
       {title || actions ? (
         <header className="card-header">
           <div>
-            {title ? <h3 className="card-title">{title}</h3> : null}
+            {title ? <h2 className="card-title">{title}</h2> : null}
             {hint ? <p className="hint">{hint}</p> : null}
           </div>
           <div className="spacer" />

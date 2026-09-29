@@ -10,7 +10,8 @@ import { PageHeader } from "@/shared/components/PageHeader";
 import { Card } from "@/shared/components/Card";
 import { EmptyState } from "@/shared/components/EmptyState";
 import { QueryState } from "@/shared/components/QueryState";
-import { RepositoryPicker, resolveSelected } from "@/shared/components/RepositoryPicker";
+import { RepositoryPicker } from "@/shared/components/RepositoryPicker";
+import { resolveSelected } from "@/shared/lib/defaultFront";
 
 export function DossierPage() {
   const t = useTranslate();

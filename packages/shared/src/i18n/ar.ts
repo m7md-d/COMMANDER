@@ -75,7 +75,7 @@ export const AR = {
   "auth.submit": "دخول",
   "auth.passwordRequired": "اكتب كلمة المرور",
   "auth.invalidPassword": "كلمة المرور غير صحيحة",
-  "auth.notConfigured": "ما تم ضبط DASHBOARD_PASSWORD في ملف .env. اضبطها وأعد تشغيل الحاويات.",
+  "auth.notConfigured": "ما تم ضبط DASHBOARD_PASSWORD في ملف \u2066.env\u2069. اضبطها وأعد تشغيل الحاويات.",
 
   "overview.title": "غرفة العمليات",
   "overview.subtitle": "حالة النظام وسجل الأفراد.",
@@ -108,12 +108,12 @@ export const AR = {
   "repos.notFound": "الريبو غير موجود",
   "repos.enabled": "مفعّل",
   "repos.branches": "الفروع المراقَبة",
-  "repos.branchesHint": "اتركها فاضية لمراقبة كل الفروع. يُقبل نجمة في النهاية مثل release/*",
+  "repos.branchesHint": "اتركها فاضية لمراقبة كل الفروع. يُقبل نجمة في النهاية مثل \u2066release/*\u2069",
   "repos.branchAdd": "أضف فرع",
   "repos.branchEmpty": "اسم الفرع فاضي",
   "repos.branchInvalid": "اسم الفرع ما يصلح يحتوي مسافات",
   "repos.discordUrl": "رابط Discord webhook",
-  "repos.discordUrlHint": "اتركه فاضي لاستخدام الرابط الافتراضي من ملف .env",
+  "repos.discordUrlHint": "اتركه فاضي لاستخدام الرابط الافتراضي من ملف \u2066.env\u2069",
   "repos.discordUrlInvalid": "هذا مو رابط webhook صالح من ديسكورد",
   "repos.model": "الناطق الخاص بالجبهة",
   "repos.modelHint": "اتركه فاضي لاستخدام النموذج الافتراضي من الإعدادات",
@@ -159,7 +159,7 @@ export const AR = {
   "rules.days": "الأيام",
 
   "rule.force_push.label": "دفع قسري",
-  "rule.force_push.hint": "يرصد إعادة كتابة تاريخ الفرع (git push --force).",
+  "rule.force_push.hint": "يرصد إعادة كتابة تاريخ الفرع (\u2066git push --force\u2069).",
   "rule.force_push.report": "دفع قسري أعاد كتابة تاريخ الفرع",
 
   "rule.batch_dump.label": "إغراق دفعة",
@@ -474,7 +474,7 @@ export const AR = {
   "scan.blocked.installationNotFound":
     "لا يوجد تثبيت بهذا الرقم لهذا التطبيق. تحقّق أنك لم تضع معرّف التثبيت مكان GITHUB_APP_ID: الأول رقم كبير في رابط التثبيت، والثاني صغير في صفحة التطبيق.",
   "scan.blocked.repoNotInInstallation":
-    "التطبيق مثبَّت على الحساب لكن ليس على هذا الريبو. في GitHub: Settings ← Applications ← Configure، وأضف الريبو إلى المسموح لها.",
+    "التطبيق مثبَّت على الحساب لكن ليس على هذا الريبو. في GitHub: \u2066Settings → Applications → Configure\u2069، وأضف الريبو إلى المسموح لها.",
   "scan.blocked.githubUnreachable":
     "تعذّر الوصول إلى GitHub — شبكة أو مهلة. الخادم لم يستلم رداً أصلاً.",
   "scan.blocked.githubRefused": "GitHub رفض الطلب لسبب آخر. التفصيل في سجلّ الـAPI.",
@@ -526,7 +526,7 @@ export const AR = {
   "settings.deliveryRetention": "مدة الاحتفاظ بسجل الإرسال (أيام)",
   "settings.paused": "إيقاف مؤقت للنظام",
   "settings.pausedHint": "يستقبل الويبهوك ويسجّله، لكن ما يرسل أي شي لديسكورد",
-  "settings.secretsHint": "تُضبط في ملف .env ولا تظهر قيمتها هنا أبداً",
+  "settings.secretsHint": "تُضبط في ملف \u2066.env\u2069 ولا تظهر قيمتها هنا أبداً",
   "settings.secretSet": "مضبوط",
   "settings.secretMissing": "ناقص",
 
@@ -561,6 +561,8 @@ export const AR = {
   "dispatch.rewriteOf": "إعادة كتابة لتقرير سابق",
   "dispatch.mainLine": "فرع رئيسي",
   "dispatch.charges": "التهم",
+  /** Points from a charge to whoever answers for it, the way the line is read. */
+  "dispatch.chargedTo": "←",
   "dispatch.credits": "المكافآت",
   "dispatch.report": "التقرير كما أُرسل",
   "dispatch.details": "التفاصيل",
@@ -625,10 +627,10 @@ export const AR = {
   "setup.step1": "١. أضف الريبو من صفحة الريبوهات",
   "setup.step2": "٢. اربط الويبهوك في GitHub",
   "setup.step2Hint":
-    "من الريبو: Settings ← Webhooks ← Add webhook. الـ Content type لازم يكون application/json، والحدث: Just the push event.",
+    "من الريبو: \u2066Settings → Webhooks → Add webhook\u2069. الـ Content type لازم يكون application/json، والحدث: Just the push event.",
   "setup.payloadUrl": "Payload URL",
   "setup.secretField": "Secret",
-  "setup.secretFieldHint": "نفس قيمة GITHUB_WEBHOOK_SECRET اللي في ملف .env",
+  "setup.secretFieldHint": "نفس قيمة GITHUB_WEBHOOK_SECRET اللي في ملف \u2066.env\u2069",
   "setup.step3": "٣. جرّب",
   "setup.step3Hint": "من صفحة الريبوهات اضغط تجربة، أو ادفع كوميت حقيقي.",
   "setup.step1Body": "من لوحة الموقف اضغط «إضافة ريبو»، ثم اكتب اسمه بصيغة owner/repo كما يظهر في رابط GitHub بالضبط. الجبهة الجديدة تُنشأ في مرحلة التأسيس وترصد كل الفروع حتى تضيّقها.",
@@ -730,7 +732,7 @@ export const AR = {
   "tier.probation": "تحت الاختبار",
   "tier.court_martial": "محكمة عسكرية",
   "repos.installationId": "معرّف تثبيت GitHub App",
-  "repos.installationHint": "من رابط التثبيت: /settings/installations/<id>. اتركه فاضياً لتعطيل الإثراء.",
+  "repos.installationHint": "من رابط التثبيت: \u2066/settings/installations/<id>\u2069. اتركه فاضياً لتعطيل الإثراء.",
   "repos.installationInvalid": "لازم يكون رقماً",
   "report.noViolations": "لا توجد مخالفات بهذه الدفعة.",
   "report.cleanRecord": "سجل نظيف حتى الآن",
@@ -842,7 +844,7 @@ export const AR = {
   "manual.link.reach.title": "المنصّة لا تحتاج منفذاً مفتوحاً",
   "manual.link.reach.body": "نفق كلاود فلير يفتح اتصالاً صادراً من الجهاز نحو الحافة، فيصل الويبهوك بلا أي منفذ داخل. البديل — Caddy على ٨٠ و٤٤٣ — مدعوم أيضاً، ويستلزم عنواناً عاماً حقيقياً.",
   "manual.link.branches.title": "قائمة فروع فارغة تعني كل الفروع",
-  "manual.link.branches.body": "قرار مقصود لا سهو: جبهة جديدة ترصد كل شيء حتى تُضيَّق. النجمة تُقبل في النهاية فقط، مثل release/*، لأن ما هو أغنى من ذلك يخفي مفاجآت أكثر ممّا يوفّر.",
+  "manual.link.branches.body": "قرار مقصود لا سهو: جبهة جديدة ترصد كل شيء حتى تُضيَّق. النجمة تُقبل في النهاية فقط، مثل \u2066release/*\u2069، لأن ما هو أغنى من ذلك يخفي مفاجآت أكثر ممّا يوفّر.",
   "manual.link.silence.title": "الصمت عند النظافة يُسجَّل ولا يُرسَل",
   "manual.link.silence.body": "الدفعة النظيفة مع تفعيل هذا الخيار تُكتب في السجل بسبب صريح، ولا تصل ديسكورد. السجل يبقى كاملاً؛ القناة وحدها تهدأ.",
   "manual.capability.violations": "رصد المخالفات",

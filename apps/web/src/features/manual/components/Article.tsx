@@ -18,7 +18,7 @@ interface ArticleProps {
 export function Article({ title, body, children }: ArticleProps) {
   return (
     <article className="article">
-      <h3 className="article-title">{title}</h3>
+      <h2 className="article-title">{title}</h2>
       <p className="article-body">{body}</p>
       {children}
     </article>

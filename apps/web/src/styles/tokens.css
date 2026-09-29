@@ -91,7 +91,13 @@
   /* ---------- typography ---------- */
   --font-sans: "IBM Plex Sans Arabic", "Segoe UI", system-ui, -apple-system, "Helvetica Neue",
     sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* No family before the generic one carried Arabic, so Arabic in a mono field
+     fell to `monospace` — Courier New on macOS — and every letter took the same
+     width (docs/UI-DEFECTS.md W-11). Named Arabic faces catch it, one per
+     platform; Latin never reaches them. `system-ui` does not: Chrome measured
+     still picking Courier New with it in the list. */
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "IBM Plex Sans Arabic",
+    "Segoe UI", "Geeza Pro", "Noto Sans Arabic", monospace;
 
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;

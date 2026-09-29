@@ -12,7 +12,7 @@
     "build": "npm run build -w @commander/shared && npm run build -w @commander/api && npm run build -w @commander/web",
     "typecheck": "npm run typecheck -w @commander/shared && npm run typecheck -w @commander/api && npm run typecheck -w @commander/web",
     "lint": "eslint . --max-warnings 0",
-    "test": "npm run test -w @commander/shared && npm run test -w @commander/api && npm run test:guards",
+    "test": "npm run test -w @commander/shared && npm run test -w @commander/api && npm run test -w @commander/web && npm run test:guards",
     "verify": "npm run typecheck && npm run lint && npm run build && npm run test",
     "compose": "sh scripts/compose.sh",
     "dev": "sh scripts/compose.sh -f docker-compose.yml -f docker-compose.dev.yml up --build --force-recreate",

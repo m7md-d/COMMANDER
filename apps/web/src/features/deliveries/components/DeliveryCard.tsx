@@ -70,21 +70,24 @@ export function DeliveryCard({
         <span className="dispatch-attempts">
           {t("delivery.attempts")}: {delivery.attempts}
         </span>
-        <span className="spacer" />
-        {delivery.resend ? (
-          <Button size="sm" loading={busy} onClick={() => onResend(delivery.id)}>
-            {t(`dispatch.resend.${delivery.resend}`)}
-          </Button>
-        ) : null}
-        {archived ? (
-          <Button size="sm" variant="ghost" loading={busy} onClick={() => onRestore(delivery.id)}>
-            {t("dispatch.restore")}
-          </Button>
-        ) : (
-          <Button size="sm" variant="ghost" loading={busy} onClick={() => onArchive(delivery.id)}>
-            {t("dispatch.archive")}
-          </Button>
-        )}
+        {/* One group, so the two wrap together; item by item, "Archive" fell to
+            a line of its own (docs/UI-DEFECTS.md W-16). */}
+        <span className="dispatch-actions">
+          {delivery.resend ? (
+            <Button size="sm" loading={busy} onClick={() => onResend(delivery.id)}>
+              {t(`dispatch.resend.${delivery.resend}`)}
+            </Button>
+          ) : null}
+          {archived ? (
+            <Button size="sm" variant="ghost" loading={busy} onClick={() => onRestore(delivery.id)}>
+              {t("dispatch.restore")}
+            </Button>
+          ) : (
+            <Button size="sm" variant="ghost" loading={busy} onClick={() => onArchive(delivery.id)}>
+              {t("dispatch.archive")}
+            </Button>
+          )}
+        </span>
       </footer>
     </article>
   );

@@ -574,6 +574,8 @@ export const EN: Dictionary = {
   "dispatch.rewriteOf": "A rewrite of an earlier report",
   "dispatch.mainLine": "main line",
   "dispatch.charges": "Charges",
+  /** Points from a charge to whoever answers for it, the way the line is read. */
+  "dispatch.chargedTo": "→",
   "dispatch.credits": "Credits",
   "dispatch.report": "The report as sent",
   "dispatch.details": "Details",

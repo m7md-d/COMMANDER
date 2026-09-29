@@ -6,6 +6,8 @@ interface ChipInputProps {
   addLabel: string;
   removeLabel: string;
   placeholder?: string;
+  /** The id of the label that names the list (`labelOf`), when a Field holds it. */
+  labelledBy?: string;
 }
 
 /**
@@ -18,13 +20,14 @@ export function ChipInput({
   addLabel,
   removeLabel,
   placeholder,
+  labelledBy,
 }: ChipInputProps) {
   const update = (index: number, next: string) => {
     onChange(values.map((value, position) => (position === index ? next : value)));
   };
 
   return (
-    <div className="chip-list">
+    <div className="chip-list" role="group" aria-labelledby={labelledBy}>
       {values.map((value, index) => (
         // Index as key is acceptable here only because the list is never
         // reordered — items are appended and removed by position.

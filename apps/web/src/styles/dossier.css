@@ -50,7 +50,10 @@
   font-size: var(--text-sm);
 }
 
+/* Both are <span>s, and an inline box ignores inline-size and block-size: the
+   bars were empty tracks until these were blocks (docs/UI-DEFECTS.md W-04). */
 .meter-track {
+  display: block;
   block-size: var(--space-2);
   background-color: var(--color-surface-sunken);
   border-radius: var(--radius-full);
@@ -58,6 +61,7 @@
 }
 
 .meter-fill {
+  display: block;
   block-size: 100%;
   background-color: var(--color-accent);
   border-radius: var(--radius-full);

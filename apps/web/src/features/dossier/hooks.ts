@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { NoteInput } from "@commander/shared";
 import { dossierApi, dossierKeys } from "./api";
+import { readDossier } from "./read";
 
 export function useDossierList(repositoryId: string | null) {
   return useQuery({
@@ -10,10 +11,19 @@ export function useDossierList(repositoryId: string | null) {
   });
 }
 
+/** Opening one recomputes and stores its score, so the roster is refreshed after (`readDossier`). */
 export function useDossier(repositoryId: string | null, login: string | null) {
+  const client = useQueryClient();
   return useQuery({
     queryKey: dossierKeys.detail(repositoryId ?? "none", login ?? "none"),
-    queryFn: () => dossierApi.detail(repositoryId as string, login as string),
+    queryFn: () =>
+      readDossier(
+        {
+          fetch: dossierApi.detail,
+          refreshList: (id) => void client.invalidateQueries({ queryKey: dossierKeys.list(id) }),
+        },
+        { repositoryId: repositoryId as string, login: login as string },
+      ),
     enabled: repositoryId !== null && login !== null,
   });
 }

@@ -1,6 +1,6 @@
 import type { RuleConfig, RuleId } from "@commander/shared";
 import { useTranslate } from "@/shared/i18n/I18nProvider";
-import { Field } from "@/shared/components/Field";
+import { Field, labelOf } from "@/shared/components/Field";
 import { Input } from "@/shared/components/Input";
 import { parseCommaList } from "@/shared/lib/format";
 
@@ -88,8 +88,8 @@ export function RuleFields({ ruleId, config, onPatch }: RuleFieldsProps) {
       const days = (read.days as number[] | undefined) ?? [];
       return (
         <Field label={t("rules.days")}>
-          {() => (
-            <div className="chip-list">
+          {(id) => (
+            <div className="chip-list" role="group" aria-labelledby={labelOf(id)}>
               {[0, 1, 2, 3, 4, 5, 6].map((day) => (
                 <label className="chip" key={day}>
                   <input

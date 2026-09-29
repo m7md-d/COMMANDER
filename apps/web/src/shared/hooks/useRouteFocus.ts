@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { arrive } from "@/shared/lib/arrive";
 
 /**
  * Moves focus to the content region on every navigation (docs/UI-AUDIT.md §7).
@@ -23,7 +24,7 @@ export function useRouteFocus() {
       return;
     }
 
-    target.current?.focus();
+    arrive({ content: target.current, view: window });
   }, [pathname]);
 
   return target;

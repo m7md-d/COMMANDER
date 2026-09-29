@@ -1,6 +1,13 @@
 import { useId } from "react";
 import type { ReactElement } from "react";
 
+/**
+ * The id of a Field's own <label>. A group of controls — chips, checkboxes — has
+ * no single element a <label> can name, so it takes `aria-labelledby` with this
+ * instead (docs/UI-DEFECTS.md W-12).
+ */
+export const labelOf = (id: string): string => `${id}-label`;
+
 interface FieldProps {
   label: string;
   hint?: string;
@@ -19,7 +26,7 @@ export function Field({ label, hint, error, children }: FieldProps) {
 
   return (
     <div className="field">
-      <label className="field-label" htmlFor={id}>
+      <label className="field-label" htmlFor={id} id={labelOf(id)}>
         {label}
       </label>
       {children(id)}
