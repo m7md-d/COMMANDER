@@ -58,6 +58,11 @@ touching how a push is judged — the defect you are about to "discover" may be 
    watch the test fail, restore it. A fix no test catches reverting is not done (D-17 was one).
 4. **The log** — the entry moves to the fixed section with its cause and fix. Never deleted.
 
+The panel has its own log in the same shape: [docs/UI-DEFECTS.md](docs/UI-DEFECTS.md) — what the
+panel shows wrongly or breaks while showing, with the evidence each was seen by (a measurement in
+a real browser, or the line responsible). The same order binds: no fix before a test that proves
+the defect. Read it before touching a page it names.
+
 `tests/coverage/defects.test.ts` keeps the open section and the reference's `defect` records
 naming the same scenarios, and fails an open entry that names no test or no proof.
 

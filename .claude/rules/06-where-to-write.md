@@ -9,7 +9,8 @@ contradict itself within months, and then nobody can tell which line is still tr
 | A defect: the platform judges something wrongly | [docs/DEFECTS.md](../../docs/DEFECTS.md), as open, when found — measured first by a `defect` record in the scenario reference where it can be. Fixed: the entry moves to the fixed section with its cause and fix, never deleted |
 | An approved item, not yet built | a row in [docs/ROADMAP.md](../../docs/ROADMAP.md) |
 | Something just built, and how it departed from the plan | [docs/CHECKS-ROADMAP.md](../../docs/CHECKS-ROADMAP.md) (engine) or [docs/UI-AUDIT.md](../../docs/UI-AUDIT.md) (panel) |
-| A UI observation | [docs/UI-AUDIT.md](../../docs/UI-AUDIT.md), **at the moment you meet it** — not gathered later from memory |
+| A UI defect: the panel shows something wrongly, or breaks while showing it | [docs/UI-DEFECTS.md](../../docs/UI-DEFECTS.md), as open, when found, with the evidence it was seen by. Fixed: the entry moves to the fixed section with its cause and fix, never deleted |
+| A UI observation that is a design question, not a defect | [docs/UI-AUDIT.md](../../docs/UI-AUDIT.md), **at the moment you meet it** — not gathered later from memory |
 | A rule binding all future code | the constitution, amended under §9 |
 | A number: limit, budget, threshold | [tests/lib/budgets.ts](../../tests/lib/budgets.ts), and nowhere else |
 | A deployment step | [docs/DEPLOY.md](../../docs/DEPLOY.md) |
