@@ -33,7 +33,7 @@ import { requestCompletion } from "@/integrations/openrouter/openrouter.client.j
 import { readRepoConstitution } from "@/modules/dossier/enrichment.service.js";
 import { readStructureDigest } from "@/modules/repositories/scan.service.js";
 import { buildEmbed, type DiscordEmbed } from "@/integrations/discord/embed.builder.js";
-import { withRewrite } from "@/domain/report/generation.js";
+import { llmOutcome, withRewrite } from "@/domain/report/generation.js";
 
 const log = createLogger("pipeline");
 
@@ -46,6 +46,10 @@ export interface ComposedReport {
   llmOk: boolean;
   llmError: string | null;
   llmRetryable: boolean;
+  llmRetryAfterSeconds: number | null;
+  llmFailure: Record<string, string | number> | null;
+  /** True for the digest, which goes out on its facts when the prose fails (`afterGeneration`). */
+  proseOptional?: boolean;
   model: string;
 }
 
@@ -187,9 +191,7 @@ export async function composeReport(input: ComposeInput): Promise<ComposedReport
       reportText,
       rewrite: Boolean(input.rewrites),
     }),
-    llmOk: completion.ok,
-    llmError: completion.ok ? null : completion.error,
-    llmRetryable: completion.ok ? false : completion.retryable,
+    ...llmOutcome(completion),
     model: completion.model,
   };
 }

@@ -8,7 +8,7 @@
  */
 
 import type { Delivery as PrismaDelivery } from "@prisma/client";
-import { sendEmbed } from "@/integrations/discord/discord.client.js";
+import { sendEmbed, type DiscordResult } from "@/integrations/discord/discord.client.js";
 import type { ComposedReport } from "./report.pipeline.js";
 import { afterGeneration } from "@/domain/report/generation.js";
 import { markFailed, markSent } from "./outbox.service.js";
@@ -28,30 +28,36 @@ export async function deliver(input: {
   const next = afterGeneration(composed);
   if (!next.send) {
     await keepGeneration(job.id, { ...given, embed: null });
-    await markFailed({ id: job.id, attempts: job.attempts, reason: next.reason, errorMessage: next.error, retryable: next.retryable });
+    await markFailed({
+      id: job.id,
+      attempts: job.attempts,
+      reason: next.reason,
+      errorMessage: next.error,
+      retryable: next.retryable,
+      ...(next.retryAfterSeconds !== undefined && { retryAfterSeconds: next.retryAfterSeconds }),
+      ...(next.detail !== undefined && { reasonDetail: next.detail }),
+    });
     return;
   }
 
   const delivery = await sendEmbed(webhookUrl, composed.embed);
   await keepGeneration(job.id, { ...given, embed: delivery.ok ? composed.embed : null });
 
-  if (!delivery.ok) {
-    await markFailed({
-      id: job.id,
-      attempts: job.attempts,
-      reason: delivery.status === 429 ? "discord_rate_limited" : "discord_failed",
-      reasonDetail:
-        delivery.status === 429
-          ? { seconds: delivery.retryAfterSeconds ?? 60 }
-          : { status: delivery.status },
-      errorMessage: delivery.error,
-      retryable: delivery.retryable,
-      ...(delivery.retryAfterSeconds !== undefined && {
-        retryAfterSeconds: delivery.retryAfterSeconds,
-      }),
-    });
-    return;
-  }
+  if (!delivery.ok) return refused(job, delivery);
 
-  await markSent(job.id, { reason: "ok", reportText: composed.reportText, model: composed.model, violationCount });
+  await markSent(job.id, { reason: next.reason, reportText: composed.reportText, model: composed.model, violationCount });
+}
+
+/** Discord said no: how long it asked us to wait, or why it will not take this at all. */
+function refused(job: PrismaDelivery, delivery: Extract<DiscordResult, { ok: false }>): Promise<void> {
+  const limited = delivery.status === 429;
+  return markFailed({
+    id: job.id,
+    attempts: job.attempts,
+    reason: limited ? "discord_rate_limited" : "discord_failed",
+    reasonDetail: { ...delivery.failure, ...(limited ? { seconds: delivery.retryAfterSeconds ?? 60 } : { status: delivery.status }) },
+    errorMessage: delivery.error,
+    retryable: delivery.retryable,
+    ...(delivery.retryAfterSeconds !== undefined && { retryAfterSeconds: delivery.retryAfterSeconds }),
+  });
 }

@@ -11,6 +11,7 @@ import { JOB_LOCK_TIMEOUT_MS } from "@/config/constants.js";
 import { prisma } from "@/db/prisma.js";
 import { createLogger } from "@/core/logger/logger.js";
 import { toJson } from "@/core/json.js";
+import type { KeptReport } from "./report.kept.js";
 
 const log = createLogger("outbox");
 
@@ -24,6 +25,8 @@ const log = createLogger("outbox");
 export async function enqueue(input: {
   occasion: Occasion;
   repositoryId: string | null;
+  /** A judgement already made — the test send's — so the worker only writes and sends (0012). */
+  judgement?: KeptReport;
 }): Promise<PrismaDelivery> {
   const { occasion, repositoryId } = input;
   const push = occasion.kind === "push" ? occasion.push : null;
@@ -44,6 +47,7 @@ export async function enqueue(input: {
       // the original delivery is long gone by then, and a digest retried three
       // hours later must still report the week it was queued for.
       payload: toJson(occasion),
+      ...(input.judgement && { judgement: toJson(input.judgement) }),
     },
   });
 }

@@ -13,6 +13,7 @@ import { createLogger } from "@/core/logger/logger.js";
 import { toJson } from "@/core/json.js";
 import { prisma } from "@/db/prisma.js";
 import { requestCompletion } from "@/integrations/openrouter/openrouter.client.js";
+import { llmOutcome } from "@/domain/report/generation.js";
 import { getSettings } from "@/modules/settings/settings.service.js";
 import { findByFullName } from "@/modules/repositories/repositories.service.js";
 import { readDigestFacts } from "@/modules/digest/digest.read.js";
@@ -151,9 +152,9 @@ function composed(
       reportText,
       trigger: ctx.trigger,
     }),
-    llmOk: completion.ok,
-    llmError: completion.ok ? null : completion.error,
-    llmRetryable: false,
+    ...llmOutcome(completion),
+    // The facts are the report; a failed generation costs the prose, not the week.
+    proseOptional: true,
     model: completion.model,
   };
 }

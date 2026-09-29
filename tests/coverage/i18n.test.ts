@@ -45,6 +45,8 @@ const TEMPLATED = [
   // The slip's short name for the same PUSH_KINDS, and its button per ResendKind (0012).
   "dispatch.event.",
   "dispatch.resend.",
+  // The card's heading per field `failureDetail` keeps, from ProviderFailure's FIELDS.
+  "failure.",
   "var.",
   // The manual prints a row per member of an enum it imports, so these families
   // are complete or the table is. A missing member shows as a blank cell in the

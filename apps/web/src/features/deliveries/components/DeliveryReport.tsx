@@ -1,6 +1,7 @@
 import type { Delivery, DeliveryFinding } from "@commander/shared";
 import { useTranslate } from "@/shared/i18n/I18nProvider";
 import { DeliveryPrompts } from "./DeliveryPrompts";
+import { ProviderFailure } from "./ProviderFailure";
 
 interface DeliveryReportProps {
   delivery: Delivery;
@@ -29,7 +30,9 @@ export function DeliveryReport({ delivery }: DeliveryReportProps) {
           <Findings title={t("dispatch.credits")} entries={judgement.credits} />
         </>
       ) : null}
-      {delivery.status === "failed" && delivery.errorMessage ? (
+      {"provider" in delivery.reasonDetail ? (
+        <ProviderFailure detail={delivery.reasonDetail} />
+      ) : delivery.status === "failed" && delivery.errorMessage ? (
         <p className="dispatch-error ltr mono">{delivery.errorMessage}</p>
       ) : null}
       {delivery.reportText ? (

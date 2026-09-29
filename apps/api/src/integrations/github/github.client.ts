@@ -5,6 +5,8 @@
 
 import { createLogger } from "@/core/logger/logger.js";
 import { getInstallationToken } from "./app-auth.js";
+import { describeFailure, readNetworkFailure } from "../provider-failure.js";
+import { readGitHubFailure } from "./github.errors.js";
 import { COMMIT_FILES_CAP, COMMIT_FILES_PAGE, nextPage, toCommitDetail, type RawCommit } from "./commit.mapper.js";
 
 const log = createLogger("github");
@@ -63,6 +65,7 @@ async function requestPage<T>(
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const started = Date.now();
 
   try {
     const response = await fetch(`${API}${path}`, {
@@ -78,13 +81,21 @@ async function requestPage<T>(
       // 404 is meaningful, not exceptional: a repo may simply have no
       // CONSTITUTION.md, and the caller should stop asking rather than retry.
       const notFound = response.status === 404;
-      if (!notFound) log.warn("request failed", { path, status: response.status });
+      if (!notFound) {
+        // What GitHub said, not the status alone: an exhausted rate limit and a
+        // missing permission are both 403 (D-32).
+        const text = await response.text().catch(() => "");
+        log.warn("request failed", { path, ...readGitHubFailure({ status: response.status, header: (name) => response.headers.get(name), text }) });
+      }
       return { ok: false, error: `http_${response.status}`, notFound };
     }
 
     return { ok: true, data: { data: (await response.json()) as T, next: nextPage(response.headers.get("link")) } };
   } catch (error) {
-    return { ok: false, error: String(error), notFound: false };
+    // Which request, how long it waited, and the reason Node's fetch keeps in `cause`.
+    const failure = readNetworkFailure("github", error, { elapsedMs: Date.now() - started, answered: null });
+    log.warn("request failed", { path, ...failure });
+    return { ok: false, error: describeFailure(failure), notFound: false };
   } finally {
     clearTimeout(timeout);
   }

@@ -15,7 +15,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { codeOnly, ROOT } from "../lib/sources.js";
+import { codeOnly, isTest, ROOT, under } from "../lib/sources.js";
 
 const PROCESSOR = "apps/api/src/queue/delivery.processor.ts";
 
@@ -55,5 +55,36 @@ test("the dispatch asks whether the model wrote the report before it sends anyth
   assert.ok(
     asked < sent,
     `${DISPATCH}: \`deliver\` sends before asking \`afterGeneration\`. A report the model did not write is retried or held, never replaced by a sentence (0012).`,
+  );
+});
+
+const DIGEST = "apps/api/src/queue/digest.processor.ts";
+
+test("the weekly digest goes out on its facts when the model fails", () => {
+  // It shares `deliver` with the push report, which holds a report the model did
+  // not write (0012). The digest's facts are its report, so it says so — and
+  // without this flag a 429 kept the whole week from the channel.
+  const code = codeOnly(readFileSync(join(ROOT, DIGEST), "utf8"));
+
+  assert.ok(
+    code.includes("proseOptional: true"),
+    `${DIGEST}: the composed digest no longer sets \`proseOptional: true\`. A failed generation must cost the digest its prose, not the week (afterGeneration).`,
+  );
+});
+
+test("the test send queues a judgement of its own, so the sample is sent and never recorded", () => {
+  // The sample push has made-up commits (aaaaaaa, bbbbbbb). Queued bare, the
+  // worker judged it like a real push: asked GitHub for them (422 on each) and
+  // wrote them and their charges into the record, against the front's first
+  // member. Queued with a kept judgement, it only goes through `send` (0012).
+  const offenders = under("apps/api/src/modules/")
+    .filter((file) => !isTest(file) && file.text.includes("samplePush(") && file.text.includes("enqueue("))
+    // The `enqueue(...)` statement, up to its semicolon, names `judgement`.
+    .filter((file) => !/enqueue\([^;]*\bjudgement\b/.test(codeOnly(file.text)));
+
+  assert.deepEqual(
+    offenders.map((file) => file.path),
+    [],
+    "these queue the sample push without a kept judgement — the worker will judge and record made-up commits. Pass `judgement` to `enqueue` (docs/DEFECTS.md D-35).",
   );
 });

@@ -122,6 +122,13 @@ code.
   until then the panel says so. Substituting a zero turns an honest gap into a confident wrong
   answer.
 
+- **A provider's refusal is read, never only its status** (`*.errors.ts`, `ProviderFailure`). A
+  429 from OpenRouter is the free daily quota, the per-minute limit, or an upstream throttling a
+  free model — three remedies, told apart only by `error.metadata` and the X-RateLimit-* headers.
+  Discord's JSON `code` tells a deleted webhook (10015) from a malformed embed (50035). Logging
+  `status` alone is what left a week of 429s unexplained (D-32). And OpenRouter's body is read as
+  text before the status, because an error page that is not JSON used to take the status with it.
+
 ## Reports
 
 - **The weekly digest's assessment may only cite measured evidence.**

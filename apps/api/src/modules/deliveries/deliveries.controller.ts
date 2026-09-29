@@ -6,12 +6,9 @@ import type {
   PreviewRequest,
   TestSendRequest,
 } from "@commander/shared";
-import { BadRequestError, NotFoundError } from "@/core/errors/app-error.js";
+import { BadRequestError } from "@/core/errors/app-error.js";
 import { ok } from "@/core/http/respond.js";
 import { validated } from "@/middleware/validate.middleware.js";
-import { getRepository } from "@/modules/repositories/repositories.service.js";
-import { enqueue } from "@/queue/outbox.service.js";
-import { samplePush } from "@/queue/report.pipeline.js";
 import {
   archiveDelivery,
   archiveMatching,
@@ -22,6 +19,7 @@ import {
   resendDelivery,
 } from "./deliveries.service.js";
 import { runPreview } from "./preview.service.js";
+import { queueTestSend } from "./test-send.service.js";
 import { sendDigestNow } from "@/modules/digest/digest.service.js";
 
 function requireId(req: Request): string {
@@ -64,25 +62,10 @@ export async function preview(req: Request, res: Response): Promise<void> {
   ok(res, await runPreview(validated<PreviewRequest>(req)));
 }
 
-/**
- * A real test send goes through the queue like any push, so it exercises the
- * exact delivery path — and takes no config from the body, which is what stops
- * a session holder using the server as a request proxy (§7).
- */
+/** A real test send, through the queue and the channel — see `queueTestSend`. */
 export async function testSend(req: Request, res: Response): Promise<void> {
   const { repositoryId } = validated<TestSendRequest>(req);
-  const repository = await getRepository(repositoryId);
-  if (!repository.enabled) throw new NotFoundError("repos.notFound");
-
-  const login = repository.members[0]?.login ?? "octocat";
-  const push = samplePush(repository.fullName, login);
-
-  const branch = repository.branches[0]?.replace(/\*$/, "") || "main";
-  push.branch = branch;
-  push.ref = `refs/heads/${branch}`;
-
-  const delivery = await enqueue({ occasion: { kind: "push", push }, repositoryId: repository.id });
-  ok(res, { deliveryId: delivery.id });
+  ok(res, await queueTestSend(repositoryId));
 }
 
 /**
