@@ -27,9 +27,12 @@ export interface Named extends Finding {
   login: string | null;
 }
 
-/** Whoever pushed. Nobody, on a push the reconciler rebuilt: git records who wrote, never who pushed. */
+/**
+ * Whoever pushed. On a push the reconciler rebuilt, only whoever GitHub's
+ * events timeline names: git records who wrote, never who pushed.
+ */
 export function pusherOf(push: NormalizedPush): string | null {
-  return push.recovered ? null : push.actorLogin || null;
+  return push.recovered ? (push.pushedBy ?? null) : push.actorLogin || null;
 }
 
 /** Nobody, when GitHub could tie the author's address to no account. */
@@ -45,6 +48,8 @@ export interface RuleFacts {
   timezoneOffset: number;
   /** Crossings the push landed on a main line from others' work (`RuleContext.landed`). */
   landed: Finding[];
+  /** What the landing merge wrote inside a conflicted file (`RuleContext.resolved`). */
+  resolved?: { merge: string; paths: string[] };
 }
 
 /**
@@ -63,7 +68,7 @@ export function judgeRules(facts: RuleFacts, onRuleError: RuleErrorReporter): Na
 
   const unjudged = push.commits.filter((commit) => !facts.knownShas.has(commit.sha));
   for (const [author, commits] of byAuthor(unjudged)) {
-    const written = { push, kind, trunk, timezoneOffset, weight, commits, landed: [] };
+    const written = { push, kind, trunk, timezoneOffset, weight, commits, landed: [], ...(facts.resolved && { resolved: facts.resolved }) };
     const found = evaluateRules({ context: written, rules, answerer: "author" }, onRuleError);
     named.push(...found.map((finding) => ({ ...finding, login: author })));
   }
@@ -97,9 +102,9 @@ export function handsOnPaths(push: NormalizedPush, weight: PushWeight): Map<stri
 }
 
 /**
- * The one author a crossing can be charged to. A path two people changed in one
- * push names nobody: the crossing is measured between the push's two ends, and
- * which of them made it would take a measurement per commit.
+ * The one author a crossing between the push's two ends can be charged to. A
+ * path two people changed names nobody here: which of them made it is read hand
+ * by hand (`hands.ts`), and where that cannot be read, nobody is named.
  */
 export function soleHand(hands: ReadonlySet<string | null>): string | null {
   return hands.size === 1 ? ([...hands][0] ?? null) : null;

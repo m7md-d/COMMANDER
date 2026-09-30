@@ -27,6 +27,20 @@
  * green-on-green theme.
  */
 
+/*
+ * Arabic inside a monospaced field (docs/UI-DEFECTS.md W-19). Menlo carries
+ * monospaced Arabic of its own: Chrome passed over it, WebKit drew Arabic with
+ * it, every letter the same width. This face answers for the Arabic ranges alone
+ * and comes first in --font-mono, so Arabic never reaches a monospace font and
+ * no Latin letter ever reaches this one. One named face per platform, as in W-11.
+ */
+@font-face {
+  font-family: "Commander Arabic";
+  src: local("IBM Plex Sans Arabic"), local("Geeza Pro"), local("GeezaPro"), local("Noto Sans Arabic"),
+    local("NotoSansArabic-Regular"), local("Segoe UI");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+
 :root {
   /* ---------- primitives: olive (the environment) ---------- */
   --palette-olive-0: #ffffff;
@@ -49,7 +63,9 @@
   --palette-khaki-300: #e6cda2;
   --palette-khaki-400: #d6b47f;
   --palette-khaki-500: #bf955a;
-  --palette-khaki-600: #997340;
+  /* Darkened from #997340 (4.30 : 1 under white) to read as the light theme's
+     filled button: 4.85 : 1 (docs/UI-DEFECTS.md W-21). */
+  --palette-khaki-600: #8f6b3b;
   --palette-khaki-700: #71542d;
 
   /* ---------- primitives: status ---------- */
@@ -96,7 +112,7 @@
      width (docs/UI-DEFECTS.md W-11). Named Arabic faces catch it, one per
      platform; Latin never reaches them. `system-ui` does not: Chrome measured
      still picking Courier New with it in the list. */
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "IBM Plex Sans Arabic",
+  --font-mono: "Commander Arabic", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "IBM Plex Sans Arabic",
     "Segoe UI", "Geeza Pro", "Noto Sans Arabic", monospace;
 
   --text-xs: 0.75rem;
@@ -114,6 +130,11 @@
   --leading-tight: 1.25;
   --leading-normal: 1.6;
   --leading-relaxed: 1.75;
+
+  /* Every letter-spacing is `calc(<n>em * var(--tracking))`. Tracking is for
+     upper-case Latin labels; on Arabic it opens a gap inside the word, which is
+     a broken word (docs/UI-DEFECTS.md W-18). Arabic sets the scale to zero. */
+  --tracking: 1;
 
   /* ---------- shape ---------- */
   --radius-sm: 0.375rem;
@@ -150,4 +171,8 @@
   /* ---------- layout ---------- */
   --sidebar-width: 15rem;
   --content-max: 76rem;
+}
+
+:root:lang(ar) {
+  --tracking: 0;
 }

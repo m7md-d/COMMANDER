@@ -57,8 +57,9 @@ const BASE = {
   commendations: [],
   history: { totalCommits: 2, totalPushes: 1, violationCounts: {} },
   project: { brief: "", stage: "active" as const, constitution: null, structure: null },
-  reviews: [],
+  review: null,
   gravity: "routine" as const,
+  fresh: null,
   options: {
     locale: "ar" as const,
     maxWords: 120,
@@ -286,13 +287,11 @@ test("a critical branch is named to the model and hardens the register", () => {
   assert.notEqual(routine.tone, critical.tone);
 });
 
-test("code verdicts reach the prompt; their absence is stated, not implied clean", () => {
+test("the push's code review reaches the prompt; its absence is stated, not implied clean", () => {
   const withReview = buildPromptValues({
     ...BASE,
     push: push([commit()]),
-    reviews: [
-      { title: "add .env.example", verdict: "clean", remark: "موثّق بدقة", findings: ["تغطية شاملة"] },
-    ],
+    review: { verdict: "clean", remark: "موثّق بدقة", findings: ["تغطية شاملة"] },
   });
   const without = buildPromptValues({ ...BASE, push: push([commit()]) });
 

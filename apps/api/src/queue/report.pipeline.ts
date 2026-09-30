@@ -7,6 +7,7 @@ import {
   DEFAULT_GRAVITY,
   weighPush,
   type Commendation,
+  type CommitReview,
   type NormalizedPush,
   type Repository,
   type Settings,
@@ -18,17 +19,8 @@ import { createLogger } from "@/core/logger/logger.js";
 import { answered, judgeRules } from "@/domain/judgement/attribution.js";
 import { classifyPush, type PushKind } from "@/domain/judgement/event.js";
 import type { RuleErrorReporter } from "@/domain/violations/engine.js";
-import {
-  buildPromptValues,
-  type HistoryRecord,
-  type MemberIdentity,
-  type ReviewedCommit,
-} from "@/domain/report/prompt-builder.js";
-import {
-  fallbackReport,
-  renderTemplate,
-  renderUserPrompt,
-} from "@/domain/report/prompt-render.js";
+import { buildPromptValues, type HistoryRecord, type MemberIdentity } from "@/domain/report/prompt-builder.js";
+import { fallbackReport, renderTemplate, renderUserPrompt } from "@/domain/report/prompt-render.js";
 import { requestCompletion } from "@/integrations/openrouter/openrouter.client.js";
 import { readRepoConstitution } from "@/modules/dossier/enrichment.service.js";
 import { readStructureDigest } from "@/modules/repositories/scan.service.js";
@@ -98,13 +90,15 @@ interface ComposeInput {
   commendations: Commendation[];
   history: HistoryRecord;
   prompt: { system: string; user: string };
-  /** Verdicts on this push's commits. Empty without the App — the block then
-   *  says so rather than letting the model assume the code was fine. */
-  reviews: ReviewedCommit[];
+  /** The push's code review, or null — off, no App, the model failed. The
+   *  block then says so rather than letting the model assume the code was fine. */
+  review: CommitReview | null;
   /** The branch's watcher. Absent in the preview, which has no real branch. */
   watcher?: Watcher;
   /** The text this report rewrites, when it is asked for again after being sent (0012). */
   rewrites?: string | null;
+  /** The shas the push brought the record (`Judgement.fresh`); null — a preview, an old row — lists every commit. */
+  fresh: readonly string[] | null;
 }
 
 /** Turns the push and the member's history into the two rendered prompts. */
@@ -122,7 +116,8 @@ function renderPrompts(
     violations,
     commendations: input.commendations,
     history,
-    reviews: input.reviews,
+    review: input.review,
+    fresh: input.fresh,
     gravity: input.watcher?.gravity ?? DEFAULT_GRAVITY,
     project: {
       brief: repository.projectBrief,

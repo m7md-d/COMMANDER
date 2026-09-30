@@ -50,6 +50,14 @@ export interface NormalizedCommit {
    * charged to whoever moved it.
    */
   moves?: [from: string, to: string][];
+  /**
+   * The content each file this commit touched was left with: its blob hash, or
+   * null where the commit removed it — a rename removes its old path. From
+   * GitHub's `files[].sha`. Undefined until enrichment, and whenever the listing
+   * may have stopped short or a file came without one. What tells the checks
+   * which of two hands in one push crossed a limit (0011).
+   */
+  blobs?: [path: string, blob: string | null][];
 }
 
 export interface NormalizedPush {
@@ -76,18 +84,27 @@ export interface NormalizedPush {
    */
   defaultBranch?: string;
   /**
-   * Whoever pushed, and whom the communiqué addresses. On a recovered push
-   * nobody is known to have pushed, and this only names the author of its
-   * newest commit, for the communiqué to address.
+   * Whoever pushed, and whom the communiqué addresses. On a recovered push it
+   * is `pushedBy` when the timeline named one; otherwise nobody is known to have
+   * pushed, and this only names the author of its newest commit, for the
+   * communiqué to address.
    */
   actorLogin: string;
   actorAvatarUrl: string;
   /**
    * Rebuilt by the reconciler from the branch's history after its webhook was
    * lost. Git records who wrote and who committed each commit, never who
-   * pushed it, so a recovered push names no pusher (0009 §4).
+   * pushed it, so a recovered push names no pusher (0009 §4) — unless
+   * `pushedBy` does.
    */
   recovered?: true;
+  /**
+   * On a recovered push, who GitHub's events timeline says made it: an event
+   * whose `before..head` holds exactly these commits (D-22). Absent when the
+   * timeline did not show the push — its latency runs to hours, it keeps 300
+   * events — and the push then names nobody.
+   */
+  pushedBy?: string;
   commits: NormalizedCommit[];
   /**
    * GitHub caps `commits` at 20 entries per push payload. When true, counters

@@ -125,8 +125,8 @@ export function defaultRuleConfig(): RuleConfigMap {
     branch_deleted: { enabled: true },
     // No threshold, deliberately: a threshold is a size a smuggler stays under,
     // and one file belonging to no commit is the whole finding. It stays quiet
-    // because a clean merge and a conflict resolution both leave nothing behind
-    // — a conflicted file is in the branch too, so it is carried, not residue.
+    // because a clean merge leaves nothing behind, and a conflict resolution
+    // only what it wrote that neither side had (D-25).
     merge_residue: { enabled: true },
     // No threshold either: one file landed over its limit is the finding. It
     // only ever fires beside a check's crossing, so a front with every check

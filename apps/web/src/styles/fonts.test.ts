@@ -26,3 +26,17 @@ test("Arabic in a monospaced field falls to a named Arabic face, not to the gene
     assert.ok(at !== -1 && at < generic, `${face} comes before the generic monospace: ${families.join(", ")}`);
   }
 });
+
+test("Arabic in a monospaced field is drawn by an Arabic face before any monospace font is asked (W-19)", () => {
+  // Menlo carries monospaced Arabic of its own. Chrome passed over it; WebKit
+  // drew Arabic with it, every letter the same width. A face limited to the
+  // Arabic ranges, first in the stack, answers for Arabic alone and leaves every
+  // Latin letter to the monospace fonts after it.
+  const tokens = readFileSync(new URL("./tokens.css", import.meta.url), "utf8");
+  const first = /--font-mono:\s*"([^"]+)"/.exec(tokens)?.[1] ?? "";
+  const face = new RegExp(`@font-face\\s*\\{[^}]*font-family:\\s*"${first}"[^}]*\\}`).exec(tokens)?.[0] ?? "";
+
+  assert.ok(face, `the stack's first family, "${first}", is not an @font-face in tokens.css`);
+  assert.match(face, /unicode-range:\s*U\+0600-06FF/, "it is limited to the Arabic ranges");
+  for (const local of ["Geeza Pro", "Noto Sans Arabic", "Segoe UI"]) assert.match(face, new RegExp(`local\\("${local}"\\)`));
+});

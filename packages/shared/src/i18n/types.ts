@@ -1,17 +1,25 @@
 /**
  * CONSTITUTION.md §3 lives here.
  *
- * `ar` is the reference dictionary: its key set defines TranslationKey, so
- * `en` is type-checked against it. A key added to one and forgotten in the
- * other fails the build rather than silently rendering the raw key at runtime.
+ * `ar` and `ar.server` are the reference dictionaries: their key sets define
+ * `PanelKey` and `ServerKey`, so `en` and `en.server` are type-checked against
+ * them. A key added to one and forgotten in the other fails the build rather
+ * than silently rendering the raw key at runtime.
  */
 
-// Type-only: the key set is the Arabic table's, and nothing that imports this
-// file — the panel's translator above all — may carry the table itself with it.
+// Type-only: the key sets are the Arabic tables', and nothing that imports this
+// file — the panel's translator above all — may carry the tables with it.
 import type { AR } from "./ar.js";
+import type { AR_SERVER } from "./ar.server.js";
 
-export type TranslationKey = keyof typeof AR;
-export type Dictionary = Record<TranslationKey, string>;
+/** What the panel shows — and the API sends it to show, like an error code. */
+export type PanelKey = keyof typeof AR;
+/** What only the server reads: the model's instructions, and the facts it is handed (ROADMAP 4.1). */
+export type ServerKey = keyof typeof AR_SERVER;
+export type TranslationKey = PanelKey | ServerKey;
+/** One locale's panel table: what a browser loads. */
+export type Dictionary = Record<PanelKey, string>;
+export type ServerDictionary = Record<ServerKey, string>;
 
 export type TranslationVars = Record<string, string | number>;
 

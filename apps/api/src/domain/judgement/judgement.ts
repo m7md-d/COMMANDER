@@ -26,12 +26,14 @@ import {
   type ViolationHit,
   type Watcher,
 } from "@commander/shared";
-import { judgeFile, type Reading } from "@/domain/checks/judge.js";
+import type { Reading } from "@/domain/checks/judge.js";
 import type { TouchedFile } from "@/domain/tree/diff.js";
 import type { RuleErrorReporter } from "@/domain/violations/engine.js";
-import { answered, handsOnPaths, judgeRules, pusherOf, soleHand } from "./attribution.js";
+import { answered, judgeRules, pusherOf } from "./attribution.js";
 import { classifyPush, judgedShas, type PullFact, type PushKind } from "./event.js";
 import { judgeLanding, type LandingOutcome, type LandingSides } from "./landing.js";
+import { writtenInResolution } from "./resolution.js";
+import { judgeWork } from "./work.js";
 
 /**
  * Whether a push is read, and whether it is judged. Read without being judged
@@ -62,8 +64,13 @@ export interface ChecksFacts {
   config: CheckConfigMap;
   /** Every file the push changed between its base and head, with the blob it replaced. */
   changes: TouchedFile[];
-  /** Measurements by blob hash — both sides of every change, where they could be taken. */
+  /** Measurements by blob hash — both sides of every change, and each hand's where hands shared a file. */
   readings: ReadonlyMap<string, Reading>;
+  /**
+   * The listing at the push's base, blob by path: where the first hand in the
+   * push starts from, when two authors changed one file (`hands.ts`, 0011).
+   */
+  base?: ReadonlyMap<string, string>;
   /**
    * When the push lands a merge (`landingMerge`), its branch and its fork, so the
    * landing is judged against its own parents rather than the push's base alone.
@@ -98,9 +105,16 @@ export type Judgement = {
   /**
    * Found, with nobody the evidence names to answer for it: a commit whose
    * author's address belongs to no account, a file two people changed in one
-   * push, what a recovered push did. Charged to nobody, and logged.
+   * push that could not be read hand by hand, what a recovered push did that no
+   * event names a pusher for. Charged to nobody, and logged.
    */
   unattributed: Finding[];
+  /**
+   * The commits this push brought the record, by sha — new work, what the
+   * communiqué lists. The rest it only carried, judged when they arrived; a
+   * landing listing its whole branch read as a heap pushed at once (0009 §7).
+   */
+  fresh: string[];
   /** Whoever pushed: whose push this counts as. Null for a recovered push. */
   pusher: string | null;
   /** What happened (`classifyPush`), and the pull request that landed it — for the communiqué to say. */
@@ -123,7 +137,7 @@ export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Jud
   const weight = weighPush({ push, knownShas });
   const trunk = isTrunk({ branch: push.branch, defaultBranch: push.defaultBranch, watchers: facts.watchers });
   const checked = judgeChecks({ ...facts, knownShas }, { weight, trunk });
-  const rules = { kind, trunk, rules: facts.rules, timezoneOffset: facts.timezoneOffset, landed: checked.landed };
+  const rules = { kind, trunk, rules: facts.rules, timezoneOffset: facts.timezoneOffset, landed: checked.landed, ...resolvedIn(facts.checks) };
   const found = [...judgeRules({ push, weight, knownShas, ...rules }, onRuleError), ...checked.violations];
   const judged = {
     violations: answered(found),
@@ -131,6 +145,7 @@ export function judgePush(facts: PushFacts, onRuleError: RuleErrorReporter): Jud
     unattributed: [...found, ...checked.commendations]
       .filter((entry) => entry.login === null)
       .map(({ ruleId, detail }) => ({ ruleId, detail })),
+    fresh: push.commits.filter((commit) => !knownShas.has(commit.sha)).map((commit) => commit.sha),
     pusher: pusherOf(push),
     event: { kind, pull: pull.status === "landed" ? pull.number : null },
     mainLine: trunk,
@@ -154,34 +169,14 @@ function judgeChecks(facts: PushFacts, on: { weight: PushWeight; trunk: boolean 
     const scope = { push, weight, knownShas, config: checks.config, readings: checks.readings, pusher, trunk };
     return judgeLanding(checks.changes, checks.landing, scope);
   }
-  return judgeChanges(checks, { hands: handsOnPaths(push, weight), pusher, trunk });
+  return judgeWork(checks, { push, weight, knownShas, pusher, trunk });
 }
 
-/**
- * Any other push, between its two ends.
- *
- * A file only carried by commits already on record was judged when they
- * arrived: its author is not charged again. On a main line it is still landed —
- * by whoever merged it unfixed.
- */
-function judgeChanges(checks: ChecksFacts, scope: { hands: Map<string, Set<string | null>>; pusher: string | null; trunk: boolean }) {
-  const outcome: LandingOutcome = { violations: [], commendations: [], landed: [] };
-
-  for (const file of checks.changes) {
-    const hands = scope.hands.get(file.path);
-    if (hands === undefined && !scope.trunk) continue;
-
-    const judged = judgeFile(checks.config, file, checks.readings);
-    const login = hands === undefined ? null : soleHand(hands);
-    if (hands !== undefined) {
-      outcome.violations.push(...judged.violations.map((finding) => ({ ...finding, login })));
-      outcome.commendations.push(...judged.commendations.map((finding) => ({ ...finding, login })));
-    }
-    // The pusher's own new work is charged once, as its author.
-    const own = scope.pusher !== null && login === scope.pusher;
-    if (scope.trunk && !own) outcome.landed.push(...judged.violations);
-  }
-  return outcome;
+/** What the landing merge wrote inside files both sides changed, where their text was read (D-25). */
+function resolvedIn(checks: ChecksFacts): { resolved?: { merge: string; paths: string[] } } {
+  const landing = checks.landing;
+  if (!landing?.contents) return {};
+  return { resolved: { merge: landing.merge, paths: writtenInResolution(landing, landing.contents) } };
 }
 
 function withholding(facts: PushFacts, findings: number): Withheld | null {

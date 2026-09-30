@@ -13,3 +13,12 @@ test("the front picker sits on the board it filters, not over the whole-platform
   assert.doesNotMatch(header, /RepositoryPicker/);
   assert.match(board.slice(0, board.indexOf("<Leaderboard")), /<RepositoryPicker/);
 });
+
+test("the picker and the reset button wrap on a narrow screen (W-20)", () => {
+  // In a nowrap row, the English "Reset stats" beside a front's name pushed the
+  // page 24px wider than a 390px phone, and the whole page scrolled sideways.
+  const page = readFileSync(new URL("./OverviewPage.tsx", import.meta.url), "utf8");
+  const actions = page.slice(page.indexOf("actions={"), page.indexOf("<RepositoryPicker"));
+
+  assert.match(actions, /className="row row-wrap"/);
+});

@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { NormalizedCommit } from "@commander/shared";
 import type { CommitFileChange } from "@/integrations/github/github.client.js";
-import { applyDetail } from "@/queue/push.detail.js";
+import { applyDetail, enrichWith, MAX_ENRICHED_COMMITS } from "@/queue/push.detail.js";
 
 const COMMIT: NormalizedCommit = {
   sha: "c1",
@@ -66,4 +66,45 @@ test("a rename is kept as a move, so a moved file can be followed to where it wa
   });
 
   assert.deepEqual(applied.moves, [["src/totals-legacy.ts", "src/totals.ts"]]);
+});
+
+test("each file keeps the blob the commit left it with, and null where it went (0011)", () => {
+  const withSha = (change: CommitFileChange, sha: string): CommitFileChange => ({ ...change, sha });
+  const read = applyDetail(COMMIT, {
+    sha: "c1",
+    additions: 1,
+    deletions: 1,
+    parents: ["p0"],
+    files: [withSha(file("src/a.ts", "modified"), "b1"), withSha(file("src/new.ts", "renamed", "src/old.ts"), "b2"), withSha(file("src/gone.ts", "removed"), "b0")],
+    complete: true,
+  });
+
+  assert.deepEqual(read.blobs, [
+    ["src/a.ts", "b1"],
+    ["src/old.ts", null],
+    ["src/new.ts", "b2"],
+    ["src/gone.ts", null],
+  ]);
+});
+
+test("a file without its blob leaves the commit's blobs unread, never half-read", () => {
+  const read = applyDetail(COMMIT, { sha: "c1", additions: 1, deletions: 0, parents: ["p0"], files: [{ ...file("src/a.ts", "modified"), sha: "b1" }, file("src/b.ts", "modified")], complete: true });
+
+  assert.equal(read.blobs, undefined);
+  assert.deepEqual(read.paths, ["src/a.ts", "src/b.ts"], "the paths are still read");
+});
+
+test("a push is read up to the cap and no further, and the rest is left as it came (D-27)", async () => {
+  const commits = Array.from({ length: MAX_ENRICHED_COMMITS + 1 }, (_, at) => ({ ...COMMIT, sha: `c${at}` }));
+  const push = { repoFullName: "team/repo", repoUrl: "", branch: "main", ref: "refs/heads/main", forced: false, created: false, deleted: false, compareUrl: "", actorLogin: "sara", actorAvatarUrl: "", commits, truncated: false };
+  const asked: string[] = [];
+
+  const { enriched } = await enrichWith(push, async (sha) => {
+    asked.push(sha);
+    return { ok: true, data: { sha, additions: 1, deletions: 0, parents: ["p"], files: [], complete: true } };
+  });
+
+  assert.equal(MAX_ENRICHED_COMMITS, 250, "a push of 21 commits went unread at 20");
+  assert.equal(enriched, MAX_ENRICHED_COMMITS);
+  assert.equal(asked.length, MAX_ENRICHED_COMMITS);
 });

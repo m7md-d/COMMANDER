@@ -113,11 +113,6 @@ const scenarios: Scenario[] = [
     front: { rules: QUIET },
     story: (story) => crossingAfter(story, 24),
     expect: charged("file_lines@sara"),
-    defect: {
-      observed: CLEAN,
-      because:
-        "Enrichment reads at most twenty commits' details (push.detail.ts MAX_ENRICHED_COMMITS), a bound on API calls per push. The other five are unread, so no commit can be told from a merge: the push is neither weighed nor measured, and the communiqué says it was not (report.unmeasured, 0009 §6). An accepted limit.",
-    },
   },
   {
     // Sara answered when her branch was pushed; the crossing is still there when
@@ -206,11 +201,6 @@ const scenarios: Scenario[] = [
       await story.push(FEATURE, SARA);
     },
     expect: charged("file_lines@lina"),
-    defect: {
-      observed: CLEAN,
-      because:
-        "A file two people changed in one push names nobody: the crossing is measured between the push's two ends, and telling whose commit crossed it would take a measurement per commit. Silent where it used to charge Sara, who pushed, with Lina's crossing (attribution.ts handsOnPaths, 0009 §4).",
-    },
   },
   {
     id: "unwatched-branch-merged",
@@ -343,11 +333,6 @@ const scenarios: Scenario[] = [
       await story.mergePullRequest({ number: 12, head: FEATURE, base: "main", author: SARA, by: OMAR, style: "merge" });
     },
     expect: credited(charged("file_lines@sara"), "file_lines@lina"),
-    defect: {
-      observed: CLEAN,
-      because:
-        "The branch is judged from where it forked to its head: 190 to 195 crosses nothing. Sara's 210 lived only between her commit and Lina's, and seeing it takes a measurement per commit (landing.ts branchWork).",
-    },
   },
 ];
 

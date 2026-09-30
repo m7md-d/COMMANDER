@@ -20,9 +20,12 @@ import { createLogger } from "@/core/logger/logger.js";
 import { wanted } from "@/domain/checks/judge.js";
 import { pushChanges, pushSpan } from "@/domain/judgement/changes.js";
 import type { ChecksFacts } from "@/domain/judgement/judgement.js";
+import { lineOf, readHands, sharedChanges } from "@/domain/judgement/hands.js";
 import { landingMerge, type LandingSides } from "@/domain/judgement/landing.js";
+import { resolutionsOf } from "@/domain/judgement/resolution.js";
 import type { TouchedFile } from "@/domain/tree/diff.js";
 import { compareCommits } from "@/integrations/github/branches.client.js";
+import { fetchBlob } from "@/integrations/github/github.client.js";
 import { fetchCommitTree, fetchRepoTree, type RepoTreeEntry } from "@/integrations/github/commits.client.js";
 import { syncTree } from "@/modules/tree/tree.service.js";
 import { measureChanges, measureSnapshot } from "@/modules/checks/checks.service.js";
@@ -88,12 +91,18 @@ export async function readChanges(repository: Repository, push: NormalizedPush, 
   const sides = landing.status === "read" ? { ...landing.sides, branch: landing.sides.branch.filter((file) => wanted(config, file.path)) } : undefined;
   const listed = [...before, ...after, ...(landing.status === "read" ? landing.listed : [])];
   const bytes = new Map(listed.map((entry) => [entry.sha, entry.bytes]));
+  // Each hand's versions, where more than one author changed a file (0011). Not
+  // in any listing, so their size is unknown until fetched.
+  const base = new Map(before.map((entry) => [entry.path, entry.sha]));
+  const line = lineOf({ push, base, ...(sides && { landing: sides }) });
+  const hands = sharedChanges(readHands({ ...line, knownShas })).filter((file) => wanted(config, file.path));
 
-  const readings = await measureChanges(target, { changes: [...changes, ...(sides?.branch ?? [])], bytes }).catch((error: unknown) => {
+  const measured = [...changes, ...(sides?.branch ?? []), ...hands];
+  const readings = await measureChanges(target, { changes: measured, bytes }).catch((error: unknown) => {
     log.error("push measurement crashed", { repositoryId: repository.id, error: String(error) });
     return null;
   });
-  return readings ? { config, changes, readings, ...(sides && { landing: sides }) } : none;
+  return readings ? { config, changes, readings, base, ...(sides && { landing: sides }) } : none;
 }
 
 type LandingRead =
@@ -130,7 +139,18 @@ async function readLanding(
   const blobs = (listing: RepoTreeEntry[]) => new Map(listing.map((entry) => [entry.path, entry.sha]));
   const branch = pushChanges({ before: forked, after: second, push: input.push });
   const sides = { merge: landing.merge, branch, first: blobs(input.before), fork: blobs(forked), second: blobs(second), merged: blobs(input.after) };
-  return { status: "read", sides, listed: [...second, ...forked] };
+  return { status: "read", sides: { ...sides, contents: await readResolutions(target, sides) }, listed: [...second, ...forked] };
+}
+
+/**
+ * The text of each file both sides changed that the merge matched to neither
+ * (`resolutionsOf`, D-25). A blob that cannot be read is left out, and its
+ * file then names nothing.
+ */
+async function readResolutions(target: MeasureTarget, sides: LandingSides): Promise<Map<string, string>> {
+  const shas = [...new Set(resolutionsOf(sides).flatMap((file) => [file.first, file.second, file.merged]))];
+  const read = await Promise.all(shas.map(async (sha) => [sha, await fetchBlob(target.installationId, target.fullName, sha)] as const));
+  return new Map(read.flatMap(([sha, blob]) => (blob.ok ? [[sha, blob.data]] : [])));
 }
 
 /** A commit's whole file listing, or null when it cannot be had complete. */

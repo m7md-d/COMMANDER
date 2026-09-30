@@ -76,7 +76,7 @@
   --color-accent: var(--palette-khaki-600);
   --color-accent-hover: var(--palette-khaki-700);
   --color-accent-text: var(--palette-khaki-700);
-  --color-accent-soft: rgb(153 115 64 / 12%);
+  --color-accent-soft: rgb(143 107 59 / 12%);
   --color-on-accent: var(--palette-olive-0);
 
   --color-success: var(--palette-green-700);
@@ -86,7 +86,7 @@
   --color-info: var(--palette-blue-700);
   --color-info-soft: rgb(81 127 153 / 14%);
 
-  --color-focus-ring: rgb(153 115 64 / 35%);
+  --color-focus-ring: rgb(143 107 59 / 35%);
   --color-grid: rgb(70 78 61 / 5%);
   --color-grid-strong: rgb(70 78 61 / 8%);
   --color-scrim: rgb(21 24 16 / 40%);

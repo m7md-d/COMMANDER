@@ -29,7 +29,7 @@ export const repositoryApi = {
   create: (input: RepositoryInput) => api.post<Repository>("/repositories", input),
   update: (id: string, patch: RepositoryUpdate) =>
     api.patch<Repository>(`/repositories/${id}`, patch),
-  remove: (id: string) => api.delete<void>(`/repositories/${id}`),
+  remove: (id: string) => api.remove(`/repositories/${id}`),
   test: (repositoryId: string) =>
     api.post<{ deliveryId: string }>("/deliveries/test", { repositoryId }),
   digest: (repositoryId: string) =>
@@ -52,5 +52,5 @@ export const checkTemplateApi = {
   create: (input: CheckTemplateInput) => api.post<CheckTemplate>("/check-templates", input),
   update: (id: string, input: CheckTemplateInput) =>
     api.put<CheckTemplate>(`/check-templates/${id}`, input),
-  remove: (id: string) => api.delete<void>(`/check-templates/${id}`),
+  remove: (id: string) => api.remove(`/check-templates/${id}`),
 };

@@ -13,7 +13,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CommitDetail, CommitFileChange } from "@/integrations/github/github.client.js";
-import { buildReviewPrompt } from "@/modules/dossier/review.build.js";
+import { buildReviewPrompt } from "@/modules/review/review.build.js";
 
 const CUT = "اقتُطع الفرق";
 

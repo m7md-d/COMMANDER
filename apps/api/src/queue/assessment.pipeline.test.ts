@@ -8,6 +8,7 @@
  */
 
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { renderAssessment } from "@/queue/assessment.pipeline.js";
 import type { AssessmentFacts } from "@/modules/digest/assessment.read.js";
@@ -15,8 +16,6 @@ import type { AssessmentFacts } from "@/modules/digest/assessment.read.js";
 const EMPTY: AssessmentFacts = {
   notes: { total: 0, byKind: [], oldest: [], added: 0 },
   worst: [],
-  verdicts: [],
-  patterns: [],
   constitution: null,
 };
 
@@ -73,14 +72,13 @@ test("a note carries its age, and the age is what makes it citable", () => {
   assert.match(text, /12/, "the size of the pile is a fact too");
 });
 
-test("a repeated review finding is reported as a pattern with its count", () => {
-  const text = renderAssessment("ar", {
-    ...EMPTY,
-    patterns: [{ finding: "أسماء متغيرات غامضة", count: 4 }],
-  });
+test("the assessment rests on measurements alone: no model's verdict is evidence (0009 §7, D-37)", () => {
+  // A review verdict is a model's text. Counted among the facts a suggestion may
+  // cite, one model's opinion became the next model's "measured evidence", and
+  // the digest could recommend on the strength of what it had itself been told.
+  const reader = readFileSync(new URL("../modules/digest/assessment.read.ts", import.meta.url), "utf8");
 
-  assert.match(text, /4/);
-  assert.match(text, /أسماء متغيرات غامضة/);
+  assert.doesNotMatch(reader, /\breview\s*:|reviewedAt|commitReviewSchema/, "assessment.read.ts reads a review");
 });
 
 test("repo-authored text cannot smuggle an instruction into the prompt", () => {

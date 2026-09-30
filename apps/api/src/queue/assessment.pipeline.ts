@@ -9,9 +9,10 @@
  * limit of 200, and this FIXME about the retry path has been here 41 days" can
  * only say something about this project.
  *
- * Everything the repository authored — a note's text, a reviewer's finding, the
- * rules document — is untrusted and passes the quote guard, exactly as a commit
- * message does.
+ * Everything the repository authored — a note's text, the rules document — is
+ * untrusted and passes the quote guard, exactly as a commit message does. And
+ * nothing a model wrote is a fact here: not a review's verdict, not its
+ * findings (0009 §7).
  */
 
 import { t, type LocaleId } from "@commander/shared";
@@ -32,7 +33,6 @@ export function renderAssessment(locale: LocaleId, facts: AssessmentFacts): stri
   const blocks = [
     ...worstBlock(locale, facts),
     ...notesBlock(locale, facts),
-    ...reviewBlock(locale, facts),
     ...rulesBlock(locale, facts),
   ];
 
@@ -73,31 +73,6 @@ function notesBlock(locale: LocaleId, facts: AssessmentFacts): string[] {
       }),
     ),
   ];
-}
-
-function reviewBlock(locale: LocaleId, facts: AssessmentFacts): string[] {
-  const blocks: string[] = [];
-
-  if (facts.verdicts.length > 0) {
-    const summary = facts.verdicts
-      .map((entry) => `${t(locale, `review.verdict.${entry.verdict}`)}:${entry.count}`)
-      .join(" · ");
-    blocks.push(t(locale, "assess.verdicts", { summary }));
-  }
-
-  if (facts.patterns.length > 0) {
-    blocks.push(t(locale, "assess.patterns"));
-    blocks.push(
-      ...facts.patterns.map((pattern) =>
-        t(locale, "assess.patternLine", {
-          count: pattern.count,
-          finding: sanitizeQuote(pattern.finding, QUOTE),
-        }),
-      ),
-    );
-  }
-
-  return blocks;
 }
 
 function rulesBlock(locale: LocaleId, facts: AssessmentFacts): string[] {

@@ -24,6 +24,18 @@ export const settingsSchema = z.object({
     .min(-12, "settings.timezoneRange")
     .max(14, "settings.timezoneRange"),
 
+  /**
+   * Reviews each push's code before its communiqué: one model request per push
+   * that brought new work. Off until someone chooses that price (0009 §7).
+   */
+  review: z.boolean(),
+
+  /**
+   * A refusal reads as a sentence; this adds the button that shows the
+   * provider's raw reply under it. Off by default.
+   */
+  rawFailures: z.boolean(),
+
   /** Wraps and truncates attacker-controlled commit text before it reaches the model. */
   injectionGuard: z.boolean(),
   quoteMaxLength: z.number().int().min(40).max(2_000),
@@ -48,6 +60,8 @@ export function defaultSettings(model: string, locale: "ar" | "en" = "ar"): Sett
     maxTokens: 500,
     maxWords: 120,
     timezoneOffset: 3,
+    review: false,
+    rawFailures: false,
     injectionGuard: true,
     quoteMaxLength: 160,
     deliveryRetentionDays: 30,

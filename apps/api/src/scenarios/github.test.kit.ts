@@ -13,17 +13,20 @@
  * | `distinct`              | not reachable from any head GitHub held before    | GitHub docs: "distinct from any that have been pushed before" |
  * | a merge's files         | its diff against the first parent                 | not documented; it is what produced the complaint b0be5de answers |
  * | a rename in the webhook | `removed` old path + `added` new path              | the webhook has no rename field |
- * | commit API `files`      | pages of 300, each named by the last one's `Link`, 3,000 in all; with `previous_filename` | GitHub docs, "Get a commit": past 300 files, "pagination link headers for the remaining files, up to a limit of 3000" |
+ * | commit API `files`      | pages of 300, each named by the last one's `Link`, 3,000 in all; with `previous_filename`, and `sha` the blob the commit left (git's for a removal, which is read as gone by its status) | GitHub docs, "Get a commit": past 300 files, "pagination link headers for the remaining files, up to a limit of 3000" |
  * | `timestamp`             | the author date                                   | assumption |
  * | list API `since`        | compared with the committer date                  | assumption |
  * | compare API `commits`   | the base..head set, oldest first, never cut        | GitHub docs, "Compare two commits": `git log BASE..HEAD`, chronological; 250 without paging |
  * | compare `merge_base_commit` | `git merge-base base head`                     | GitHub docs, "Compare two commits" |
+ * | compare `status`        | `ahead` when the fork is base and head has more; `identical`, `behind`, else `diverged` | GitHub docs, "Compare two commits" |
+ * | events timeline         | every push the story made, lost ones included, by its sender — unless the pass is marked as running before the timeline caught up | GitHub docs, "List repository events": "event latency can be anywhere from 30s to 6h"; 300 events, 30 days — not modelled |
  * | `commits/{sha}/pulls`   | the pull request merged into `main` whose merge made the sha; none for any other base, open ones not modelled | GitHub docs, "List pull requests associated with a commit": the merged one on the default branch, open ones elsewhere |
  * | `pulls?state=closed&base=` | every pull request merged into that base, the latest first | GitHub docs, "List pull requests" |
  * | `username` / `login`    | `<login>@users.noreply.github.com`; GitHub's own address is `web-flow` | fixture convention |
  * | `repository.default_branch` | `main`                                        | GitHub docs, push event: the full repository object |
  */
 
+import { parseSections, type Entry } from "./diff.test.kit.js";
 import type { Git } from "./git.test.kit.js";
 import { REPOSITORY, ZERO, type MergedPull, type PushEvent } from "./story.test.kit.js";
 
@@ -49,14 +52,6 @@ interface Meta {
   message: string;
 }
 
-interface Entry {
-  /** git's letter: A, D, M, T, R or C. */
-  status: string;
-  path: string;
-  previous?: string;
-  additions: number;
-  deletions: number;
-}
 
 export interface WebhookPush {
   ref: string;
@@ -168,7 +163,9 @@ export class GitHubView {
     ]);
     const metas = parseMetas(log);
     metas.forEach((meta) => this.metas.set(meta.sha, meta));
-    return { total_commits: metas.length, commits: metas.map(listed), merge_base_commit: { sha: fork.trim() } };
+    const forked = fork.trim();
+    const status = compareStatus({ base, head, fork: forked, ahead: metas.length });
+    return { status, total_commits: metas.length, commits: metas.map(listed), merge_base_commit: { sha: forked } };
   }
 
   /** before..after, or — for a new branch — everything no other head reaches. */
@@ -273,58 +270,6 @@ function parseMetas(out: string): Meta[] {
     });
 }
 
-interface Section {
-  entries: Entry[];
-  counts: Map<string, [number, number]>;
-}
-
-/**
- * `diff-tree --stdin -z --raw --numstat`: for each commit its sha, its raw
- * records, then its counts — all NUL-separated, so a sha token opens a section.
- */
-function parseSections(out: string): Map<string, Entry[]> {
-  const tokens = out.split("\0");
-  const sections = new Map<string, Section>();
-  let current: Section | undefined;
-
-  for (let i = 0; i < tokens.length; i += 1) {
-    const token = tokens[i] ?? "";
-    if (/^[0-9a-f]{40}$/.test(token)) {
-      current = { entries: [], counts: new Map() };
-      sections.set(token, current);
-    } else if (current) {
-      i += readRecord(tokens, i, current);
-    }
-  }
-  return new Map([...sections].map(([sha, section]) => [sha, withCounts(section)]));
-}
-
-/** One raw record or one count at `tokens[at]`; returns how many path tokens followed it. */
-function readRecord(tokens: string[], at: number, section: Section): number {
-  const token = tokens[at] ?? "";
-  if (token.startsWith(":")) {
-    const status = (token.split(" ").at(-1) ?? "M").charAt(0);
-    const twoPaths = status === "R" || status === "C";
-    const first = tokens[at + 1] ?? "";
-    const path = twoPaths ? tokens[at + 2] ?? "" : first;
-    section.entries.push({ status, path, ...(twoPaths && { previous: first }), additions: 0, deletions: 0 });
-    return twoPaths ? 2 : 1;
-  }
-
-  const count = /^([\d-]+)\t([\d-]+)\t(.*)$/.exec(token);
-  if (!count) return 0;
-  // A rename's count carries no path of its own: the old and new paths follow it.
-  const path = count[3] || (tokens[at + 2] ?? "");
-  section.counts.set(path, [Number(count[1]) || 0, Number(count[2]) || 0]);
-  return count[3] ? 0 : 2;
-}
-
-function withCounts(section: Section): Entry[] {
-  return section.entries.map((entry) => {
-    const [additions, deletions] = section.counts.get(entry.path) ?? [0, 0];
-    return { ...entry, additions, deletions };
-  });
-}
 
 function login(email: string): string | undefined {
   if (email === "noreply@github.com") return "web-flow";
@@ -378,10 +323,18 @@ function totals(files: Entry[]) {
 function apiFile(file: Entry) {
   return {
     filename: file.path,
+    sha: file.blob,
     status: API_STATUS[file.status] ?? "modified",
     additions: file.additions,
     deletions: file.deletions,
     changes: file.additions + file.deletions,
     ...(file.previous !== undefined && { previous_filename: file.previous }),
   };
+}
+
+/** GitHub's `status` for a compare, from where the two sides fork. */
+function compareStatus(at: { base: string; head: string; fork: string; ahead: number }): string {
+  if (at.base === at.head) return "identical";
+  if (at.fork === at.base && at.ahead > 0) return "ahead";
+  return at.fork === at.head ? "behind" : "diverged";
 }

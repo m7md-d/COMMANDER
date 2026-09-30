@@ -104,11 +104,6 @@ const scenarios: Scenario[] = [
     title: "a conflict resolved with an extra line neither side wrote",
     story: (story) => conflictResolvedAs(story, 'export const part1 = "total";\nexport const skipAudit = true;\n'),
     expect: charged("direct_push@omar", "merge_residue@omar"),
-    defect: {
-      observed: charged("direct_push@omar"),
-      because:
-        "merge_residue works per file, and a conflicted file belongs to the branch, so a line added inside the resolution is invisible to it. git's combined diff (--cc) would show it. (0009, limits)",
-    },
   },
   {
     id: "strategy-ours",

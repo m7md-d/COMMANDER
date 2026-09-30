@@ -1,5 +1,5 @@
 import type { SecretStatus, Settings, SettingsUpdate } from "@commander/shared";
-import { api } from "@/shared/api/client";
+import { api } from "./client";
 
 export const settingsKeys = {
   all: ["settings"] as const,

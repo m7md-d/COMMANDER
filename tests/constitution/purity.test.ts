@@ -25,7 +25,8 @@ const MODEL_FACING = [
   /^packages\/shared\/src\/i18n\//,
   /^packages\/shared\/src\/domain\/(prompt|review)\.ts$/,
   /^apps\/api\/src\/domain\/report\/prompt-blocks\.ts$/,
-  /^apps\/api\/src\/modules\/dossier\/(review\.build|narrative\.service)\.ts$/,
+  /^apps\/api\/src\/modules\/dossier\/narrative\.service\.ts$/,
+  /^apps\/api\/src\/modules\/review\/review\.build\.ts$/,
   /^apps\/api\/src\/modules\/prompts\/prompts\.service\.ts$/,
 ];
 

@@ -1,10 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SettingsUpdate } from "@commander/shared";
-import { settingsApi, settingsKeys } from "./api";
-
-export function useSettings() {
-  return useQuery({ queryKey: settingsKeys.all, queryFn: settingsApi.read });
-}
+import { settingsApi, settingsKeys } from "@/shared/api/settings";
 
 export function useSecretStatus() {
   return useQuery({

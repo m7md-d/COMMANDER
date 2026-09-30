@@ -11,7 +11,23 @@
 
 import { branchIsWatched, watchesEverything } from "@commander/shared";
 import type { NormalizedCommit, NormalizedPush } from "@commander/shared";
+import { RECONCILE_LOOKBACK_MS } from "@/config/constants.js";
 import type { CommitListEntry } from "@/integrations/github/commits.client.js";
+
+/**
+ * Where a pass starts reading, in ms: the lookback floor, or when the front began
+ * being watched if that is later. What is already on record is dropped by sha,
+ * never by date.
+ *
+ * The newest commit on record used to be the cursor, and the record is the
+ * whole repository's: a push that arrived on another branch after a lost one
+ * moved it past the lost commits, and they were never read (D-23, scenario
+ * `lost-push-overtaken-by-a-later-one`). Before the front existed nothing was
+ * lost — nobody was listening — so its creation bounds the read instead.
+ */
+export function readSince(input: { now: number; watchedSince: number }): number {
+  return Math.max(input.now - RECONCILE_LOOKBACK_MS, input.watchedSince);
+}
 
 /** A branch the reconciler reads, and how. */
 export interface BranchRead {
@@ -25,40 +41,50 @@ export interface BranchRead {
    * (scenario `branch-cut-from-an-unwatched-main`).
    */
   beyond: string | null;
+  /** The head the listing showed, stored once the read succeeds; null without a listing. */
+  head: string | null;
 }
 
 /**
  * The branches the reconciler reads for a front.
  *
- * A front that watches every branch is read on its default branch alone:
- * reading them all costs a request per branch on every pass, stale ones
- * included, which is a price nobody chose by leaving the default in place.
+ * With a listing, each watched branch whose head moved since a pass last read
+ * it — every branch, on a front that watches them all. A branch whose head has
+ * not moved gained nothing, so it costs no request: that is what lets a front
+ * that watches every branch be read on every branch. It used to be read on its
+ * default branch alone, and a push lost anywhere else stayed lost (D-24).
  *
- * Any other front is read on each existing branch it watches. A pattern is not
- * a branch the commits API can read, so it is matched against the listing —
- * reading the default branch in its place read a branch the front might not
- * watch at all, and everything recovered from it was skipped as unwatched.
- * Without a listing, the branches the front names are still readable.
+ * A pattern is not a branch the commits API can read, so it is matched against
+ * the listing. Without one, the branches the front names are read, and the
+ * default branch on a front that watches every branch.
  *
  * Without the default branch nothing is read: there would be no telling a
  * branch's own work from what it inherited, and a guess here is an accusation.
  */
 export function branchesToReconcile(input: {
   watch: string[];
-  /** The repository's branches, or null when they could not be listed. */
-  existing: string[] | null;
+  /** Each branch's head, or null when they could not be listed. */
+  existing: ReadonlyMap<string, string> | null;
+  /** Each branch's head when a pass last read it. */
+  lastRead: ReadonlyMap<string, string>;
   /** The repository's default branch, or null when it is not known. */
   defaultBranch: string | null;
 }): BranchRead[] {
-  const { watch, existing, defaultBranch } = input;
+  const { watch, existing, lastRead, defaultBranch } = input;
   if (!defaultBranch) return [];
-  if (watchesEverything(watch)) return [{ branch: defaultBranch, beyond: null }];
+  const read = (branch: string, head: string | null): BranchRead => ({
+    branch,
+    beyond: branch === defaultBranch ? null : defaultBranch,
+    head,
+  });
 
-  const watched =
-    existing === null
-      ? watch.filter((entry) => entry.length > 0 && !entry.includes("*"))
-      : existing.filter((branch) => branchIsWatched(watch, branch));
-  return watched.map((branch) => ({ branch, beyond: branch === defaultBranch ? null : defaultBranch }));
+  if (existing === null) {
+    const named = watchesEverything(watch) ? [defaultBranch] : watch.filter((entry) => entry.length > 0 && !entry.includes("*"));
+    return named.map((branch) => read(branch, null));
+  }
+  return [...existing]
+    .filter(([branch, head]) => branchIsWatched(watch, branch) && lastRead.get(branch) !== head)
+    .map(([branch, head]) => read(branch, head));
 }
 
 /**
@@ -70,7 +96,8 @@ export function branchesToReconcile(input: {
  * each of them: an author was charged with a push someone else made, and with a
  * batch of commits they had pushed across a day (0009 §4, scenario
  * `contributors-branch-pushed-by-a-maintainer-webhook-lost`). So the push names
- * no pusher — `recovered` — and is addressed to the author of its newest commit.
+ * no pusher — `recovered` — and is addressed to the author of its newest commit,
+ * unless GitHub's events timeline names one (`reconciler.pushers.ts`).
  */
 export function recoveredPush(
   repo: { fullName: string; defaultBranch: string },

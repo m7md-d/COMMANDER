@@ -15,7 +15,7 @@ import {
   type LocaleId,
   type NormalizedCommit,
   type NormalizedPush,
-  type ReviewVerdict,
+  type CommitReview,
   type StructureDigest,
   type ViolationHit,
 } from "@commander/shared";
@@ -25,14 +25,6 @@ import { sanitizeQuote } from "./sanitize.js";
 export interface Quote {
   maxLength: number;
   guardEnabled: boolean;
-}
-
-/** One reviewed commit, as the communiqué is allowed to cite it. */
-export interface ReviewedCommit {
-  title: string;
-  verdict: ReviewVerdict;
-  remark: string;
-  findings: string[];
 }
 
 /**
@@ -102,11 +94,28 @@ function commitLine(locale: LocaleId, commit: NormalizedCommit, quote: Quote): s
   });
 }
 
-export function buildCommitBlock(push: NormalizedPush, locale: LocaleId, quote: Quote): string {
-  const lines = push.commits.map((commit) => commitLine(locale, commit, quote)).join("\n");
-  if (!lines) return t(locale, "report.noViolations");
+/**
+ * The commits the push brought, one line each, and what it only carried as a
+ * count (0009 §7). A landing carries its whole branch, reported when each
+ * commit arrived; listed again, nineteen of them read as a heap pushed at once.
+ * `fresh` null — a report kept before it was — lists every commit.
+ */
+export function buildCommitBlock(reported: { push: NormalizedPush; fresh: readonly string[] | null }, locale: LocaleId, quote: Quote): string {
+  const { push } = reported;
+  const brought = freshCommits(reported);
+  const carried = push.commits.length - brought.length;
+  const lines = brought.map((commit) => commitLine(locale, commit, quote));
+  if (carried > 0) lines.push(t(locale, "report.carried", { count: carried }));
+  if (lines.length === 0) return t(locale, "report.noViolations");
   const notes = [push.truncated && "report.truncated", readInPart(push) && "report.unmeasured"] as const;
-  return [lines, ...notes.filter((key) => key !== false).map((key) => t(locale, key))].join("\n");
+  return [...lines, ...notes.filter((key) => key !== false).map((key) => t(locale, key))].join("\n");
+}
+
+/** The commits new to the record when the push was judged — all of them when that was not kept. */
+export function freshCommits(reported: { push: NormalizedPush; fresh: readonly string[] | null }): NormalizedCommit[] {
+  if (reported.fresh === null) return reported.push.commits;
+  const fresh = new Set(reported.fresh);
+  return reported.push.commits.filter((commit) => fresh.has(commit.sha));
 }
 
 export function buildViolationBlock(violations: ViolationHit[], locale: LocaleId, addressee: string): string {
@@ -129,31 +138,19 @@ export function buildCommendationBlock(entries: Commendation[], locale: LocaleId
 }
 
 /**
- * The code verdicts, so the communiqué can praise or condemn what is actually in
- * the diff instead of guessing from a commit title.
+ * The push's code review, so the communiqué can praise or condemn what is
+ * actually in the diff instead of guessing from a commit title. One review for
+ * the push, of its net diff (0009 §7) — or a line saying there is none.
  */
-export function buildReviewBlock(
-  reviews: ReviewedCommit[],
-  locale: LocaleId,
-  quote: Quote,
-): string {
-  if (reviews.length === 0) return t(locale, "report.noReviews");
+export function buildReviewBlock(review: CommitReview | null, locale: LocaleId, quote: Quote): string {
+  if (review === null) return t(locale, "report.noReviews");
 
-  return reviews
-    .map((review) => {
-      const head = t(locale, "report.reviewLine", {
-        title: sanitizeQuote(review.title, quote),
-        verdict: t(locale, `review.verdict.${review.verdict}`),
-        remark: sanitizeQuote(review.remark, quote),
-      });
-
-      const findings = review.findings.map((finding) =>
-        t(locale, "report.reviewFinding", { finding: sanitizeQuote(finding, quote) }),
-      );
-
-      return [head, ...findings].join("\n");
-    })
-    .join("\n");
+  const head = t(locale, "report.reviewLine", {
+    verdict: t(locale, `review.verdict.${review.verdict}`),
+    remark: sanitizeQuote(review.remark, quote),
+  });
+  const findings = review.findings.map((finding) => t(locale, "report.reviewFinding", { finding: sanitizeQuote(finding, quote) }));
+  return [head, ...findings].join("\n");
 }
 
 /**

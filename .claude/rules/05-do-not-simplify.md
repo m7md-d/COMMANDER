@@ -68,8 +68,16 @@ code.
   at the cap stays unread, and a push read in part says so in the communiqué (`readInPart`).
   The next page is followed only on `api.github.com`: the installation token goes with it.
 - **A finding the evidence names nobody for is charged to nobody** (`unattributed`): an author
-  address tied to no account, a file two people changed in one push, the pusher of a recovered
-  push. Falling back to whoever pushed is a guess, and it lands on the person nearest the button.
+  address tied to no account, a file two people changed in one push that cannot be read hand by
+  hand, the pusher of a recovered push no event names. Falling back to whoever pushed is a guess,
+  and it lands on the person nearest the button.
+- **A file two authors changed in one push is read hand by hand** (`hands.ts`, 0011). Consecutive
+  commits by one author are one hand, judged on what it handed over — so a draft its author fixed
+  before passing it on is not charged — from the blob each commit left the file (`blobs`, GitHub's
+  `files[].sha`). Reading commit by commit instead charges an author with a version that never
+  left their hand. Any gap — a commit whose files are unread, a merge inside the line — leaves the
+  whole line to the push's ends, which name nobody: a hand judged against the wrong "before" is an
+  accusation.
 - **Every rule declares where it applies** (`RULE_SCOPE`, 0009 §3). The rules about how work
   lands — direct push, force push, deletion, landing unfixed — hold on a main line only: the
   default branch, or one a watcher marks guarded or critical (`isTrunk`). Pushing straight to a
@@ -81,9 +89,13 @@ code.
   `main_line`), and weighs double there in the dossier (`MAIN_LINE_WEIGHT`). The role is stored,
   not recomputed: the default branch is not kept anywhere else, and a watcher added later must not
   reweigh what was charged before it. A row without one keeps the weight it always had.
-- **A recovered push names no pusher** (`recovered`). Git records who wrote and who committed a
-  commit, never who pushed it; grouping by author invented a push per author and charged them
-  with pushes someone else made.
+- **A recovered push names no pusher of its own** (`recovered`). Git records who wrote and who
+  committed a commit, never who pushed it; grouping by author invented a push per author and
+  charged them with pushes someone else made. Only GitHub's events timeline names a pusher
+  (`pushedBy`, D-22): an event whose `before..head` holds exactly commits of the gap, and only
+  moving forward — a force push is not named as a plain one. The timeline lags by hours and keeps
+  300 events, so a push it does not show names nobody. And two pushes by one person stay two
+  (`splitByPusher`): a push's size is charged per push.
 - **A landing merge is judged against its own parents** (`landing.ts`), which costs a compare
   call and two more listings and looks redundant beside the push's own two trees. Between the
   push's ends alone, a branch adding 20 lines while main added 40 — each under the limit, joined
@@ -133,9 +145,10 @@ code.
 
 - **The weekly digest's assessment may only cite measured evidence.**
   `assessment.pipeline.ts` enumerates every fact a suggestion is allowed to rest on — worst files
-  with their limits and baselines, notes with their ages, repeated review findings, the repo's own
-  rules — and the prompt's binding rule is that a suggestion quotes one verbatim or is not
-  written, even if that leaves the section empty. Suggestions that could apply to any repository
+  with their limits and baselines, notes with their ages, the repo's own rules — and the prompt's
+  binding rule is that a suggestion quotes one verbatim or is not written, even if that leaves the
+  section empty. A code review's verdict or finding is not among them: it is a model's text, and
+  counted as evidence it let one model's opinion become the next one's fact (0009 §7, D-37). Suggestions that could apply to any repository
   are the failure mode, and they come from missing evidence, not from insufficiently polite
   prompting. `renderAssessment` returns `""` when there is nothing, dropping the instruction
   rather than asking for an assessment of nothing.

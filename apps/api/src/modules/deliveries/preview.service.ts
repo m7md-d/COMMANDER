@@ -45,7 +45,9 @@ export async function runPreview(request: PreviewRequest): Promise<PreviewResult
     // The sample push cites shas that do not exist, so there is no code to
     // review; the preview shows the same "unavailable" line a real push gets
     // before its commits have been judged.
-    reviews: [],
+    review: null,
+    // A sample weighed against no history: every commit is new.
+    fresh: null,
     history: {
       totalCommits: record?.totalCommits ?? 0,
       totalPushes: record?.totalPushes ?? 0,

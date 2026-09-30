@@ -84,6 +84,8 @@ model Repository {
   dossierNotes     DossierNote[]
   reportSchedules  ReportSchedule[]
   todoMarkers      TodoMarker[]
+  reconciledHeads  ReconciledHead[]
+  pushReviews      PushReview[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -285,9 +287,9 @@ model CommitRecord {
   deletions    Int     @default(0)
   enriched     Boolean @default(false)
 
-  /// LLM code review of the diff — { verdict, remark, findings }, validated by
-  /// zod on read (commitReviewSchema). Null until the review pass runs, which
-  /// needs the App (for the diff) and OpenRouter (for the judgement).
+  /// LLM code review of this commit's diff — { verdict, remark, findings }.
+  /// No longer written since reviews moved to the push (`push_reviews`, 0009 §7);
+  /// the rows written before stay as they were, and nothing reads them.
   review      Json?
   reviewModel String?   @map("review_model")
   reviewedAt  DateTime? @map("reviewed_at")
@@ -527,4 +529,41 @@ model ReportSchedule {
 
   @@unique([repositoryId, kind])
   @@map("report_schedules")
+}
+
+/// The head each branch had when the reconciler last read it. A branch whose head
+/// has not moved since gained nothing, so it costs no request — which is what lets
+/// a front that watches every branch be read on every branch (D-24). Written only
+/// after a read succeeds: a failed read leaves the branch to be asked again.
+model ReconciledHead {
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  branch       String
+  sha          String
+  readAt       DateTime   @default(now()) @updatedAt @map("read_at")
+
+  @@id([repositoryId, branch])
+  @@map("reconciled_heads")
+}
+
+/// One code review per push that brought new work (0009 §7): its net diff, read
+/// once. Keyed by the push's head, so a retry or a resend of the same report
+/// never pays for a second review.
+model PushReview {
+  id           String     @id @default(cuid())
+  repositoryId String     @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  head         String
+  /// Whose work it was, when one person's; null when several wrote it.
+  login        String?
+  /// The newest commit's title, which names the work in the dossier.
+  title        String
+  /// { verdict, remark, findings }, validated by zod on read (commitReviewSchema).
+  review       Json
+  model        String
+  reviewedAt   DateTime   @default(now()) @map("reviewed_at")
+
+  @@unique([repositoryId, head])
+  @@index([repositoryId, login, reviewedAt])
+  @@map("push_reviews")
 }

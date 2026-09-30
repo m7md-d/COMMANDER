@@ -11,13 +11,15 @@
  * merge against what git makes of its parents unaided. Where one side left a
  * file alone, that is the other side's version; anything else is the merger's.
  * Where both sides changed it, nothing says which lines are whose, and the
- * merge's own share is not judged.
+ * merge's own share is not judged. And where more than one author changed a
+ * file on the branch, the branch is read hand by hand from its fork (0011).
  */
 
 import { isGitHubUiCommit, isMerge, type CheckConfigMap, type Finding, type NormalizedPush, type PushWeight } from "@commander/shared";
 import { judgeFile, type CheckOutcome, type Reading } from "@/domain/checks/judge.js";
 import type { TouchedFile } from "@/domain/tree/diff.js";
 import { handsOnPaths, soleHand, type Named } from "./attribution.js";
+import { judgeHands, lineOf, readHands, type HandShares } from "./hands.js";
 
 /** The merge a push lands, and its parents: the line it lands on, and the branch it brings. */
 export interface Landing {
@@ -56,6 +58,8 @@ export interface LandingSides {
   fork: ReadonlyMap<string, string>;
   second: ReadonlyMap<string, string>;
   merged: ReadonlyMap<string, string>;
+  /** The text of each version `resolutionsOf` names, where it could be read (D-25). */
+  contents?: ReadonlyMap<string, string>;
 }
 
 export interface LandingScope {
@@ -88,7 +92,7 @@ export function judgeLanding(net: TouchedFile[], sides: LandingSides, scope: Lan
 
   for (const path of new Set([...onTrunk.keys(), ...onBranch.keys()])) {
     const v = versionsOf(path, { trunk: onTrunk.get(path), branch: onBranch.get(path), sides });
-    const wrote = judged(branchWork(path, v, context), soleHand(context.hands.get(path) ?? new Set()));
+    const wrote = context.shares.get(path) ?? judged(branchWork(path, v, context), soleHand(context.hands.get(path) ?? new Set()));
     const made = judged(mergeWork(path, v, scope), context.merger);
     for (const share of [wrote, made]) {
       outcome.violations.push(...share.violations);
@@ -108,8 +112,12 @@ function contextOf(sides: LandingSides, scope: LandingScope) {
   const { push, weight, knownShas } = scope;
   const brought = push.commits.filter((commit) => commit.sha !== sides.merge);
   const work = weight.work.filter((entry) => entry.sha !== sides.merge);
+  // Where more than one author changed a file on the branch, each hand from the fork (0011).
+  const hands = readHands({ ...lineOf({ push, base: sides.first, landing: sides }), knownShas });
+  const shares: HandShares = hands ? judgeHands(hands, scope) : new Map();
   return {
     ...scope,
+    shares,
     hands: handsOnPaths(push, { ...weight, work }),
     carried: new Set(brought.filter((commit) => knownShas.has(commit.sha)).flatMap((commit) => commit.paths ?? [])),
     merger: push.commits.find((commit) => commit.sha === sides.merge)?.authorLogin || null,

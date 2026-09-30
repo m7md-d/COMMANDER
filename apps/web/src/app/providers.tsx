@@ -24,7 +24,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <I18nProvider>
           <ToastProvider>
             <QueryClientProvider client={queryClient}>
-              <BrowserRouter>{children}</BrowserRouter>
+              <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>{children}</BrowserRouter>
             </QueryClientProvider>
           </ToastProvider>
         </I18nProvider>

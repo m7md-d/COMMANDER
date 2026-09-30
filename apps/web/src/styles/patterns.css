@@ -116,7 +116,7 @@
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: calc(0.04em * var(--tracking));
   white-space: nowrap;
 }
 

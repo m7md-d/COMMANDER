@@ -41,16 +41,19 @@ deliver`. Nothing in the first waits on the second.
    ([domain/judgement/landing.ts](../../apps/api/src/domain/judgement/landing.ts)).
 7. **[reconciler.ts](../../apps/api/src/queue/reconciler.ts) pulls what push missed.** Nothing
    guarantees the host was awake, and GitHub gives up after a few retries. It asks the GitHub App
-   for commits newer than the last on record and replays each branch's gap through the same
-   pipeline as one recovered push, which names no pusher: git records who wrote a commit, never
-   who pushed it, so only what a commit holds is charged, to its author. The
-   default branch is read by its history; any other watched branch only for what it has beyond
-   the default, because its history also holds everything it inherited when it was cut — read by
-   date, that came back as pushes nobody made. Which branches and how is `branchesToReconcile`,
-   pure and called as it is by the scenario reference. Gated on the App: with no installation
-   token it is a no-op, and it is `best-effort` by nature — it cannot see a branch deleted during
-   downtime, nor history a force push overwrote, and a front that watches every branch is read on
-   its default branch alone.
+   for the commits of its lookback window that are not on record — by sha, never by date: a
+   cursor on the newest commit skipped a push lost before a later one arrived (D-23) — and
+   replays each branch's gap through the same pipeline as recovered pushes: git records who wrote a
+   commit, never who pushed it, so a part of the gap is named only by a push GitHub's events
+   timeline shows (D-22), and the rest names no pusher — only what a commit holds is charged
+   there, to its author. A branch is read only when its head moved since a pass last read it
+   (`reconciled_heads`), which is what lets a front that watches every branch be read on every
+   branch (D-24). The default branch is read by its history; any other watched branch only for
+   what it has beyond the default, because its history also holds everything it inherited when
+   it was cut — read by date, that came back as pushes nobody made. Which branches and how is
+   `branchesToReconcile`, pure and called as it is by the scenario reference. Gated on the App:
+   with no installation token it is a no-op, and it is `best-effort` by nature — it cannot see a
+   branch deleted during downtime, nor history a force push overwrote.
 
 ## The dependency rule
 

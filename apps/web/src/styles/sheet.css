@@ -54,3 +54,15 @@
   padding-inline-start: var(--space-4);
   border-inline-start: var(--border-width) dashed var(--color-border-strong);
 }
+
+/* The excluded patterns, folded: the same shipped list stood open under every
+   metric. The summary keeps the count in view. */
+.clause-fold > summary {
+  cursor: pointer;
+  color: var(--color-accent-text);
+  font-size: var(--text-sm);
+}
+
+.clause-fold[open] > summary {
+  margin-block-end: var(--space-2);
+}

@@ -50,6 +50,12 @@ export class Contents {
   }
 }
 
+/** `GET /repos/{owner}/{repo}/git/blobs/{sha}`, for each: the blob's text. */
+export async function blobTexts(git: Git, shas: string[]): Promise<ReadonlyMap<string, string>> {
+  if (shas.length === 0) return new Map();
+  return parseBatch(await git.feed(["cat-file", "--batch"], `${shas.join("\n")}\n`));
+}
+
 /** `git cat-file --batch`: "<sha> blob <bytes>\n<content>\n" per object, sized in bytes. */
 function parseBatch(out: string): Map<string, string> {
   const buffer = Buffer.from(out, "utf8");

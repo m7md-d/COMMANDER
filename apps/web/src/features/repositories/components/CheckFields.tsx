@@ -5,10 +5,10 @@ import {
   type PartialCheckMap,
 } from "@commander/shared";
 import { useTranslate } from "@/shared/i18n/I18nProvider";
-import { ChipInput } from "@/shared/components/ChipInput";
-import { Field, labelOf } from "@/shared/components/Field";
+import { Field } from "@/shared/components/Field";
 import { NumberField } from "@/shared/components/NumberField";
 import { Toggle } from "@/shared/components/Toggle";
+import { PatternField } from "./PatternField";
 
 interface CheckFieldsProps {
   value: PartialCheckMap;
@@ -69,35 +69,22 @@ export function CheckFields({ value, onChange, inherited }: CheckFieldsProps) {
                   )}
                 </Field>
 
-                <Field
+                <PatternField
                   label={t("checks.include")}
-                  hint={t("checks.inherited", { value: base.include.length })}
-                >
-                  {(id) => (
-                    <ChipInput
-                      labelledBy={labelOf(id)}
-                      values={layer.include ?? base.include}
-                      onChange={(include) => patch(metric, { include })}
-                      addLabel={t("checks.patternAdd")}
-                      removeLabel={t("checks.patternRemove")}
-                    />
-                  )}
-                </Field>
+                  inherited={base.include.length}
+                  values={layer.include ?? base.include}
+                  onChange={(include) => patch(metric, { include })}
+                />
 
-                <Field
-                  label={t("checks.exclude")}
-                  hint={t("checks.inherited", { value: base.exclude.length })}
-                >
-                  {(id) => (
-                    <ChipInput
-                      labelledBy={labelOf(id)}
-                      values={layer.exclude ?? base.exclude}
-                      onChange={(exclude) => patch(metric, { exclude })}
-                      addLabel={t("checks.patternAdd")}
-                      removeLabel={t("checks.patternRemove")}
-                    />
-                  )}
-                </Field>
+                <details className="clause-fold">
+                  <summary>{t("checks.excludeFold", { count: (layer.exclude ?? base.exclude).length })}</summary>
+                  <PatternField
+                    label={t("checks.exclude")}
+                    inherited={base.exclude.length}
+                    values={layer.exclude ?? base.exclude}
+                    onChange={(exclude) => patch(metric, { exclude })}
+                  />
+                </details>
               </div>
             ) : null}
           </article>

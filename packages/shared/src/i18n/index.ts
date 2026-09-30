@@ -1,11 +1,16 @@
 import { AR } from "./ar.js";
+import { AR_SERVER } from "./ar.server.js";
 import { EN } from "./en.js";
-import type { Dictionary, LocaleId, Translate } from "./types.js";
+import { EN_SERVER } from "./en.server.js";
+import type { LocaleId, Translate, TranslationKey } from "./types.js";
 import { translateFrom } from "./types.js";
 
-export const DICTIONARIES: Record<LocaleId, Dictionary> = {
-  ar: AR,
-  en: EN,
+/** Every key, the panel's and the server's: what the API translates from. */
+export type FullDictionary = Record<TranslationKey, string>;
+
+export const DICTIONARIES: Record<LocaleId, FullDictionary> = {
+  ar: { ...AR, ...AR_SERVER },
+  en: { ...EN, ...EN_SERVER },
 };
 
 /**
@@ -22,10 +27,10 @@ export const DICTIONARIES: Record<LocaleId, Dictionary> = {
  * dictionaries into every browser. It loads the one locale it shows and calls
  * `translateFrom` (apps/web/src/shared/i18n/I18nProvider.tsx).
  */
-export function createTranslate(dictionaries: Record<LocaleId, Dictionary>): Translate {
+export function createTranslate(dictionaries: Record<LocaleId, FullDictionary>): Translate {
   return (locale, key, vars) => {
     const table: Record<string, string> = dictionaries[locale] ?? dictionaries.ar;
-    const fallback: Record<string, string> = AR;
+    const fallback: Record<string, string> = dictionaries.ar;
     return translateFrom(key in table ? table : fallback, key, vars);
   };
 }
@@ -33,5 +38,5 @@ export function createTranslate(dictionaries: Record<LocaleId, Dictionary>): Tra
 /** Bound translator. Every renderer in the API goes through this. */
 export const t = createTranslate(DICTIONARIES);
 
-export { AR, EN };
+export { AR, AR_SERVER, EN, EN_SERVER };
 export * from "./types.js";

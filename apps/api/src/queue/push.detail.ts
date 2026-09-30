@@ -12,12 +12,15 @@ import type { NormalizedCommit, NormalizedPush } from "@commander/shared";
 import type { CommitDetail, CommitFileChange, Result } from "@/integrations/github/github.client.js";
 
 /**
- * Bounds the API calls one push may cost. The number came from the 20-commit cap
- * GitHub applies to its Events *timeline*; a webhook delivery carries up to
- * 2,048 commits, so a longer push is enriched only in part — which the scenario
- * reference records rather than hides.
+ * Bounds the API calls one push may cost: one request per commit, from an
+ * installation's 5,000 an hour. 250 is the most commits GitHub lists for a pull
+ * request ("List commits on a pull request"), so any pull request GitHub shows
+ * whole is read whole. It was 20 — the cap on GitHub's events *timeline*, not on
+ * a push — and a crossing in a push of 21 commits was never seen (D-27). A
+ * webhook delivery carries up to 2,048 commits; a longer push is read in part,
+ * and says so (`report.unmeasured`).
  */
-export const MAX_ENRICHED_COMMITS = 20;
+export const MAX_ENRICHED_COMMITS = 250;
 
 export type DetailFetcher = (sha: string) => Promise<Result<CommitDetail>>;
 
@@ -65,13 +68,32 @@ export function applyDetail(commit: NormalizedCommit, detail: CommitDetail): Nor
   // reads as work nobody did, or as a merge's own. The commit stays unread.
   if (!detail.complete) return read;
 
+  const blobs = blobsAfter(detail.files);
   return {
     ...read,
     paths: touchedPaths(detail.files),
     moves: detail.files.flatMap((file): [string, string][] =>
       file.previousPath === undefined ? [] : [[file.previousPath, file.path]],
     ),
+    ...(blobs && { blobs }),
   };
+}
+
+/**
+ * What each touched file was left holding: its blob, or null where it went — a
+ * rename's old path included. Null for the whole commit when any file comes
+ * without its blob: a hand read from a partial list could be charged with
+ * another's version (0011).
+ */
+function blobsAfter(files: CommitFileChange[]): [string, string | null][] | null {
+  const blobs: [string, string | null][] = [];
+  for (const file of files) {
+    if (file.previousPath !== undefined) blobs.push([file.previousPath, null]);
+    if (file.status === "removed") blobs.push([file.path, null]);
+    else if (file.sha) blobs.push([file.path, file.sha]);
+    else return null;
+  }
+  return blobs;
 }
 
 /**

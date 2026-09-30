@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslate } from "@/shared/i18n/I18nProvider";
 import { useRepositories } from "@/features/repositories/hooks";
 import { useMemberStats, useOverviewStats, useResetStats } from "@/features/stats/hooks";
-import { useSettings } from "@/features/settings/hooks";
+import { useSettings } from "@/shared/hooks/useSettings";
 import { useToast } from "@/shared/hooks/useToast";
 import { StatsSkeleton } from "@/features/stats/components/StatsSkeleton";
 import { RosterSkeleton } from "@/features/stats/components/RosterSkeleton";
@@ -68,7 +68,7 @@ export function OverviewPage() {
         actions={
           // The picker filters this board alone: the tiles above count every
           // front, and in the page header it read as their scope (W-09).
-          <div className="row">
+          <div className="row row-wrap">
             <RepositoryPicker
               repositories={repositories.data?.repositories ?? []}
               value={selected?.id ?? null}

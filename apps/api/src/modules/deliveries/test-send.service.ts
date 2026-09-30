@@ -34,6 +34,8 @@ export async function queueTestSend(repositoryId: string): Promise<{ deliveryId:
       mainLine: true,
       violations: detectViolations({ push, repository, settings }),
       commendations: [],
+      // A sample stands on no record: every commit in it is new.
+      fresh: push.commits.map((commit) => commit.sha),
     },
     // A made-up push stands on no record: it cites none.
     history: { totalCommits: 0, totalPushes: 0, violationCounts: {} },

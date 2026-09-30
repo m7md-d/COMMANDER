@@ -17,8 +17,15 @@ import {
   type MergeSpec,
   type Person,
 } from "./git.test.kit.js";
+import type { PushEventEntry } from "@/integrations/github/events.client.js";
 
 export const ZERO = "0".repeat(40);
+
+/** A push as GitHub's events timeline lists it, whether or not its webhook arrived. */
+function toTimeline(event: RemoteEvent): PushEventEntry[] {
+  if (event.kind !== "push") return [];
+  return [{ actor: event.sender.login, ref: event.ref, before: event.before, head: event.after }];
+}
 export const REPOSITORY = "team/repo";
 
 export interface PushEvent {
@@ -40,6 +47,8 @@ export interface PushEvent {
 export interface ReconcileEvent {
   kind: "reconcile";
   remote: ReadonlyMap<string, string>;
+  /** GitHub's events timeline as the pass reads it: every push so far, lost ones included. */
+  timeline: PushEventEntry[];
   /** The story's clock when the pass ran: its "now". */
   clock: number;
 }
@@ -141,9 +150,14 @@ export class Story {
     this.events.push({ kind: "retry" });
   }
 
-  /** The reconciler's periodic pass, which is the only thing that sees a lost push. */
-  reconcile(): void {
-    this.events.push({ kind: "reconcile", remote: new Map(this.remote), clock: this.git.clock });
+  /**
+   * The reconciler's periodic pass, which is the only thing that sees a lost push.
+   * `timelineBehind`: the pass runs before GitHub's events timeline shows the
+   * pushes — its latency runs to hours — so it names no pusher.
+   */
+  reconcile(options: { timelineBehind?: boolean } = {}): void {
+    const timeline = options.timelineBehind ? [] : this.events.flatMap(toTimeline);
+    this.events.push({ kind: "reconcile", remote: new Map(this.remote), clock: this.git.clock, timeline });
   }
 
   /** The green button, in each of its three styles, then the push GitHub sends. */

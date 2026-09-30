@@ -73,11 +73,6 @@ const scenarios: Scenario[] = [
       story.reconcile();
     },
     expect: charged("direct_push@lina", "lazy_message@sara"),
-    defect: {
-      observed: charged("lazy_message@sara"),
-      because:
-        "The reconciler cannot know Lina pushed: git records that Sara wrote and committed these, and nothing about who pushed them. Her 'wip' is hers on either road; the direct push is charged to nobody. Grouped by author, as before, it was charged to Sara (reconciled-direct-push).",
-    },
   },
 ];
 

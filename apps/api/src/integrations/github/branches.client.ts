@@ -11,22 +11,24 @@ import type { CommitListEntry } from "./commits.client.js";
 
 interface RawBranch {
   name?: string;
+  commit?: { sha?: string };
 }
 
 /** Pages of 100. A repository with more branches is listed in part, and says so. */
 const BRANCH_PAGES = 10;
 
 /**
- * The repository's branch names: what a watched pattern is matched against,
- * since a pattern is not a branch the commits API can read. `complete` is false
- * when the listing stopped at the page cap, so a partial list never reads as
- * the whole.
+ * The repository's branches, each with the sha its head points at: what a
+ * watched pattern is matched against, since a pattern is not a branch the
+ * commits API can read, and what tells the reconciler a branch moved.
+ * `complete` is false when the listing stopped at the page cap, so a partial
+ * list never reads as the whole.
  */
 export async function listBranches(
   installationId: string,
   repoFullName: string,
-): Promise<Result<{ names: string[]; complete: boolean }>> {
-  const names: string[] = [];
+): Promise<Result<{ heads: Map<string, string>; complete: boolean }>> {
+  const heads = new Map<string, string>();
 
   for (let page = 1; page <= BRANCH_PAGES; page += 1) {
     const result = await request<RawBranch[]>(
@@ -34,11 +36,13 @@ export async function listBranches(
       `/repos/${repoFullName}/branches?per_page=100&page=${page}`,
     );
     if (!result.ok) return result;
-    names.push(...result.data.flatMap((branch) => (branch.name ? [branch.name] : [])));
-    if (result.data.length < 100) return { ok: true, data: { names, complete: true } };
+    for (const branch of result.data) {
+      if (branch.name && branch.commit?.sha) heads.set(branch.name, branch.commit.sha);
+    }
+    if (result.data.length < 100) return { ok: true, data: { heads, complete: true } };
   }
 
-  return { ok: true, data: { names, complete: false } };
+  return { ok: true, data: { heads, complete: false } };
 }
 
 interface RawRepoMeta {
@@ -59,6 +63,8 @@ export async function fetchDefaultBranch(
 }
 
 interface RawCompare {
+  /** `ahead` when base is an ancestor of head and head has more. */
+  status?: string;
   total_commits?: number;
   commits?: RawListCommit[];
   merge_base_commit?: { sha?: string };
@@ -72,14 +78,15 @@ const asPath = (branch: string): string => branch.split("/").map(encodeURICompon
  * the one it was cut from. GitHub's docs: the `git log BASE..HEAD` set, in
  * chronological order, at most 250 without paging. `complete` is false when
  * `total_commits` says there were more. `mergeBase` is where the two last
- * shared history — a landing's branch is judged from there.
+ * shared history — a landing's branch is judged from there. `ahead` is true when
+ * head only added to base: a push that moved a branch forward, not a rewrite.
  */
 export async function compareCommits(input: {
   installationId: string;
   repoFullName: string;
   base: string;
   head: string;
-}): Promise<Result<{ commits: CommitListEntry[]; complete: boolean; mergeBase: string | null }>> {
+}): Promise<Result<{ commits: CommitListEntry[]; complete: boolean; mergeBase: string | null; ahead: boolean }>> {
   const { installationId, repoFullName, base, head } = input;
   const result = await request<RawCompare>(
     installationId,
@@ -89,5 +96,6 @@ export async function compareCommits(input: {
 
   const commits = (result.data.commits ?? []).map(toCommitListEntry);
   const complete = commits.length >= (result.data.total_commits ?? 0);
-  return { ok: true, data: { commits, complete, mergeBase: result.data.merge_base_commit?.sha || null } };
+  const mergeBase = result.data.merge_base_commit?.sha || null;
+  return { ok: true, data: { commits, complete, mergeBase, ahead: result.data.status === "ahead" } };
 }

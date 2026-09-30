@@ -105,7 +105,7 @@ export function startWorker(): void {
   log.info("started", { pollMs: env.QUEUE_POLL_INTERVAL_MS, batch: env.QUEUE_BATCH_SIZE });
   void resumeThenTick();
   // Run maintenance once at boot, not only on the hourly timer, so a freshly
-  // (re)started instance enriches, reviews and re-scores within a minute instead
+  // (re)started instance enriches and re-scores within a minute instead
   // of sitting idle until the first interval fires — and so its first App call
   // happens now, making a misconfiguration visible immediately rather than in an
   // hour.

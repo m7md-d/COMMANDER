@@ -20,6 +20,8 @@ export interface RawCommit {
   stats?: { additions?: number; deletions?: number };
   files?: {
     filename: string;
+    /** The file's blob after the commit. */
+    sha?: string;
     additions?: number;
     deletions?: number;
     status?: string;
@@ -64,8 +66,35 @@ function toFileChange(file: NonNullable<RawCommit["files"]>[number]): CommitFile
     additions: file.additions ?? 0,
     deletions: file.deletions ?? 0,
     status: file.status ?? "modified",
+    ...(file.sha !== undefined && { sha: file.sha }),
     ...(file.patch !== undefined && { patch: file.patch }),
     ...(file.previous_filename !== undefined && { previousPath: file.previous_filename }),
+  };
+}
+
+/** `GET /repos/{owner}/{repo}/compare/{base}...{head}`, the files read from it. */
+export interface RawCompareFiles {
+  files?: RawCommit["files"];
+}
+
+/** GitHub's compare lists at most 300 files ("Compare two commits"), and says nothing when it stops. */
+export const COMPARE_FILES_CAP = 300;
+
+/**
+ * Two commits' net difference, read as one commit's detail: what a push changed
+ * between its ends, which the code review reads (0009 §7). Its lines are the
+ * files' sums — the compare carries no totals of its own.
+ */
+export function toCompareDetail(raw: RawCompareFiles, head: string): CommitDetail {
+  const files = (raw.files ?? []).map(toFileChange);
+  const sum = (pick: (file: CommitFileChange) => number) => files.reduce((total, file) => total + pick(file), 0);
+  return {
+    sha: head,
+    parents: [],
+    additions: sum((file) => file.additions),
+    deletions: sum((file) => file.deletions),
+    files,
+    complete: files.length < COMPARE_FILES_CAP,
   };
 }
 

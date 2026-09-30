@@ -122,14 +122,14 @@
 .console-btn-code {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  letter-spacing: 0.1em;
+  letter-spacing: calc(0.1em * var(--tracking));
   color: var(--color-text-muted);
 }
 
 .console-btn-label {
   font-size: var(--text-lg);
   font-weight: var(--weight-medium);
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em * var(--tracking));
 }
 
 .console-btn-desc {

@@ -88,6 +88,10 @@ export function SettingsForm({ value, patch, secrets }: SettingsFormProps) {
           {numberField({ labelKey: "settings.maxTokens", key: "maxTokens", min: 64, max: 4000 })}
           {numberField({ labelKey: "settings.maxWords", key: "maxWords", min: 20, max: 600 })}
         </div>
+        <div className="stack">
+          <Toggle label={t("settings.review")} checked={value.review} onChange={(next) => patch("review", next)} />
+          <p className="hint">{t("settings.reviewHint")}</p>
+        </div>
       </Card>
 
       <Card title={t("settings.sectionSecurity")}>
@@ -117,6 +121,8 @@ export function SettingsForm({ value, patch, secrets }: SettingsFormProps) {
             onChange={(next) => patch("paused", next)}
           />
           <p className="hint">{t("settings.pausedHint")}</p>
+          <Toggle label={t("settings.rawFailures")} checked={value.rawFailures} onChange={(next) => patch("rawFailures", next)} />
+          <p className="hint">{t("settings.rawFailuresHint")}</p>
           {numberField({
             labelKey: "settings.deliveryRetention",
             key: "deliveryRetentionDays",

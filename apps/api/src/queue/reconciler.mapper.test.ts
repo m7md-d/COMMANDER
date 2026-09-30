@@ -10,7 +10,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { GITHUB_UI_COMMITTER, isTrunk } from "@commander/shared";
 import type { CommitListEntry } from "@/integrations/github/commits.client.js";
-import { branchesToReconcile, recoveredPush } from "@/queue/reconciler.mapper.js";
+import { RECONCILE_LOOKBACK_MS } from "@/config/constants.js";
+import { branchesToReconcile, readSince, recoveredPush } from "@/queue/reconciler.mapper.js";
 
 const REPO = { fullName: "team/repo", defaultBranch: "main" };
 
@@ -79,41 +80,58 @@ test("commit order is preserved, file counts are unknown, and nothing recovered 
   assert.equal(recoveredPush(REPO, "main", []), null);
 });
 
-const BRANCHES = ["main", "release/1.0", "release/2.0", "feature/export"];
-const BY_TIME = (branch: string) => ({ branch, beyond: null });
-const BEYOND_MAIN = (branch: string) => ({ branch, beyond: "main" });
+const HEADS = new Map([
+  ["main", "m1"],
+  ["release/1.0", "r1"],
+  ["release/2.0", "r2"],
+  ["feature/export", "f1"],
+]);
+const NEVER_READ = new Map<string, string>();
+const BY_TIME = (branch: string, head: string | null = HEADS.get(branch) ?? null) => ({ branch, beyond: null, head });
+const BEYOND_MAIN = (branch: string, head: string | null = HEADS.get(branch) ?? null) => ({ branch, beyond: "main", head });
+const reads = (watch: string[], lastRead = NEVER_READ) =>
+  branchesToReconcile({ watch, existing: HEADS, lastRead, defaultBranch: "main" });
 
-test("a front that watches every branch is read on its default branch alone, by its history", () => {
+test("a front that watches every branch is read on every branch, not on its default alone (D-24)", () => {
   for (const watch of [[], ["*"]]) {
-    assert.deepEqual(branchesToReconcile({ watch, existing: BRANCHES, defaultBranch: "main" }), [BY_TIME("main")]);
+    assert.deepEqual(reads(watch), [BY_TIME("main"), BEYOND_MAIN("release/1.0"), BEYOND_MAIN("release/2.0"), BEYOND_MAIN("feature/export")]);
   }
 });
 
+test("a branch whose head has not moved since it was last read costs no request", () => {
+  const lastRead = new Map([...HEADS, ["feature/export", "f0"]]);
+
+  assert.deepEqual(reads([], lastRead), [BEYOND_MAIN("feature/export")]);
+  assert.deepEqual(reads(["main", "release/*"], lastRead), []);
+});
+
 test("any other branch is read only beyond the default, never on the default in its place", () => {
-  assert.deepEqual(branchesToReconcile({ watch: ["release/*"], existing: BRANCHES, defaultBranch: "main" }), [
-    BEYOND_MAIN("release/1.0"),
-    BEYOND_MAIN("release/2.0"),
-  ]);
-  assert.deepEqual(branchesToReconcile({ watch: ["main", "release/*"], existing: BRANCHES, defaultBranch: "main" }), [
-    BY_TIME("main"),
-    BEYOND_MAIN("release/1.0"),
-    BEYOND_MAIN("release/2.0"),
-  ]);
+  assert.deepEqual(reads(["release/*"]), [BEYOND_MAIN("release/1.0"), BEYOND_MAIN("release/2.0")]);
+  assert.deepEqual(reads(["main", "release/*"]), [BY_TIME("main"), BEYOND_MAIN("release/1.0"), BEYOND_MAIN("release/2.0")]);
 });
 
 test("a named branch that does not exist is not read", () => {
-  const reads = branchesToReconcile({ watch: ["main", "develop"], existing: BRANCHES, defaultBranch: "main" });
-
-  assert.deepEqual(reads, [BY_TIME("main")]);
+  assert.deepEqual(reads(["main", "develop"]), [BY_TIME("main")]);
 });
 
 test("without a listing, the named branches are read and the patterns are not", () => {
-  const reads = branchesToReconcile({ watch: ["release/1.0", "release/*"], existing: null, defaultBranch: "main" });
+  const unlisted = (watch: string[]) => branchesToReconcile({ watch, existing: null, lastRead: NEVER_READ, defaultBranch: "main" });
 
-  assert.deepEqual(reads, [BEYOND_MAIN("release/1.0")]);
+  assert.deepEqual(unlisted(["release/1.0", "release/*"]), [BEYOND_MAIN("release/1.0", null)]);
+  assert.deepEqual(unlisted([]), [BY_TIME("main", null)]);
 });
 
 test("without the default branch nothing is read: inherited work could not be told from pushed work", () => {
-  assert.deepEqual(branchesToReconcile({ watch: [], existing: BRANCHES, defaultBranch: null }), []);
-  assert.deepEqual(branchesToReconcile({ watch: ["release/*"], existing: BRANCHES, defaultBranch: null }), []);
+  for (const watch of [[], ["release/*"]]) {
+    assert.deepEqual(branchesToReconcile({ watch, existing: HEADS, lastRead: NEVER_READ, defaultBranch: null }), []);
+  }
+});
+
+test("a pass reads from the lookback floor, or from when the front began, whatever is on record (D-23)", () => {
+  const now = Date.parse("2026-09-30T12:00:00Z");
+  const floor = now - RECONCILE_LOOKBACK_MS;
+
+  assert.equal(readSince({ now, watchedSince: 0 }), floor);
+  // Before the front existed nobody was listening, so nothing there was lost.
+  assert.equal(readSince({ now, watchedSince: now - 1_000 }), now - 1_000);
 });

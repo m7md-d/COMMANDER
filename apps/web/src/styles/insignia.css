@@ -45,7 +45,7 @@
 .wordmark-name {
   font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
-  letter-spacing: 0.22em;
+  letter-spacing: calc(0.22em * var(--tracking));
   line-height: 1;
   /* The mark is a proper noun and stays LTR inside Arabic text. */
   direction: ltr;
@@ -67,7 +67,7 @@
   gap: var(--space-2);
   color: var(--color-text-muted);
   font-size: var(--text-xs);
-  letter-spacing: 0.08em;
+  letter-spacing: calc(0.08em * var(--tracking));
   white-space: nowrap;
 }
 
@@ -93,7 +93,7 @@
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--tracking));
   text-transform: uppercase;
 }
 

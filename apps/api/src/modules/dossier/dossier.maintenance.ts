@@ -12,7 +12,6 @@ import { prisma } from "@/db/prisma.js";
 import { createLogger, describeError } from "@/core/logger/logger.js";
 import { computeFacts, persistFacts, pruneExpiredNotes } from "./dossier.service.js";
 import { enrichPendingCommits, syncRepoConstitution } from "./enrichment.service.js";
-import { reviewPendingCommits } from "./review.service.js";
 import { refreshNarrative } from "./narrative.service.js";
 
 const log = createLogger("dossier-maintenance");
@@ -21,16 +20,16 @@ const log = createLogger("dossier-maintenance");
 const MAX_NARRATIVES_PER_CYCLE = 5;
 
 /**
- * The App-dependent enrichment for one repository: line counts, code reviews,
- * and the cached rules document. Each is best-effort and independent — one
- * failing must not skip the others or abort the cycle.
+ * The App-dependent enrichment for one repository: line counts and the cached
+ * rules document. Each is best-effort and independent — one failing must not
+ * skip the other or abort the cycle. Code reviews are not here: a push is
+ * reviewed once, before its communiqué, and only when the setting asks for it
+ * (0009 §7) — a backlog reviewed commit by commit every hour was a price
+ * nobody had chosen.
  */
 async function enrichRepository(repositoryId: string): Promise<void> {
   await enrichPendingCommits(repositoryId).catch((error: unknown) =>
     log.warn("enrichment failed", { repositoryId, error: String(error) }),
-  );
-  await reviewPendingCommits(repositoryId).catch((error: unknown) =>
-    log.warn("review failed", { repositoryId, error: String(error) }),
   );
   await syncRepoConstitution(repositoryId).catch(() => false);
 }

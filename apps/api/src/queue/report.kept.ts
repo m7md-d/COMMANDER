@@ -30,11 +30,17 @@ export interface KeptReport {
   history: HistoryRecord;
   /** The text this row rewrites, when it was asked for again after being sent; null for a first report. */
   rewrites: string | null;
+  /**
+   * The shas the push brought the record — what the communiqué lists; the rest
+   * it only carried (0009 §7). Absent from a row kept before it was, which then
+   * lists every commit.
+   */
+  fresh?: string[];
 }
 
 export function keptReport(input: {
   push: NormalizedPush;
-  judgement: Pick<Judgement, "event" | "mainLine" | "violations" | "commendations">;
+  judgement: Pick<Judgement, "event" | "mainLine" | "violations" | "commendations" | "fresh">;
   history: HistoryRecord;
 }): KeptReport {
   const { push, judgement, history } = input;
@@ -47,6 +53,7 @@ export function keptReport(input: {
     commendations: judgement.commendations,
     history,
     rewrites: null,
+    fresh: judgement.fresh,
   };
 }
 
@@ -63,7 +70,8 @@ export function readKeptReport(value: Prisma.JsonValue | null): KeptReport | nul
     typeof kept.push === "object" &&
     Array.isArray(kept.violations) &&
     Array.isArray(kept.commendations) &&
-    typeof kept.history === "object";
+    typeof kept.history === "object" &&
+    (kept.fresh === undefined || Array.isArray(kept.fresh));
   return readable ? fromJson<KeptReport>(value) : null;
 }
 

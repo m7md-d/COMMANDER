@@ -36,12 +36,13 @@ export const BUNDLE_GZIP_KB = {
    */
   index: 80,
   /**
-   * One dictionary each, loaded when the panel shows that language. Still with
-   * the keys only the API reads (`digest.prompt`, `report.rewrite`…) — the other
-   * half of UI-AUDIT #22, not yet done.
+   * One dictionary each, loaded when the panel shows that language. Lowered
+   * 24 → 21 and 21 → 18 on 2026-09-30, measured 18.5 and 16.0 once the keys only
+   * the API reads (`digest.prompt`, `report.rewrite`…) moved to `*.server.ts` —
+   * the other half of UI-AUDIT #22. bundle.test.ts fails if one comes back.
    */
-  ar: 24,
-  en: 21,
+  ar: 21,
+  en: 18,
   vendor: 60,
   motion: 45,
   ui: 40,

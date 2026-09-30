@@ -41,7 +41,6 @@ const EXPORTED = /^export (?:(?:async )?function|const) ([A-Za-z0-9_]+)\s*(?:[(<
 const UNTESTED_AT_ADOPTION = new Set([
   "absorb",
   "buildCommendationBlock",
-  "buildCommitBlock",
   "buildHistoryBlock",
   "buildReviewBlock",
   "buildStructureBlock",

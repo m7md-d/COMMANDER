@@ -4,10 +4,10 @@ import { Card } from "@/shared/components/Card";
 import { EmptyState } from "@/shared/components/EmptyState";
 
 /**
- * The per-commit code reviews: the officer's verdict on each diff, newest first.
- * The verdict is a labelled badge — the word carries the state, colour only
- * reinforces it — followed by the model's remark and any concrete findings.
- * Empty without the GitHub App (there is no diff to read).
+ * The code reviews of this member's pushes: the officer's verdict on each push's
+ * diff, newest first (0009 §7). The verdict is a labelled badge — the word
+ * carries the state, colour only reinforces it — followed by the model's remark
+ * and any concrete findings. Empty while the review is off.
  */
 export function DossierReviews({ reviews }: { reviews: DossierReview[] }) {
   const t = useTranslate();
@@ -19,7 +19,7 @@ export function DossierReviews({ reviews }: { reviews: DossierReview[] }) {
       ) : (
         <ul className="reviews">
           {reviews.map((review) => (
-            <li key={review.sha} className="review">
+            <li key={review.head} className="review">
               <div className="review-head">
                 <span className={`verdict verdict-${review.verdict}`}>
                   {t(`review.verdict.${review.verdict}`)}

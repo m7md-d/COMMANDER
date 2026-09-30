@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **الحالة** | مطروح |
+| **الحالة** | معتمد |
 | **يمسّ** | `apps/api/src/integrations/github/commit.mapper.ts` · `apps/api/src/queue/push.detail.ts` · `apps/api/src/domain/judgement/` · `apps/api/src/queue/delivery.checks.ts` · `packages/shared/src/domain/push.ts` |
 
 ## المشكلة

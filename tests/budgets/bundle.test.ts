@@ -81,9 +81,10 @@ test("vendor code stays split from ours", () => {
 /**
  * The panel shows one language at a time, so it loads one dictionary, on its
  * own, when it needs it (UI-AUDIT #22, ROADMAP 4.1). Both used to ride in
- * `index`, and every feature's text was paid twice by every browser. A key that
- * appears in `index` means a dictionary was pulled back in — by a static import
- * of `t`, `DICTIONARIES` or a locale file.
+ * `index`, and every feature's text was paid twice by every browser. A
+ * dictionary's text in `index` — its title, which the code never spells out
+ * (CONSTITUTION.md §3) — means one was pulled back in, by a static import of
+ * `t`, `DICTIONARIES` or a locale file.
  */
 test("each dictionary loads on its own, and none rides in index", () => {
   const files = readdirSync(ASSETS).filter((file) => file.endsWith(".js"));
@@ -93,7 +94,26 @@ test("each dictionary loads on its own, and none rides in index", () => {
   for (const locale of ["ar", "en"]) {
     assert.ok(names.has(locale), `expected a "${locale}" dictionary chunk, saw: ${[...names].join(", ")}`);
   }
-  // A key only the API reads: the panel's own code never names it, so the only
-  // way it reaches `index` is inside a dictionary.
-  assert.ok(!index.includes('"report.fallback"'), 'the index chunk holds a dictionary (its "report.fallback" key): a static import pulled one back into it. Load the locale through I18nProvider\'s dynamic import.');
+  const dictionary = readFileSync(join(ROOT, "packages/shared/src/i18n/ar.ts"), "utf8");
+  const title = /"app\.name": "([^"]+)"/.exec(dictionary)?.[1];
+  assert.ok(title, "ar.ts has no app.name: the guard would check nothing");
+  assert.ok(!index.includes(title), "the index chunk holds the Arabic dictionary (its app.name): a static import pulled it back in. Load the locale through I18nProvider's dynamic import.");
+});
+
+/**
+ * What only the server reads — the model's instructions, the facts it is
+ * handed — lives in `*.server.ts` and reaches no browser (ROADMAP 4.1). One of
+ * its keys in any chunk means the panel imported a server dictionary.
+ */
+test("no browser file carries the server's dictionary", () => {
+  const server = readFileSync(join(ROOT, "packages/shared/src/i18n/ar.server.ts"), "utf8");
+  const keys = [...server.matchAll(/^\s*"([a-zA-Z0-9._]+)":/gm)].map((match) => match[1] ?? "");
+  assert.ok(keys.length > 0, "ar.server.ts lists no keys: the guard would check nothing");
+
+  const files = readdirSync(ASSETS).filter((file) => file.endsWith(".js"));
+  const found = files.flatMap((file) => {
+    const text = readFileSync(join(ASSETS, file), "utf8");
+    return keys.filter((key) => text.includes(`"${key}"`)).map((key) => `${file}: "${key}"`);
+  });
+  assert.deepEqual(found, [], "a server key reached the browser: import ar.server/en.server from the API only");
 });

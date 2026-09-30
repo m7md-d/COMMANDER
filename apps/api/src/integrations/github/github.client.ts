@@ -18,6 +18,8 @@ export interface CommitFileChange {
   additions: number;
   deletions: number;
   status: string;
+  /** The file's blob after the commit, as GitHub lists it. */
+  sha?: string;
   /** The unified diff for this file. Absent for binary or very large files. */
   patch?: string;
   /** Where a renamed file came from. GitHub sets it only on a rename. */

@@ -36,6 +36,12 @@ export interface RuleContext {
    * the authors' pass.
    */
   landed: Finding[];
+  /**
+   * Files the landing merge wrote lines into that neither of its parents had,
+   * inside files both sides changed (`writtenInResolution`, D-25) — its own work
+   * hidden in a conflict's resolution. Absent when nothing was read line by line.
+   */
+  resolved?: { merge: string; paths: string[] };
 }
 
 /**

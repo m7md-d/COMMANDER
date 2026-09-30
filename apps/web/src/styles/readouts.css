@@ -20,7 +20,7 @@
 .readout-label {
   color: var(--color-screen-dim);
   font-size: var(--text-xs);
-  letter-spacing: 0.14em;
+  letter-spacing: calc(0.14em * var(--tracking));
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -93,7 +93,7 @@
 
 .clock-time {
   font-size: var(--text-base);
-  letter-spacing: 0.08em;
+  letter-spacing: calc(0.08em * var(--tracking));
   font-variant-numeric: tabular-nums;
   color: var(--color-text);
 }

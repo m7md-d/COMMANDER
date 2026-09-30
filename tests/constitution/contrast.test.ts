@@ -68,3 +68,36 @@ test("every colour the situation screens draw text in reads against the tube", (
     `below ${TEXT_CONTRAST_MIN} : 1 against --palette-screen. Raise the alpha in themes.css; it is a contrast ratio.`,
   );
 });
+
+/** One theme's block in themes.css: `:root, [data-theme="dark"] { … }` or `[data-theme="light"] { … }`. */
+function themeBlock(themes: string, name: "dark" | "light"): string {
+  const start = themes.indexOf(`[data-theme="${name}"] {`);
+  assert.ok(start !== -1, `themes.css: no [data-theme="${name}"] block`);
+  return themes.slice(start, themes.indexOf("}", start));
+}
+
+/**
+ * Text drawn on a filled control reads against its fill, in both themes. The
+ * primary button's label, white on the light theme's khaki, came to 4.30 : 1 —
+ * on every page, since the menu button is one (docs/UI-DEFECTS.md W-21).
+ */
+test("the text on a filled button reads against its fill, in both themes", () => {
+  const palette = css("tokens.css");
+  const themes = css("themes.css");
+  const colour = (block: string, token: string): Rgb => {
+    const alias = new RegExp(`${token}:\\s*var\\((--palette-[\\w-]+)\\)`).exec(block)?.[1];
+    assert.ok(alias, `themes.css: ${token} is not a palette colour in this theme`);
+    return hex(new RegExp(`${alias}:\\s*([^;]+);`).exec(palette)?.[1] ?? "");
+  };
+
+  const faint = (["dark", "light"] as const).flatMap((name) => {
+    const block = themeBlock(themes, name);
+    return ["--color-accent", "--color-accent-hover"].map((fill) => ({ name, fill, contrast: ratio(colour(block, "--color-on-accent"), colour(block, fill)) }));
+  }).filter((entry) => entry.contrast < TEXT_CONTRAST_MIN);
+
+  assert.deepEqual(
+    faint.map((entry) => `${entry.name}: --color-on-accent on ${entry.fill} is ${entry.contrast.toFixed(2)} : 1`),
+    [],
+    `below ${TEXT_CONTRAST_MIN} : 1. Move the fill's palette colour in tokens.css; the ratio is the tokens' own.`,
+  );
+});

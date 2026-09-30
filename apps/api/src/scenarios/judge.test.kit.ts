@@ -13,11 +13,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DEFAULT_CHECKS, isGitHubUiCommit, type CheckConfigMap, type NormalizedPush, type RuleConfigMap, type Watcher } from "@commander/shared";
-import { RECONCILE_LOOKBACK_MS } from "@/config/constants.js";
 import { wanted } from "@/domain/checks/judge.js";
 import { pushChanges, pushSpan } from "@/domain/judgement/changes.js";
 import { admitPush, judgePush, type ChecksFacts } from "@/domain/judgement/judgement.js";
 import { landingMerge, type LandingSides } from "@/domain/judgement/landing.js";
+import { lineOf, readHands, sharedChanges } from "@/domain/judgement/hands.js";
+import { resolutionsOf } from "@/domain/judgement/resolution.js";
 import { headOf, pullFact, type PullFact } from "@/domain/judgement/event.js";
 import { mergeWithDefaults } from "@/domain/violations/engine.js";
 import { toCommitDetail, toCommitListEntry, toCommitPull, type RawCommit } from "@/integrations/github/commit.mapper.js";
@@ -25,8 +26,10 @@ import type { CommitDetail } from "@/integrations/github/github.client.js";
 import { isBranchRef, normalizePush } from "@/modules/webhook/push.mapper.js";
 import { enrichWith } from "@/queue/push.detail.js";
 import type { CommitListEntry } from "@/integrations/github/commits.client.js";
-import { branchesToReconcile, recoveredPush, type BranchRead } from "@/queue/reconciler.mapper.js";
-import { Contents, type Listed } from "./contents.test.kit.js";
+import { branchesToReconcile, readSince, recoveredPush, type BranchRead } from "@/queue/reconciler.mapper.js";
+import { eventsToRead, pushedBy, splitByPusher, type TimelinePush } from "@/queue/reconciler.pushers.js";
+import type { PushEventEntry } from "@/integrations/github/events.client.js";
+import { blobTexts, Contents, type Listed } from "./contents.test.kit.js";
 import { GitHubView } from "./github.test.kit.js";
 import { REPOSITORY, Story, type PushEvent, type ReconcileEvent, type RemoteEvent } from "./story.test.kit.js";
 
@@ -55,8 +58,6 @@ export const SUITE_RULES: RuleConfigMap = mergeWithDefaults({ large_diff: { enab
 
 const DEFAULT_FRONT: Front = { watch: [], watchers: [], app: true, rules: SUITE_RULES, checks: DEFAULT_CHECKS, silent: false, channel: true };
 const TIMEZONE_OFFSET = 3;
-/** reconciler.ts `computeSince` — the minute of overlap against clock skew. */
-const OVERLAP_MS = 60_000;
 
 export type Outcome = "judged" | "ignored" | "unwatched" | "skipped" | "lost" | "resent";
 
@@ -111,6 +112,8 @@ interface Run {
   /** Whether that row kept its judgement (`report.kept.ts`), which a retry sends from. */
   kept: boolean;
   contents: Contents;
+  /** reconciled_heads: each branch's head when a pass last read it. */
+  lastRead: Map<string, string>;
 }
 
 /** Plays a scenario on a fresh repository and returns its last verdict, with the trail. */
@@ -121,7 +124,7 @@ export async function play(scenario: Scenario): Promise<{ verdict: Verdict; trai
     if (story.events.length === 0) throw new Error(`${scenario.id}: the story emits no event`);
 
     const front = { ...DEFAULT_FRONT, ...scenario.front };
-    const run: Run = { story, view: new GitHubView(story.git, story.pulls), front, known: new Map(), contents: new Contents(story.git), kept: false };
+    const run: Run = { story, view: new GitHubView(story.git, story.pulls), front, known: new Map(), contents: new Contents(story.git), kept: false, lastRead: new Map() };
     const trail: string[] = [];
     let verdict = CLEAN;
     for (const event of story.events) {
@@ -228,18 +231,32 @@ function remember(known: Map<string, number>, push: NormalizedPush): void {
  * branch — which it queues, so each is handled exactly as a live push is.
  */
 async function reconcile(run: Run, event: ReconcileEvent): Promise<Verdict> {
-  const existing = [...event.remote.keys()];
-  const reads = branchesToReconcile({ watch: run.front.watch, existing, defaultBranch: "main" });
-  const since = cursor(run, event.clock);
+  const reads = branchesToReconcile({ watch: run.front.watch, existing: event.remote, lastRead: run.lastRead, defaultBranch: "main" });
+  const since = cursor(event.clock);
   const found: Verdict[] = [];
 
   for (const read of reads) {
-    // reconcileBranch — drop what is on record.
-    const fresh = (await missed(run, { read, since, remote: event.remote })).filter((entry) => !run.known.has(entry.sha));
-    const push = recoveredPush({ fullName: REPOSITORY, defaultBranch: "main" }, read.branch, fresh);
-    if (push) found.push(await handle(run, push));
+    // reconcileBranch — drop what is on record, then remember the head it read.
+    const gap = (await missed(run, { read, since, remote: event.remote })).filter((entry) => !run.known.has(entry.sha));
+    // recover — the gap split by the pushes GitHub's timeline shows.
+    const timeline = await timelineFor(run, { events: event.timeline, branch: read.branch, gap });
+    for (const part of splitByPusher(gap, timeline)) {
+      const push = recoveredPush({ fullName: REPOSITORY, defaultBranch: "main" }, read.branch, part.commits);
+      if (push) found.push(await handle(run, pushedBy(push, part.pusher)));
+    }
+    if (read.head) run.lastRead.set(read.branch, read.head);
   }
   return credited(charged(...found.flatMap((verdict) => verdict.charges)), ...found.flatMap((verdict) => verdict.credits));
+}
+
+/** reconciler.read.ts `readTimeline`: each event's before..head, when it only added. */
+async function timelineFor(run: Run, at: { events: PushEventEntry[]; branch: string; gap: CommitListEntry[] }): Promise<TimelinePush[]> {
+  const pushes: TimelinePush[] = [];
+  for (const event of eventsToRead(at)) {
+    const { status, commits } = await run.view.compare(event.before, event.head);
+    if (status === "ahead") pushes.push({ pusher: event.actor, shas: commits.map((commit) => commit.sha) });
+  }
+  return pushes;
 }
 
 /** reconciler.read.ts `readMissed`, oldest first: the default branch by its history, any other beyond it. */
@@ -270,9 +287,12 @@ async function readChanges(run: Run, push: NormalizedPush, knownShas: ReadonlySe
   const landing = await readLanding(run, { push, knownShas, before, after });
   const changes = pushChanges({ before, after, push }).filter((file) => wanted(config, file.path));
   const branch = (landing?.branch ?? []).filter((file) => wanted(config, file.path));
-  const blobs = [...changes, ...branch].flatMap((file) => [file, ...(file.previousSha ? [{ path: file.path, sha: file.previousSha }] : [])]);
+  // Each hand's versions, where more than one author changed a file (0011).
+  const base = new Map(before.map((entry) => [entry.path, entry.sha]));
+  const hands = sharedChanges(readHands({ ...lineOf({ push, base, ...(landing && { landing }) }), knownShas })).filter((file) => wanted(config, file.path));
+  const blobs = [...changes, ...branch, ...hands].flatMap((file) => [file, ...(file.previousSha ? [{ path: file.path, sha: file.previousSha }] : [])]);
   const readings = await run.contents.measure(blobs);
-  return { config, changes, readings, ...(landing && { landing: { ...landing, branch } }) };
+  return { config, changes, readings, base, ...(landing && { landing: { ...landing, branch } }) };
 }
 
 /** delivery.checks.ts `readLanding`: the fork from the compare API, then its listing and the branch head's. */
@@ -284,14 +304,15 @@ async function readLanding(run: Run, input: { push: NormalizedPush; knownShas: R
   const [second, forked] = await Promise.all([run.contents.tree(landing.second), run.contents.tree(fork.sha)]);
   const blobs = (listing: Listed[]) => new Map(listing.map((entry) => [entry.path, entry.sha]));
   const branch = pushChanges({ before: forked, after: second, push: input.push });
-  return { merge: landing.merge, branch, first: blobs(input.before), fork: blobs(forked), second: blobs(second), merged: blobs(input.after) };
+  const sides = { merge: landing.merge, branch, first: blobs(input.before), fork: blobs(forked), second: blobs(second), merged: blobs(input.after) };
+  // The text of each file both sides changed, which the merge matched to neither (D-25).
+  const contents = await blobTexts(run.story.git, resolutionsOf(sides).flatMap((file) => [file.first, file.second, file.merged]));
+  return { ...sides, contents };
 }
 
-/** reconciler.ts `computeSince`. */
-function cursor(run: Run, now: number): number {
-  const floor = now - RECONCILE_LOOKBACK_MS;
-  const newest = Math.max(floor, ...run.known.values());
-  return Math.max(newest - OVERLAP_MS, floor);
+/** reconciler.ts `reconcileRepo`: the front is watched from before the story begins. */
+function cursor(now: number): number {
+  return readSince({ now, watchedSince: 0 });
 }
 
 function describeEvent(event: RemoteEvent): string {

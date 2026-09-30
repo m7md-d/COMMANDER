@@ -30,11 +30,13 @@ export interface DossierNote {
   expiresAt: string | null;
 }
 
-/** One reviewed commit: the LLM's verdict on the diff plus its remark. */
+/** One reviewed push: the model's verdict on its net diff, plus its remark (0009 §7). */
 export interface DossierReview {
-  sha: string;
+  /** The push's head: what the review is kept by. */
+  head: string;
+  /** The newest commit's title, which names the work. */
   title: string;
-  committedAt: string;
+  reviewedAt: string;
   verdict: ReviewVerdict;
   remark: string;
   findings: string[];
@@ -63,7 +65,7 @@ export interface MemberDossier {
   notes: DossierNote[];
   /** Decay-free medals and marks earned from the record (see computeAchievements). */
   achievements: Achievement[];
-  /** Most recent per-commit code reviews, newest first. Empty without the App. */
+  /** Most recent reviews of pushes that were this member's work alone, newest first. */
   reviews: DossierReview[];
 
   narrative: string | null;

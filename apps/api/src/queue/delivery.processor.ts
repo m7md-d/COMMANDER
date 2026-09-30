@@ -10,7 +10,7 @@ import { findByFullName } from "@/modules/repositories/repositories.service.js";
 import { getDefaultPrompt, getPrompt } from "@/modules/prompts/prompts.service.js";
 import { getSettings } from "@/modules/settings/settings.service.js";
 import { recordPush } from "@/modules/stats/stats.service.js";
-import { reviewPushCommits } from "@/modules/dossier/review.service.js";
+import { reviewPush } from "@/modules/review/review.service.js";
 import { recordedShas } from "@/modules/dossier/dossier.ledger.js";
 import { composeReport, logRuleError } from "./report.pipeline.js";
 import { readChanges, refreshMeasurements, refreshTodos, refreshTree } from "./delivery.checks.js";
@@ -161,13 +161,15 @@ async function send(job: PrismaDelivery, kept: KeptReport): Promise<void> {
   if (!webhookUrl) return markSkipped(job.id, "discord_missing");
 
   const watcher = resolveWatcher(repository.watchers, kept.push.branch);
-  const [prompt, reviews] = await Promise.all([
+  const { push, event, violations, commendations, history, rewrites } = kept;
+  const fresh = kept.fresh ?? null;
+  const [prompt, review] = await Promise.all([
     // The branch's own persona when it names one, otherwise the repository's.
     resolvePrompt(watcher.promptId ?? repository.promptId),
-    reviewPushCommits(repository.id, kept.push.commits.map((commit) => commit.sha)).catch(() => []),
+    reviewPush({ repository, push, fresh: fresh ?? push.commits.map((commit) => commit.sha), settings }).catch(() => null),
   ]);
 
-  const { push, event, violations, commendations, history, rewrites } = kept;
-  const composed = await composeReport({ push, event, repository, settings, violations, commendations, history, watcher, prompt, reviews, rewrites });
+  const reported = { push, event, violations, commendations, history, rewrites, fresh };
+  const composed = await composeReport({ ...reported, repository, settings, watcher, prompt, review });
   await deliver({ job, webhookUrl, composed, violationCount: violations.length });
 }

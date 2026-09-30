@@ -49,6 +49,8 @@ const NONE: ReadonlySet<string> = new Set();
 test("pusherOf: whoever pushed — and nobody, for a push git never recorded the pusher of", () => {
   assert.equal(pusherOf(push([])), "omar");
   assert.equal(pusherOf(push([], { recovered: true })), null);
+  // Recovered, but GitHub's events timeline names who made it (D-22).
+  assert.equal(pusherOf(push([], { recovered: true, pushedBy: "lina" })), "lina");
 });
 
 test("judgeRules: the pusher's rules name the pusher, each author's rules that author", () => {

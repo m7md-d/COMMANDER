@@ -13,7 +13,7 @@ import {
   useUpdateRepository,
 } from "@/features/repositories/hooks";
 import { usePrompts } from "@/features/prompts/hooks";
-import { useSettings } from "@/features/settings/hooks";
+import { useSettings } from "@/shared/hooks/useSettings";
 import { Card } from "@/shared/components/Card";
 import { EmptyState } from "@/shared/components/EmptyState";
 import { QueryState } from "@/shared/components/QueryState";

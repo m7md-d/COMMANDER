@@ -46,7 +46,7 @@
   color: var(--color-accent-text);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  letter-spacing: 0.18em;
+  letter-spacing: calc(0.18em * var(--tracking));
   text-transform: uppercase;
 }
 
@@ -56,7 +56,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
-  letter-spacing: 0.01em;
+  letter-spacing: calc(0.01em * var(--tracking));
   overflow-wrap: anywhere;
 }
 
@@ -81,7 +81,7 @@
 .file-particulars dt {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
-  letter-spacing: 0.1em;
+  letter-spacing: calc(0.1em * var(--tracking));
   text-transform: uppercase;
 }
 

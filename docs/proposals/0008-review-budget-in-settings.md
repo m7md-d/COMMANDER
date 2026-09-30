@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **الحالة** | مرفوض |
-| **يمسّ** | `apps/api/src/modules/dossier/review.build.ts` · `packages/shared/src/contracts/settings.ts` · `apps/web/src/features/settings/` · الواجهة |
+| **يمسّ** | `apps/api/src/modules/review/review.build.ts` · `packages/shared/src/contracts/settings.ts` · `apps/web/src/features/settings/` · الواجهة |
 
 ## المشكلة
 

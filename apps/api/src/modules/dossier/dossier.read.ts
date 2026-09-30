@@ -72,11 +72,13 @@ function loadDossierRows(repositoryId: string, login: string) {
     // now of the credits beside them. Neither decays the way the score does.
     countByRule(repositoryId, login, "violation"),
     countByRule(repositoryId, login, "commendation"),
-    prisma.commitRecord.findMany({
-      where: { repositoryId, login, reviewedAt: { not: null } },
-      orderBy: { committedAt: "desc" },
+    // A push is filed under one member only when the work was theirs alone
+    // (`reviewTarget`): a review is not a charge, and is not handed to whoever merged.
+    prisma.pushReview.findMany({
+      where: { repositoryId, login },
+      orderBy: { reviewedAt: "desc" },
       take: 10,
-      select: { sha: true, title: true, committedAt: true, review: true },
+      select: { head: true, title: true, reviewedAt: true, review: true },
     }),
   ]).then(([row, member, files, notes, enrichedCount, ruleCountRows, credits, reviewRows]) => ({
     row,
@@ -100,22 +102,14 @@ function countByRule(repositoryId: string, login: string, kind: LedgerKind) {
   });
 }
 
-/**
- * A stored review is JSON, so its shape is asserted here; a verdict-less row
- * (an unresolvable sha, or output that was not valid JSON) simply drops out.
- */
+/** A stored review is JSON, so its shape is asserted here; a row that fails it drops out. */
 function mapReviews(
-  rows: { sha: string; title: string; committedAt: Date; review: unknown }[],
+  rows: { head: string; title: string; reviewedAt: Date; review: unknown }[],
 ): DossierReview[] {
   return rows.flatMap((record) => {
     const parsed = commitReviewSchema.safeParse(record.review);
     if (!parsed.success) return [];
-    return [{
-      sha: record.sha,
-      title: record.title,
-      committedAt: record.committedAt.toISOString(),
-      ...parsed.data,
-    }];
+    return [{ head: record.head, title: record.title, reviewedAt: record.reviewedAt.toISOString(), ...parsed.data }];
   });
 }
 

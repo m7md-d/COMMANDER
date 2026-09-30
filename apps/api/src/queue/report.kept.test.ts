@@ -32,6 +32,7 @@ const KEPT = keptReport({
     mainLine: true,
     violations: [{ ruleId: "direct_push", login: "sara", detail: { count: 1 } }],
     commendations: [{ ruleId: "file_lines", login: "lina", detail: { before: 210, after: 190 } }],
+    fresh: PUSH.commits.map((commit) => commit.sha),
   },
   history: { totalCommits: 3, totalPushes: 2, violationCounts: { direct_push: 1 } },
 });

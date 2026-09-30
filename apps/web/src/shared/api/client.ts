@@ -62,6 +62,30 @@ async function request<T>(run: () => Promise<{ data: ApiResponse<T> }>): Promise
   }
 }
 
+/**
+ * Whether a request that returns nothing succeeded. The server answers those
+ * with `204 No Content` — no body, so no envelope — or with an `ok` envelope.
+ * Read through `request`, an empty body is a failed envelope: deleting a front
+ * deleted it, and the panel showed an empty error and stayed on its page
+ * (docs/UI-DEFECTS.md W-23).
+ */
+export function answeredNothing(response: { status: number; data: unknown }): boolean {
+  if (response.status === 204) return true;
+  const { data } = response;
+  return typeof data === "object" && data !== null && "ok" in data && data.ok === true;
+}
+
+/** A request that returns nothing: success is `answeredNothing`, anything else an ApiError. */
+async function requestNothing(run: () => Promise<{ status: number; data: unknown }>): Promise<void> {
+  try {
+    const response = await run();
+    if (!answeredNothing(response)) throw new ApiError("error.unknown", response.status);
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw toApiError(error);
+  }
+}
+
 export const api = {
   get: <T>(url: string, params?: Record<string, unknown>) =>
     request<T>(() => http.get<ApiResponse<T>>(url, { params })),
@@ -75,6 +99,9 @@ export const api = {
     request<T>(() => http.patch<ApiResponse<T>>(url, body)),
 
   delete: <T>(url: string) => request<T>(() => http.delete<ApiResponse<T>>(url)),
+
+  /** A delete the server answers with nothing (`204`). */
+  remove: (url: string) => requestNothing(() => http.delete(url)),
 };
 
 export function isUnauthorized(error: unknown): boolean {

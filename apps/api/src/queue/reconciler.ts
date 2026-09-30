@@ -2,27 +2,30 @@
  * Recovers pushes that never reached the webhook because the server was offline
  * when they happened — nothing guarantees the host is awake, and GitHub gives up
  * on a delivery after a few retries (see docs/DEPLOY.md). For each watched
- * repository it asks GitHub for commits newer than the last one on record and
- * enqueues each branch's gap as one recovered push, so it flows through the
- * same pipeline as a live one.
+ * repository it asks GitHub for the commits of the lookback window that are not
+ * on record, and enqueues each branch's gap as one recovered push, so it flows
+ * through the same pipeline as a live one.
  *
  * Gated on the GitHub App: with no installation token there is no way to read a
  * repo's history, so without it this is a no-op and missed pushes stay missed.
  * Best-effort — it cannot see a branch deleted during downtime, nor history a
- * force push overwrote, and a front that watches every branch is read on its
- * default branch alone (see branchesToReconcile).
+ * force push overwrote. A branch is read only when its head moved since a pass
+ * last read it (see branchesToReconcile).
  */
 
-import { watchesEverything, type NormalizedPush } from "@commander/shared";
+import type { NormalizedPush } from "@commander/shared";
 import { prisma } from "@/db/prisma.js";
 import { createLogger, describeError } from "@/core/logger/logger.js";
 import { fromJson } from "@/core/json.js";
-import { RECONCILE_LOOKBACK_MS } from "@/config/constants.js";
 import { isGitHubAppConfigured } from "@/integrations/github/app-auth.js";
+import type { CommitListEntry } from "@/integrations/github/commits.client.js";
+import type { PushEventEntry } from "@/integrations/github/events.client.js";
 import { syncTree } from "@/modules/tree/tree.service.js";
 import { enqueue } from "./outbox.service.js";
-import { branchesToReconcile, recoveredPush, type BranchRead } from "./reconciler.mapper.js";
-import { readBranches, readDefaultBranch, readMissed } from "./reconciler.read.js";
+import { branchesToReconcile, readSince, recoveredPush, type BranchRead } from "./reconciler.mapper.js";
+import { forgetGone, loadLastRead, rememberRead } from "./reconciler.heads.js";
+import { pushedBy, splitByPusher } from "./reconciler.pushers.js";
+import { readBranches, readDefaultBranch, readMissed, readPushEvents, readTimeline } from "./reconciler.read.js";
 import { sweepMeasurements } from "./reconciler.sweep.js";
 
 const log = createLogger("reconciler");
@@ -32,6 +35,7 @@ interface RepoTarget {
   fullName: string;
   githubInstallationId: string;
   branches: string[];
+  createdAt: Date;
 }
 
 export async function reconcile(): Promise<void> {
@@ -39,7 +43,7 @@ export async function reconcile(): Promise<void> {
 
   const repos = await prisma.repository.findMany({
     where: { enabled: true, githubInstallationId: { not: "" } },
-    select: { id: true, fullName: true, githubInstallationId: true, branches: true },
+    select: { id: true, fullName: true, githubInstallationId: true, branches: true, createdAt: true },
   });
   if (repos.length === 0) return;
 
@@ -71,59 +75,66 @@ async function reconcileRepo(repo: RepoTarget): Promise<number> {
   const { reads, defaultBranch } = await resolveBranches(repo);
   if (reads.length === 0 || !defaultBranch) return 0;
 
-  const since = await computeSince(repo.id);
+  const since = new Date(readSince({ now: Date.now(), watchedSince: repo.createdAt.getTime() }));
+  // Asked once a pass, and only when some branch has a gap: most passes have none.
+  let events: Promise<PushEventEntry[]> | null = null;
+  const timeline = () => (events ??= readPushEvents(repo));
   let recovered = 0;
   for (const read of reads) {
-    recovered += await reconcileBranch({ ...repo, defaultBranch }, read, since);
+    recovered += await reconcileBranch({ ...repo, defaultBranch, timeline }, read, since);
   }
   return recovered;
 }
 
 /**
  * Which branches to read, and how, is `branchesToReconcile`'s decision. This
- * fetches what it needs: the default branch always — it is what every other
- * branch is read against — and the branch listing unless the front watches
- * every branch.
+ * fetches what it needs: the default branch — what every other branch is read
+ * against — each branch's head, and the head each had when last read.
  */
 async function resolveBranches(repo: RepoTarget): Promise<{ reads: BranchRead[]; defaultBranch: string | null }> {
-  const everything = watchesEverything(repo.branches);
-  const [defaultBranch, existing] = await Promise.all([
+  const [defaultBranch, existing, lastRead] = await Promise.all([
     readDefaultBranch(repo),
-    everything ? null : readBranches(repo),
+    readBranches(repo),
+    loadLastRead(repo.id),
   ]);
-  return { reads: branchesToReconcile({ watch: repo.branches, existing, defaultBranch }), defaultBranch };
+  if (existing) await forgetGone(repo.id, existing);
+  return { reads: branchesToReconcile({ watch: repo.branches, existing, lastRead, defaultBranch }), defaultBranch };
+}
+
+interface BranchTarget extends RepoTarget {
+  defaultBranch: string;
+  /** GitHub's push events, read on first need. */
+  timeline: () => Promise<PushEventEntry[]>;
+}
+
+async function reconcileBranch(repo: BranchTarget, read: BranchRead, since: Date): Promise<number> {
+  const listed = await readMissed(repo, read, since);
+  if (listed === null) return 0;
+
+  const recovered = await recover(repo, read.branch, listed);
+  // Only now: had the enqueue thrown, the branch is asked again next pass.
+  if (read.head) await rememberRead({ repositoryId: repo.id, branch: read.branch, sha: read.head });
+  return recovered;
 }
 
 /**
- * Where to start reading. The newest commit already on record is the cursor; a
- * lookback floor bounds a first run (or a long outage) so catch-up cannot replay
- * an unbounded backlog of reports. Overlaps a minute against clock skew — sha
- * dedup drops anything the overlap re-reads.
+ * The branch's gap, enqueued as the pushes that made it: each push GitHub's
+ * timeline shows, named by its pusher, and one naming nobody for the rest
+ * (`splitByPusher`).
  */
-async function computeSince(repositoryId: string): Promise<Date> {
-  const agg = await prisma.commitRecord.aggregate({
-    where: { repositoryId },
-    _max: { committedAt: true },
-  });
-  const floor = Date.now() - RECONCILE_LOOKBACK_MS;
-  const cursor = agg._max.committedAt?.getTime() ?? floor;
-  return new Date(Math.max(cursor - 60_000, floor));
-}
-
-async function reconcileBranch(repo: RepoTarget & { defaultBranch: string }, read: BranchRead, since: Date): Promise<number> {
-  const listed = await readMissed(repo, read, since);
-  if (listed.length === 0) return 0;
-
+async function recover(repo: BranchTarget, branch: string, listed: CommitListEntry[]): Promise<number> {
   const known = await knownShas(repo.id, listed.map((commit) => commit.sha));
-  const fresh = listed.filter((commit) => !known.has(commit.sha));
-  if (fresh.length === 0) return 0;
+  const gap = listed.filter((commit) => !known.has(commit.sha));
+  if (gap.length === 0) return 0;
 
-  const push = recoveredPush(repo, read.branch, fresh);
-  if (!push) return 0;
-  await enqueue({ occasion: { kind: "push", push }, repositoryId: repo.id });
+  const timeline = await readTimeline(repo, { events: await repo.timeline(), branch, gap });
+  for (const part of splitByPusher(gap, timeline)) {
+    const push = recoveredPush(repo, branch, part.commits);
+    if (push) await enqueue({ occasion: { kind: "push", push: pushedBy(push, part.pusher) }, repositoryId: repo.id });
+  }
 
-  log.info("recovered missed commits", { repo: repo.fullName, branch: read.branch, commits: fresh.length });
-  return fresh.length;
+  log.info("recovered missed commits", { repo: repo.fullName, branch, commits: gap.length, named: timeline.length });
+  return gap.length;
 }
 
 /**

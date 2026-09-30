@@ -24,7 +24,7 @@ checklist nobody starts.
 | A UI defect | The same order, logged in [docs/UI-DEFECTS.md](../../docs/UI-DEFECTS.md). Its test sits beside the code in `apps/web/src/` (`npm run test -w @commander/web`, Node's runner, no DOM — so pull the logic into a pure function the component calls), or is a guard in `tests/` when the rule is repo-wide. Then see the fix in a real browser: a test once passed on a W-11 fix that did not work |
 | A repo-wide invariant | A guard in `tests/`. Read [tests/README.md](../../tests/README.md) first — the five rules for writing one are there |
 | A number: limit, budget, threshold | [tests/lib/budgets.ts](../../tests/lib/budgets.ts) and nowhere else, so raising one is a reviewable diff on a single file |
-| A user-visible string | A key in `packages/shared/src/i18n/`, in **both** dictionaries |
+| A user-visible string | A key in `packages/shared/src/i18n/`, in **both** dictionaries: `ar.ts` and `en.ts` for what the panel shows, `ar.server.ts` and `en.server.ts` for what only the server reads — the model's instructions and the facts it is handed, which no browser downloads (ROADMAP 4.1) |
 
 If a guard fails, fix the code. Weaken a guard only when it is demonstrably wrong, and write
 the reason inside it. A guard turned off to make a diff green is worse than never having

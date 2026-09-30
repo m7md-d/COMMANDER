@@ -53,11 +53,32 @@ const scenarios: Scenario[] = [
       story.reconcile();
     },
     expect: charged("direct_push@sara"),
-    defect: {
-      observed: CLEAN,
-      because:
-        "A recovered push names no pusher: the push event is gone, and git records who wrote and who committed a commit, never who pushed it. Naming the author instead, as grouping by author did, charged Sara with Lina's push in contributors-branch-pushed-by-a-maintainer-webhook-lost. GitHub's events timeline names the actor of each push, and is not read (reconciler.mapper.ts recoveredPush, 0009 §4).",
+  },
+  {
+    // GitHub's events timeline lags by up to hours. Before it shows the push,
+    // nothing says who made it, and a guess is an accusation.
+    id: "reconciled-direct-push-before-the-timeline-shows-it",
+    title: "the same lost push, recovered before GitHub's events timeline shows it",
+    story: async (story) => {
+      await seed(story);
+      await work(story, { on: "main", by: SARA, commits: 2, width: 3 });
+      await story.push("main", SARA, { lost: true });
+      story.reconcile({ timelineBehind: true });
     },
+    expect: CLEAN,
+  },
+  {
+    id: "two-lost-pushes-by-two-hands",
+    title: "Sara and then Omar push straight to main, both webhooks lost; one reconciler pass",
+    story: async (story) => {
+      await seed(story);
+      await work(story, { on: "main", by: SARA, commits: 1, width: 2 });
+      await story.push("main", SARA, { lost: true });
+      await work(story, { on: "main", by: OMAR, commits: 1, width: 2 });
+      await story.push("main", OMAR, { lost: true });
+      story.reconcile();
+    },
+    expect: charged("direct_push@omar", "direct_push@sara"),
   },
   {
     // A pattern is not a branch the commits API can read; the reconciler matches
@@ -101,11 +122,6 @@ const scenarios: Scenario[] = [
       story.reconcile();
     },
     expect: charged("lazy_message@sara"),
-    defect: {
-      observed: CLEAN,
-      because:
-        "A front that watches every branch is reconciled on its default branch alone: reading them all costs a request per branch on every pass, stale ones included. A push lost anywhere else stays lost. A cost bound, chosen — reconciler.mapper.ts branchesToReconcile.",
-    },
   },
   {
     id: "lost-push-overtaken-by-a-later-one",
@@ -120,11 +136,6 @@ const scenarios: Scenario[] = [
       story.reconcile();
     },
     expect: charged("direct_push@sara", "lazy_message@sara"),
-    defect: {
-      observed: CLEAN,
-      because:
-        "The cursor is the newest commit on record anywhere in the repository. Omar's later push moved it past Sara's lost commits, so main is read from after them and even her 'wip' is never seen. Reading a branch back to the first commit on record, rather than by date, would not skip them (reconciler.ts computeSince) — and would recover them as a push naming no pusher, charging the 'wip' alone (reconciled-direct-push).",
-    },
   },
   {
     id: "merge-without-the-app",

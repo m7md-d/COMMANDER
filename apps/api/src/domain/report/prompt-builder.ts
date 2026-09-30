@@ -7,6 +7,7 @@ import {
   computeTone,
   t,
   type Commendation,
+  type CommitReview,
   type LocaleId,
   type NormalizedPush,
   type Gravity,
@@ -25,11 +26,11 @@ import {
   buildStructureBlock,
   buildViolationBlock,
   eventLine,
+  freshCommits,
   type Quote,
-  type ReviewedCommit,
 } from "./prompt-blocks.js";
 
-export { chargeLabel, creditLabel, praiseLabel, violationLabel, type ReviewedCommit } from "./prompt-blocks.js";
+export { chargeLabel, creditLabel, praiseLabel, violationLabel } from "./prompt-blocks.js";
 
 export interface MemberIdentity {
   displayName: string;
@@ -81,12 +82,15 @@ export interface PromptFacts {
   history: HistoryRecord;
   options: BuildOptions;
   project: ProjectProfile;
-  reviews: ReviewedCommit[];
+  /** The push's code review, or null when there is none (off, no App, the model failed). */
+  review: CommitReview | null;
   gravity: Gravity;
+  /** The shas the push brought the record (`Judgement.fresh`); null lists every commit. */
+  fresh: readonly string[] | null;
 }
 
 export function buildPromptValues(input: PromptFacts): PromptValues {
-  const { push, member, violations, history, options, project, reviews, gravity } = input;
+  const { push, member, violations, history, options, project, review, gravity } = input;
   const { locale } = options;
   const quote = { maxLength: options.quoteMaxLength, guardEnabled: options.injectionGuard };
 
@@ -104,14 +108,14 @@ export function buildPromptValues(input: PromptFacts): PromptValues {
   return {
     tone: t(locale, `tone.${tone.level}.guidance`, { repeats: tone.repeats }),
     branchGravity: t(locale, `gravity.${gravity}.guidance`, { branch: push.branch }),
-    codeReview: buildReviewBlock(reviews, locale, quote),
+    codeReview: buildReviewBlock(review, locale, quote),
     today: localDate(options.now, options.timezoneOffset),
     ...projectValues(project, locale, quote),
     ...identityValues({ push, member, locale, quote }),
     branch: push.branch,
-    commitCount: push.commits.length,
+    commitCount: freshCommits(input).length,
     event: eventLine(locale, input.event),
-    commits: buildCommitBlock(push, locale, quote),
+    commits: buildCommitBlock(input, locale, quote),
     violations: buildViolationBlock(violations, locale, addressee),
     commendations: buildCommendationBlock(input.commendations, locale, addressee),
     history: buildHistoryBlock(history.violationCounts, locale),

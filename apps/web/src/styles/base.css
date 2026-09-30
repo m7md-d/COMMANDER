@@ -41,7 +41,7 @@ h3,
 h4 {
   font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
-  letter-spacing: -0.01em;
+  letter-spacing: calc(-0.01em * var(--tracking));
 }
 
 h1 {

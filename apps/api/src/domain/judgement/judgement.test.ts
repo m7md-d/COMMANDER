@@ -287,3 +287,9 @@ test("with nowhere to send, a push is withheld — its charges stand, and silenc
   assert.notDeepEqual(unsent.violations, [], "what is found is recorded whether or not it is sent");
   assert.equal(judge({ hasChannel: false, silentWhenClean: true }).withheld, "clean_and_silent");
 });
+
+test("the judgement names the commits the push brought, and leaves what it carried out (0009 §7)", () => {
+  const judgement = judge({ push: push([commit("c1"), commit("c2")]), knownShas: new Set(["c1"]) });
+
+  assert.deepEqual(judgement.fresh, ["c2"]);
+});

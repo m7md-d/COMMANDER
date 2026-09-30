@@ -24,5 +24,5 @@ export const dossierApi = {
   addNote: (repositoryId: string, login: string, input: NoteInput) =>
     api.post<DossierNote>(`/dossiers/${repositoryId}/${login}/notes`, input),
 
-  deleteNote: (noteId: string) => api.delete<void>(`/dossiers/notes/${noteId}`),
+  deleteNote: (noteId: string) => api.remove(`/dossiers/notes/${noteId}`),
 };
